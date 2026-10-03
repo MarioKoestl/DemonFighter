@@ -148,6 +148,25 @@ C# 9 only (no record structs, no file-scoped namespaces). Private fields `_camel
 
 Levels (XP) grant allocatable stat points and, at thresholds, an evolution chosen from three options; each option grants a package of allocatable stat points plus free mutations and extra skills. Mutations (Biomass) grow and upgrade the body. Skills level by use, Skyrim style, with perks at skill level thresholds. All three apply to AI demons as well.
 
+### D-038: Unity packages for M0: Cinemachine 3.1.7 and Newtonsoft JSON 3.2.2; unused template packages removed
+
+Added `com.unity.cinemachine` 3.1.7 for the camera rig (D-013) and `com.unity.nuget.newtonsoft-json` 3.2.2 for run saves (D-026, D-036). Cinemachine brings `com.unity.splines` 2.0.0 and `com.unity.settings-manager` 1.0.3 as dependencies. Removed the template packages Visual Scripting, Multiplayer Center, Collab Proxy (Unity Version Control), Rider integration and Timeline: nothing in the design uses them, and fewer packages mean faster compiles and fewer surprises. Input System 1.20.0, Test Framework 1.6.0, uGUI 2.0.0, AI Navigation 2.0.14 and the built-in UI Toolkit module stay. Rules out: nothing; a removed package comes back by adding its name to `Packages/manifest.json`.
+
+### D-039: Test and analyzer libraries as DLLs: AwesomeAssertions 9.6.0, NSubstitute 6.2.0, Castle.Core 5.2.1, Microsoft.Unity.Analyzers 1.28.0
+
+Implements D-034. All four come from nuget.org and are committed as DLLs through Git LFS:
+
+- `Assets/_Project/Tests/Plugins/AwesomeAssertions.dll`: AwesomeAssertions 9.6.0, netstandard2.1 build, Apache-2.0. The maintained fork of FluentAssertions 7 with the same API; since version 9 its root namespace is `AwesomeAssertions`, so tests write `using AwesomeAssertions;`. Chosen over FluentAssertions 7.2.0 because the 7.x line is frozen; both are free.
+- `Assets/_Project/Tests/Plugins/NSubstitute.dll`: NSubstitute 6.2.0, netstandard2.0 build, BSD-3-Clause.
+- `Assets/_Project/Tests/Plugins/Castle.Core.dll`: Castle.Core 5.2.1, netstandard2.1 build, Apache-2.0. Required by NSubstitute.
+- `Assets/_Project/Analyzers/Microsoft.Unity.Analyzers.dll`: Microsoft.Unity.Analyzers 1.28.0, MIT. Built against Roslyn 3.11, so it loads in the Roslyn 4.3 compiler that Unity 6 ships.
+
+Import settings are enforced by `PluginImportRules` (an `AssetPostprocessor` in the Editor assembly) on every import and can be re-applied with `Demon Fighter > Setup > Configure Plugin Imports`. Test DLLs are editor-only with Auto Reference off and are listed as precompiled references of the test assembly. Castle.Core has reference validation off because it references `System.Diagnostics.EventLog`, which Unity does not ship and NSubstitute never calls. The analyzer has every platform disabled and carries the `RoslynAnalyzer` label; loaded as a normal plugin it would inject its `UnityEngine` type stubs into every compilation. Upgrading a library means replacing the DLL and this entry. Rules out: FluentAssertions 8 or newer (commercial license) and OpenUPM wrappers (another registry to trust).
+
+### D-040: `DemonFighter.Common` assembly for Unity-side helpers shared by all layers
+
+The `Log` helper from CODING_GUIDELINES must be reachable from Presentation, Input, UI and App, and no assembly in the original reference graph is referenced by all four. `DemonFighter.Common` holds Unity-side infrastructure without game rules (logging now, small shared adapters later) and is referenced by those four assemblies and by Editor. Simulation does not reference it, so the pure C# rule (D-006) is untouched. ARCHITECTURE.md lists it. Rules out: infrastructure types in Data, and a static logger inside the simulation.
+
 ## Open
 
 Each open item has a proposed default. Work proceeds with the default until Mario decides.

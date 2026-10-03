@@ -1,0 +1,21 @@
+{
+  "name": "DemonFighter.App",
+  "rootNamespace": "DemonFighter.App",
+  "references": [
+    "DemonFighter.Simulation",
+    "DemonFighter.Data",
+    "DemonFighter.Presentation",
+    "DemonFighter.Input",
+    "DemonFighter.UI",
+    "DemonFighter.Common"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

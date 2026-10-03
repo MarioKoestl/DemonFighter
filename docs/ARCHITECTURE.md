@@ -19,6 +19,7 @@ Each assembly is a Unity assembly definition (`.asmdef`). Think of them as separ
 Assets/_Project/
   Scripts/
     Simulation/      DemonFighter.Simulation        no UnityEngine, no Unity packages
+    Common/          DemonFighter.Common            Unity-side helpers without game rules (Log), see D-040
     Data/            DemonFighter.Data              ScriptableObject definitions, converts to Simulation specs
     Presentation/    DemonFighter.Presentation      views, animation, VFX, gore, camera, audio
     Input/           DemonFighter.Input             Unity Input System -> commands
@@ -28,6 +29,8 @@ Assets/_Project/
   Tests/
     Simulation/      DemonFighter.Simulation.Tests  EditMode, NUnit, fast
     PlayMode/        DemonFighter.PlayMode.Tests    PlayMode, needs scenes, slow
+    Plugins/         test library DLLs: AwesomeAssertions, NSubstitute, Castle.Core (D-039)
+  Analyzers/         Roslyn analyzer DLLs: Microsoft.Unity.Analyzers (D-039)
   Content/           ScriptableObject assets: BodyParts/, Skills/, Mutations/, Archetypes/, Biomes/, Catalog/
   Prefabs/           generated or hand-made prefabs
   Scenes/            Bootstrap.unity, MainMenu.unity, Run.unity
@@ -38,11 +41,12 @@ Assets/_Project/
 Reference graph:
 
 ```
-App -> Presentation, Input, UI, Data, Simulation
-Presentation -> Data, Simulation
-Input -> Simulation
-UI -> Data, Simulation
+App -> Presentation, Input, UI, Data, Simulation, Common
+Presentation -> Data, Simulation, Common
+Input -> Simulation, Common
+UI -> Data, Simulation, Common
 Data -> Simulation
+Common -> (UnityEngine only, no game rules)
 Simulation -> (nothing from Unity)
 Editor -> everything
 Tests -> the assembly under test (+ Simulation)

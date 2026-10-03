@@ -1,0 +1,16 @@
+{
+  "name": "DemonFighter.Data",
+  "rootNamespace": "DemonFighter.Data",
+  "references": [
+    "DemonFighter.Simulation"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -1,0 +1,19 @@
+{
+  "name": "DemonFighter.Presentation",
+  "rootNamespace": "DemonFighter.Presentation",
+  "references": [
+    "DemonFighter.Simulation",
+    "DemonFighter.Data",
+    "DemonFighter.Common",
+    "Unity.Cinemachine"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
