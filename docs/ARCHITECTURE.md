@@ -45,7 +45,7 @@ App -> Presentation, Input, UI, Data, Simulation, Common
 Presentation -> Data, Simulation, Common
 Input -> Simulation, Common
 UI -> Data, Simulation, Common
-Data -> Simulation
+Data -> Simulation, Common
 Common -> (UnityEngine only, no game rules)
 Simulation -> (nothing from Unity)
 Editor -> everything

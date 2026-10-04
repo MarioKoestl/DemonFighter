@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e200d38376f35a4db874514bb10ed9b, type: 3}
+  m_Name: DemonViewSettings
+  m_EditorClassIdentifier: DemonFighter.Presentation::DemonFighter.Presentation.Demons.DemonViewSettings
+  _gravity: -20
+  _groundStickSpeed: 2
+  _turnSpeedDegreesPerSecond: 540
+  _radiusPerMeter: 0.3
+  _stepOffsetPerMeter: 0.25
+  _skinWidthPerMeter: 0.04
+  _slopeLimitDegrees: 45

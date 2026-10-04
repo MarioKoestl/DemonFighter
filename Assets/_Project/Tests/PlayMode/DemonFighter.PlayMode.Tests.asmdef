@@ -5,7 +5,9 @@
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner",
     "DemonFighter.Simulation",
-    "DemonFighter.App"
+    "DemonFighter.App",
+    "DemonFighter.UI",
+    "DemonFighter.Presentation"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

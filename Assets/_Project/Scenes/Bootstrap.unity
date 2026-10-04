@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &1513407562
+--- !u!1 &676059765
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,8 +127,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1513407564}
-  - component: {fileID: 1513407563}
+  - component: {fileID: 676059767}
+  - component: {fileID: 676059766}
   m_Layer: 0
   m_Name: Bootstrapper
   m_TagString: Untagged
@@ -136,25 +136,27 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1513407563
+--- !u!114 &676059766
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1513407562}
+  m_GameObject: {fileID: 676059765}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7295a2e598aff124686b1b1c94fac4de, type: 3}
   m_Name: 
   m_EditorClassIdentifier: DemonFighter.App::DemonFighter.App.Bootstrapper
---- !u!4 &1513407564
+  _biome: {fileID: 11400000, guid: 8beec02103d5ce543bcb09f6de4e568b, type: 2}
+  _actions: {fileID: -944628639613478452, guid: 5d140ff6698a9284b8394a66168d3ec0, type: 3}
+--- !u!4 &676059767
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1513407562}
+  m_GameObject: {fileID: 676059765}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -167,4 +169,4 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1513407564}
+  - {fileID: 676059767}

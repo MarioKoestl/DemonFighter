@@ -4,7 +4,7 @@ Milestones are ordered. Each has acceptance criteria that Mario can check in Pla
 
 ## Current milestone
 
-**M0: Project setup.** All Claude Code items are done on branch `chore/m0-project-setup` (2026-10-04): packages, test libraries, analyzer, assemblies, generated scenes, composition root, simulation foundation with 44 EditMode tests and 1 PlayMode test, Input Actions asset, project settings. Open: the two Play Mode acceptance checks (Console without errors or warnings; Bootstrap opens MainMenu, New Run loads Run) are Mario's. Next: M1 walking skeleton.
+**M1: Walking skeleton.** M0 is merged and verified. All Claude Code items of M1 are done on branch `feat/m1-walking-skeleton` (2026-10-04): seeded cavern world with terrain mesh, walls, rocks, fissures, pools and bone piles; player capsule with WASD, mouse look and sprint; Cinemachine third and first person with V; ten wandering blobs and a patrolling elder through the same command path; HUD with seed; 113 EditMode and 2 PlayMode tests. Open: the five Play Mode acceptance checks are Mario's. Next: M2 combat, death and eating.
 
 (Claude Code: update this section when a milestone completes. Do not rewrite other sections without asking.)
 
@@ -35,24 +35,24 @@ Done by Claude Code:
 
 Acceptance:
 
-- [ ] Project opens with zero errors and zero warnings in the Console
+- [x] Project opens with zero errors and zero warnings in the Console
 - [x] `dotnet build DemonFighter.slnx` passes
 - [x] EditMode test passes in the Test Runner
-- [ ] Pressing Play in `Bootstrap.unity` loads `MainMenu.unity` and shows a "New Run" button that loads an empty `Run.unity`
+- [x] Pressing Play in `Bootstrap.unity` loads `MainMenu.unity` and shows a "New Run" button that loads an empty `Run.unity`
 
 ## M1: Walking skeleton (be in a 3D world and see other demons)
 
 Goal: the first thing Mario asked for. A seeded world you can walk through, with AI demons moving around in it, from both camera views.
 
-- [ ] `IWorldGenerator` produces a `WorldLayout` from a seed: heightfield with gentle variation and no terrain that needs jumping, cavern walls at the bounds, 40 to 80 rock features, 5 to 10 glowing fissures, 2 lava pools, 3 water pools, bone piles, a spawn cluster, one elder route loop
-- [ ] `WorldBuilder` builds terrain (Unity Terrain or a generated mesh, Claude Code decides and records it in DECISIONS.md), places primitive features with colliders, and sets up the glowing-ceiling ambient light plus emissive lava and fissures as the setting's light sources
-- [ ] Player demon as a capsule with `CharacterController`, WASD, mouse look, sprint placeholder (no stamina yet)
-- [ ] Cinemachine rig with third-person (default) and first-person cameras; V toggles; third-person shows the player capsule; camera distance reads the demon's size step
-- [ ] About 10 AI demons (capsules, different color) with a `UtilityBrain` that only knows `Wander` and `Rest`, moving through the same `MoveCommand` path as the player
-- [ ] One elder demon (large capsule, distinct color) walking its route, visible from spawn
-- [ ] HUD with placeholder Health, Stamina, Biomass, Level, Tier, seed
-- [ ] Seed shown on screen; same seed produces the same world (test)
-- [ ] EditMode tests: world generation is deterministic; AI wander produces commands; commands move entities
+- [x] `IWorldGenerator` produces a `WorldLayout` from a seed: heightfield with gentle variation and no terrain that needs jumping, cavern walls at the bounds, 40 to 80 rock features, 5 to 10 glowing fissures, 2 lava pools, 3 water pools, bone piles, a spawn cluster, one elder route loop
+- [x] `WorldBuilder` builds terrain (Unity Terrain or a generated mesh, Claude Code decides and records it in DECISIONS.md), places primitive features with colliders, and sets up the glowing-ceiling ambient light plus emissive lava and fissures as the setting's light sources
+- [x] Player demon as a capsule with `CharacterController`, WASD, mouse look, sprint placeholder (no stamina yet)
+- [x] Cinemachine rig with third-person (default) and first-person cameras; V toggles; third-person shows the player capsule; camera distance reads the demon's size step
+- [x] About 10 AI demons (capsules, different color) with a `UtilityBrain` that only knows `Wander` and `Rest`, moving through the same `MoveCommand` path as the player
+- [x] One elder demon (large capsule, distinct color) walking its route, visible from spawn
+- [x] HUD with placeholder Health, Stamina, Biomass, Level, Tier, seed
+- [x] Seed shown on screen; same seed produces the same world (test)
+- [x] EditMode tests: world generation is deterministic; AI wander produces commands; commands move entities
 
 Acceptance:
 

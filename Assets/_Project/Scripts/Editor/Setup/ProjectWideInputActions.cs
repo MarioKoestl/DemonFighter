@@ -12,7 +12,7 @@ namespace DemonFighter.Editor.Setup
     /// </summary>
     public static class ProjectWideInputActions
     {
-        private const string AssetPath = "Assets/_Project/Settings/DemonFighter.inputactions";
+        internal const string AssetPath = "Assets/_Project/Settings/DemonFighter.inputactions";
 
         [MenuItem("Demon Fighter/Setup/Assign Project-Wide Input Actions")]
         public static void Assign()

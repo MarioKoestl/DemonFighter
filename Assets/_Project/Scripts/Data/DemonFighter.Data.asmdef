@@ -2,7 +2,8 @@
   "name": "DemonFighter.Data",
   "rootNamespace": "DemonFighter.Data",
   "references": [
-    "DemonFighter.Simulation"
+    "DemonFighter.Simulation",
+    "DemonFighter.Common"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
