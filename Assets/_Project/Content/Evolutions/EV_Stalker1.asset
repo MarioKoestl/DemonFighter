@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 456dd76e25d58c74db5992596139d702, type: 3}
+  m_Name: EV_Stalker1
+  m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.EvolutionDefinition
+  _id: evolution.stalker.1
+  _displayName: Stalker
+  _description: Speed and senses. +10 Agility, Spines unlocked, Legs for free.
+  _stage: 1
+  _fitStatId: stat.agility
+  _statPoints: 0
+  _statBonuses:
+  - _statId: stat.agility
+    _value: 10
+  _statCapBonuses:
+  - _statId: stat.agility
+    _value: 5
+  _freeMutations:
+  - {fileID: 11400000, guid: 302ea2c3a8769c841997e940356b79e3, type: 2}
+  _unlockedParts:
+  - {fileID: 11400000, guid: 64b1a580dd46a0742b7392388de724e8, type: 2}
+  _extraSkills: []
+  _contentVersion: 2

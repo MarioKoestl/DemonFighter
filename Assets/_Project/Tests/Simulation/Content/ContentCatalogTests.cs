@@ -106,8 +106,9 @@ namespace DemonFighter.Simulation.Tests.Content
 
             int skills = catalog.Skills.Count;
 
-            skills.Should().Be(1);
-            catalog.BodyParts.Count.Should().Be(3);
+            skills.Should().Be(7);
+            catalog.Evolutions.Count.Should().Be(6);
+            catalog.BodyParts.Count.Should().Be(8);
             catalog.Demons.Count.Should().Be(2);
         }
     }

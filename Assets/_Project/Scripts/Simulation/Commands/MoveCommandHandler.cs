@@ -9,6 +9,8 @@ namespace DemonFighter.Simulation.Commands
     {
         internal const string UnknownActor = "Unknown actor";
         internal const string ActorDead = "Actor is dead";
+        internal const string Transforming = "Transforming";
+        internal const string Held = "Held";
 
         /// <inheritdoc />
         public CommandResult Handle(in MoveCommand command, RunState state)
@@ -21,6 +23,16 @@ namespace DemonFighter.Simulation.Commands
             if (!demon.IsAlive)
             {
                 return CommandResult.Rejected(ActorDead);
+            }
+
+            if (demon.IsTransforming(state.Tick))
+            {
+                return CommandResult.Rejected(Transforming);
+            }
+
+            if (demon.IsHeld(state.Tick))
+            {
+                return CommandResult.Rejected(Held);
             }
 
             demon.SetIntent(new MovementIntent(command.Direction, command.Sprint, command.Facing));

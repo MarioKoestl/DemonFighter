@@ -37,6 +37,7 @@ namespace DemonFighter.Simulation.Tests.Combat
             Events.Subscribe<XpGained>(XpGains.Add);
             Events.Subscribe<LevelUp>(LevelUps.Add);
             Events.Subscribe<StatPointSpent>(StatSpends.Add);
+            Events.Subscribe<DemonHeld>(Held.Add);
         }
 
         public RunState State { get; }
@@ -79,6 +80,8 @@ namespace DemonFighter.Simulation.Tests.Combat
 
         public List<StatPointSpent> StatSpends { get; } = new List<StatPointSpent>();
 
+        public List<DemonHeld> Held { get; } = new List<DemonHeld>();
+
         public DamageSystem DamageSystem => Ticker.Damage;
 
         /// <summary>The damage events one attacker caused; bleeding reports with no attacker are left out.</summary>
@@ -104,7 +107,13 @@ namespace DemonFighter.Simulation.Tests.Combat
         /// <summary>Starts Bite for the attacker and ticks into its active window.</summary>
         public SkillActivated StartBiteAndReachActiveWindow()
         {
-            Submit(new UseSkillCommand(Attacker.Id, TestContent.BiteId));
+            return StartSkillAndReachActiveWindow(TestContent.BiteId);
+        }
+
+        /// <summary>Starts any skill for the attacker and ticks into its active window.</summary>
+        public SkillActivated StartSkillAndReachActiveWindow(string skillId)
+        {
+            Submit(new UseSkillCommand(Attacker.Id, skillId));
             Tick(1);
             SkillActivated activation = Activations[Activations.Count - 1];
             while (State.Tick < activation.ActiveFromTick)

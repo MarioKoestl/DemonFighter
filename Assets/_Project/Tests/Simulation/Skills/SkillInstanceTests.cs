@@ -14,7 +14,7 @@ namespace DemonFighter.Simulation.Tests.Skills
         [Test]
         public void Constructor_Always_StartsAtLevelOneWithFullCost()
         {
-            var skill = new SkillInstance(TestContent.Bite, 0);
+            var skill = new SkillInstance(TestContent.Bite);
 
             int level = skill.Level;
 
@@ -27,7 +27,7 @@ namespace DemonFighter.Simulation.Tests.Skills
         [Test]
         public void GainXp_BaseXp_ReachesLevelTwoAndCheapensTheSkill()
         {
-            var skill = new SkillInstance(TestContent.Bite, 0);
+            var skill = new SkillInstance(TestContent.Bite);
 
             int gained = skill.GainXp(100f);
 
@@ -42,7 +42,7 @@ namespace DemonFighter.Simulation.Tests.Skills
         public void GainXp_HugeAmount_StopsAtTheMaxLevel()
         {
             SkillSpec capped = TestContent.Bite with { LevelCurve = new SkillLevelCurve { MaxLevel = 3 } };
-            var skill = new SkillInstance(capped, 0);
+            var skill = new SkillInstance(capped);
 
             skill.GainXp(100000f);
 
@@ -53,7 +53,7 @@ namespace DemonFighter.Simulation.Tests.Skills
         public void StaminaCost_ManyLevels_NeverDropsBelowTheFloor()
         {
             SkillSpec cheap = TestContent.Bite with { StaminaCostReductionPerLevel = 0.5f, LevelCurve = new SkillLevelCurve { BaseXp = 1f, Exponent = 0f } };
-            var skill = new SkillInstance(cheap, 0);
+            var skill = new SkillInstance(cheap);
             skill.GainXp(50f);
 
             float cost = skill.StaminaCost;
@@ -64,7 +64,7 @@ namespace DemonFighter.Simulation.Tests.Skills
         [Test]
         public void StartCooldown_Always_IsOnCooldownUntilTheTick()
         {
-            var skill = new SkillInstance(TestContent.Bite, 0);
+            var skill = new SkillInstance(TestContent.Bite);
 
             skill.StartCooldown(12);
 

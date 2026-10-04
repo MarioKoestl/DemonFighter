@@ -18,6 +18,36 @@ MonoBehaviour:
   _maxHp: 100
   _defense: 0
   _fate: 1
+  _maxUpgrade: 0
   _grantedSkills:
   - {fileID: 11400000, guid: cef99d5b6e0d04b4187e63be439d52c4, type: 2}
+  _statBonusesPerLevel: []
+  _skillDamageBonusesPerLevel: []
+  _moveSpeedBonus: 0
+  _perceptionBonus: 0
+  _returnDamageFraction: 0
+  _sockets:
+  - _kind: 1
+    _capacity: 2
+  - _kind: 2
+    _capacity: 2
+  - _kind: 3
+    _capacity: 1
+  - _kind: 4
+    _capacity: 1
+  - _kind: 5
+    _capacity: 1
   _biomassValue: 20
+  _biomassCost: 0
+  _minLevel: 1
+  _repeatMinLevel: 1
+  _requiredParts: []
+  _requiresUnlock: 0
+  _visual:
+    _kind: 0
+    _material: 0
+    _localPosition: {x: 0, y: 0, z: 0}
+    _localScale: {x: 1, y: 1, z: 1}
+    _localEuler: {x: 0, y: 0, z: 0}
+    _mirrorSecondCopy: 0
+  _contentVersion: 3

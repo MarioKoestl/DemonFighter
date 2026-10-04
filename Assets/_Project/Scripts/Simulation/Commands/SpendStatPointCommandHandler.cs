@@ -14,6 +14,7 @@ namespace DemonFighter.Simulation.Commands
         internal const string ActorDead = "Actor is dead";
         internal const string UnknownStat = "Unknown stat";
         internal const string NoPoints = "No unspent stat points";
+        internal const string AtCap = "Stat is at its cap";
 
         private readonly SimulationEvents _events;
 
@@ -38,6 +39,11 @@ namespace DemonFighter.Simulation.Commands
             if (!demon.Stats.Has(command.Stat))
             {
                 return CommandResult.Rejected(UnknownStat);
+            }
+
+            if (demon.Stats.Get(command.Stat) >= demon.StatCap(command.Stat))
+            {
+                return CommandResult.Rejected(AtCap);
             }
 
             if (!demon.Stats.TrySpendPoint(command.Stat))

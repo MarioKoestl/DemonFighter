@@ -31,7 +31,7 @@ namespace DemonFighter.Simulation.Ai
             for (int i = 0; i < _brains.Count; i++)
             {
                 UtilityBrain brain = _brains[i];
-                if (!brain.Demon.IsAlive)
+                if (!brain.Demon.IsAlive || brain.Demon.IsTransforming(tick) || brain.Demon.IsHeld(tick))
                 {
                     continue;
                 }

@@ -148,7 +148,7 @@ namespace DemonFighter.Simulation.Tests.Commands
 
             skills.Should().Be(1);
             scenario.Attacker.FindSkill(TestContent.BiteId).Should().NotBeNull();
-            scenario.Attacker.FindSkill(TestContent.BiteId)!.GrantedByPartIndex.Should().Be(scenario.Attacker.Body.Core.Index);
+            scenario.Attacker.FindSkill(TestContent.BiteId)!.IsGrantedBy(scenario.Attacker.Body).Should().BeTrue();
         }
     }
 }

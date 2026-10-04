@@ -31,14 +31,26 @@ MonoBehaviour:
   _killXpBase: 50
   _rewardBonusPerTierAbove: 0.5
   _rewardFactorFarBelow: 0.1
-  _levelXpBase: 100
-  _levelXpExponent: 1.5
+  _levelXpBase: 30
+  _levelXpExponent: 1.2
   _statPointsPerLevel: 3
   _characterXpPerSkillXp: 0.5
   _eatBiomassPerSecond: 15
   _eatReachPerMeter: 1.5
   _corpseBiomassPerTier: 20
   _foodDecaySeconds: 90
+  _tierInvestmentStep: 4
+  _sizeStepPerTier: 0.5
+  _partHpPerUpgradeLevel: 0.15
+  _transformationSeconds: 2
+  _repeatCostMultiplier: 1.5
+  _upgradeCostFraction: 0.5
+  _regrowCostFraction: 0.5
+  _characterLevelPerUpgradeLevel: 2
+  _knockbackSeconds: 0.3
+  _firstEvolutionLevel: 5
+  _secondEvolutionLevel: 10
+  _baseStatCap: 10
   _stats:
   - _id: stat.strength
     _name: Strength

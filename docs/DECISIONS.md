@@ -218,13 +218,73 @@ A hit makes the attacker the prey of its victim on the next decision, overriding
 
 A spawn stage spawns one Tier 0 demon per `RespawnSeconds` (biome data, 12 s) while fewer live than `InitialBlobs`, between `RespawnMinDistance` and `RespawnMaxDistance` from the player, inside the bounds and clear of features, with a brain and a `DemonSpawned` event the App layer answers with a body. Pulled forward from M4 because the arena emptied within minutes; the threat level that scales spawns over time stays an M4 item. Rules out: a run that ends because nothing is left to fight.
 
+### D-054: Tier and size follow body investment and evolutions
+
+Tier is the spawn tier plus the evolutions taken plus one per `TierInvestmentStep` (4) investment points, where every part beyond the core, lost or not, counts one point and every upgrade level one more. Size is the spawn size grown by `SizeStepPerTier` (50 percent of the spawn size) per tier gained, so a 1.2 m blob with four parts stands 1.8 m tall and an evolved one 2.4 m. The view, the `CharacterController` and the camera framing read the size; the HUD shows tier and size. Rules out: tiers as hand-assigned content labels, and parts that change the tier without changing the body.
+
+### D-055: Mutation costs, requirements, sockets and the menu flow (resolves O-001 for v1)
+
+The core has sockets with capacities (Head 2, Limb 2, Locomotion 1, Hide 1, Tail 1); a part occupies one slot of its socket kind and a lost part keeps its slot until it is regrown. Costs in Biomass: the base cost of the part (Eyes 20, Jaws 25, Arm 30, Legs 40, hides and Tail 35), a further copy of a part the body already holds costs `RepeatCostMultiplier` (1.5) times that, an upgrade costs `UpgradeCostFraction` (one half) of the base per level reached, a regrow `RegrowCostFraction` (one half) of the base. Requirements: a character level per part (`MinLevel`, for example Legs 2, Tail 4) and per repeat copy (`RepeatMinLevel`, second Arm 3), upgrade level n needs character level 2n (`CharacterLevelPerUpgradeLevel`), parts can require other parts, and Plates, Elastic Tissue, Spines and Tail need an evolution unlock. Upgrades go to +5 (the core cannot be upgraded); a level adds `PartHpPerUpgradeLevel` (15 percent) of the base HP and one more helping of the stat and skill bonuses of the part. The menu: Tab opens the mutation menu on Mutate, C on Stats, any menu key closes it; opening pauses the run; a confirmed mutation or evolution closes the menu, resumes the run and the command applies on the next tick; Apply in the Stats tab spends through commands while paused and keeps the menu open. The shop (`ShopOfferPolicy`) lists every attach, upgrade and regrow with cost and the reason a confirm is disabled; `RandomOfferPolicy` offers a hand of three for the M4 playtest. Rules out: free sockets without limits, upgrades past +5, and a menu that confirms while the world keeps moving.
+
+### D-056: The v1 skill set, its slots and passive Sprint
+
+One key per slot, resolved through `SkillSlots.Find` from the skills the attached parts grant, highest priority wins: left mouse Primary (Bite, Claw with priority 1 replaces it), right mouse Secondary (Grab), Space Lunge, Q Tail Swing, Shift Sprint. Claw: 8 Cut, 10 stamina, 0.1 s windup, 0.15 s active, 0.25 s recovery, 0.4 s cooldown, 4 s of bleeding at 3 per second. Grab: 20 stamina, 4 s cooldown, holds a smaller target for 1.5 s; a held demon ignores its own commands and the AI skips it. Lunge: 10 Blunt, 25 stamina, 3 s cooldown, a 4 m dash during the active window, 2 m of knockback over `KnockbackSeconds` (0.3 s) scaled by the size ratio, 0.5 s of stagger. Tail Swing: 14 Blunt in a 150 degree arc, 20 stamina, 2 s cooldown, 0.6 s of stagger. Sprint is a passive skill granted by Legs: while the sprint flag of the move command is set and at least one stamina is left it drains 15 stamina per second and earns 2 skill XP per second; Legs also add 50 percent movement speed. Skill XP for hits is scaled by the reward factor of the target tier; half of every skill XP gain is character XP (D-049). Rules out: a key that does nothing because a skill is bound to it by name, and sprinting without legs.
+
+### D-057: Skill progression numbers and one perk per skill (resolves O-011)
+
+Per skill level above one: damage plus `DamageBonusPerLevel` (5 percent), stamina cost minus 3 percent down to half, cooldown minus 2 percent down to half, windup, active and recovery 2 percent faster, reach plus 1 percent; the curve is 100 XP times the level to the power of 1.5, max level 20. At level 10 every skill gains its one perk as data on the spec (`SkillPerkSpec`, multipliers only): Deep Bite (bleed lasts half again as long), Quick Claw (recovery a quarter shorter), Iron Grip (hold 2 s), Long Leap (dash a quarter farther), Tireless (sprint costs 30 percent less), Heavy Tail (stagger half again as long). Levels freeze while the granting part is lost and return with it; a skill an evolution grants has no part to lose. Rules out: perks as code branches, and perk trees before playtests ask for them.
+
+### D-058: Spines return damage; Eyes extend perception and reach
+
+Spines (Hide socket, unlock) deal `ReturnDamageFraction` (30 percent) of every melee hit taken back to the attacker as plain Pierce on its core; the returned damage never returns again, so two spined demons cannot chain. Eyes (Head socket, 20 Biomass) add `PerceptionBonus` (30 percent) to the perception radius of an AI demon and, through `Demon.ReachMultiplier`, 30 percent to the reach of every hit and of eating for any demon; Presentation uses the same factor for its aim and eat scans, so what the crosshair accepts the simulation accepts. The Spines mechanic was offered as a decision and accepted; GAME_DESIGN names Eyes without an effect, and this is it. Rules out: thorns that scale with armor or chain, and sensory parts without a gameplay effect.
+
+### D-059: Evolution lines, thresholds and packages in v1 (resolves O-009)
+
+Thresholds at character level 5 and 10 (`EvolutionLevels`); each stage offers the three lines, ordered by how many points the demon has in the fit stat of the line: Brute (Strength; 6 then 8 stat points, Strength cap +5 per stage, unlocks Plates and Tail, Thick Hide free, later Jaws free), Stalker (Agility; 4 then 6 points, Agility cap +5, unlocks Spines, Legs free, later Eyes free), Bulwark (Constitution; 5 then 7 points, Constitution cap +5, unlocks Plates and Elastic Tissue, Elastic Tissue free, later Spines unlocked). Stat caps start at `BaseStatCap` (10) and only evolutions raise them; a free part is attached only when a socket is free and otherwise skipped. Evolving follows the calm rule and the 2 second transformation of D-014, raises the tier by one and with it the size (D-054). AI demons do not evolve or mutate yet; that is the M4 ecosystem work. Rules out: evolution options generated at random, and caps that mutations can raise.
+
+### D-060: The out-of-combat rule for mutating and evolving is suspended (Mario)
+
+Opening the mutation menu and finding every button disabled because a fight had just happened felt wrong in the first M3 playtest. Until a better rule is found, `MutationRules.CanMutateNow` asks only for a living demon that is not transforming; the menu pause and the 2 second invulnerable transformation of D-014 stay. Known consequence: a mutation started in a fight buys 2 seconds of invulnerability, which D-014 wanted to rule out; the replacement rule (candidates: a vulnerable transformation, a Biomass surcharge in combat, a cooldown after taking damage) has to close that. Supersedes the combat clause of D-014; `InCombatSeconds` stays for the AI.
+
+### D-061: A grabbed demon is dragged along by its holder (Mario)
+
+Grab rooted its target; Mario wants to take it with him. The hold stores the grab spot in the frame of the holder, pulled in until the two bodies touch, and `HoldSystem` pushes the held demon toward that spot every tick, at most 12 m/s, until the hold ends, either side dies or the holder is gone. The held demon still ignores its own commands and the AI skips it. Rules out: a hold that only roots the target, and a holder slowed by what it drags (not for now).
+
+### D-062: Playtest leveling pace
+
+The tuning asset now asks 30 XP times the level to the power of 1.2 for the next level (was 100 and 1.5): level 5 after about 370 XP, roughly five Tier 0 kills with their bites, level 10 after about 1900 XP. The `CombatTuning` record keeps the old numbers as the test baseline; the asset is the truth for the game and the `CombatTuningDefinition` defaults match the asset. Revisit with the threat level in M4.
+
+### D-063: The body preview is a second camera on a stage below the world
+
+The Mutate tab shows the own body as a live render: `BodyPreviewRig` builds the prefab capsule and the same part primitives the world uses from a body the menu composes (own parts plus the offers toggled to Preview), on a stage 500 m below the world on a Preview layer only its own camera sees, into a RenderTexture the menu shows as a background image; fog is switched off for the frames of that camera. Chosen over a UI-drawn silhouette because it reuses the part visuals one to one and shows the real result of a purchase, including the size step. Rules out: a second copy of the visual data for the menu.
+
+### D-064: Mutations are selected together and applied at once (Mario)
+
+Like the Stats tab, the Mutate tab is a planner: offers are selected, the preview shows them on the body, the footer sums the cost against the Biomass, and one Apply sends every selected mutation as its own `MutateCommand` in the same tick, new parts first. The menu refuses a selection the Biomass or the free sockets could not carry; the simulation still validates every command. Mutations that start in the same tick share one transformation: `MutationRules.CanMutateNow` lets a mutation join a transformation that began this very tick, so a batch reshapes the body once for 2 seconds. Rules out: a batch command type, and one transformation per bought part.
+
+### D-065: Grab holds anything no bigger than you; the aim marks the part under the crosshair (Mario)
+
+Grab refused demons of equal size, so a blob could never grab a blob and the skill looked dead in the playtest; now only a bigger demon shrugs it off. The part under the crosshair of the player, within eight body heights (stretched by the senses), is tinted gold on the body and named under the crosshair together with the kind and tier of its owner, and "out of reach" when the primary attack would not land from here, so aiming a bite at an arm, a leg or the core is a visible choice (D-027). Hit reports and the marker read the same reach rule (`SkillReach`). A hit that deals no damage, such as a grab, draws no blood. Rules out: a grab that needs a size advantage, and aiming blind.
+
+### D-066: Analyze key and sense levels (Mario)
+
+F locks the demon under the crosshair; a panel then shows what the senses of the player reveal, and the lock drops when the target dies or F is pressed again. The sense level is the perception bonus of the body divided by `PerceptionPerSenseLevel` (0.3, so one pair of Eyes is one level): level 0 shows the parts and visible wounds, level 1 adds the health of every part, bleeding and the skills the parts grant with their levels, level 2 adds level, stats, evolutions and the Biomass the corpse would hold. This is what Eyes and later sensory parts are for beyond reach and AI perception. Rules out: a target panel that shows everything to everyone.
+
+### D-067: Evolution packages give bound stat gains, not a free pool (Mario)
+
+An evolution gives a specific number of points to specific stats (`StatBonuses`): Brute +10 Strength, Stalker +10 Agility, Bulwark +10 Constitution at stage one; stage two adds +10 of the line stat and +5 of a second one (Brute Constitution, Stalker Strength, Bulwark Agility). A bound gain raises the stat and its cap by the same amount, so it always fits; the separate cap bonus of +5 stays as headroom for level points. The free pool (`StatPoints`) stays in the data at zero. The free parts and unlocks remain the special mutations of each package; Bulwark two now gives Legs for free. The six evolution assets are rewritten once by the generator (content version 2). Supersedes the free-pool default of O-009 and D-059. Rules out: evolutions that only hand out points to spend.
+
+### D-068: Body blood dries (Mario)
+
+Blood blobs stuck to a body stayed until the pool reused them, so a healed demon still wore every old hit. A body blob now lives 15 seconds, shrinks away over the last third of that and goes back to the pool; ground pools stay until the pool reuses them, the trail of a fight. Look only, nothing in the simulation. Rules out: blood that outlives the wound.
+
 ## Open
 
 Each open item has a proposed default. Work proceeds with the default until Mario decides.
 
 ### O-001: Mutation offers: shop (A) or three random offers (B)
 
-Default: A for v1. Implemented behind `IMutationOfferPolicy`; B gets a playtest in M4.
+Default: A for v1. Implemented behind `IMutationOfferPolicy`; B gets a playtest in M4. Resolved in M3 for v1: A, see D-055; B exists as `RandomOfferPolicy` for the M4 playtest.
 
 ### O-002: Run end conditions beyond death
 
@@ -256,11 +316,11 @@ Default: player content reaches about Tier 3, roughly 3 meters. Elder sizes exis
 
 ### O-009: Evolution thresholds, option count and package shape in v1
 
-Default: Level 5 and Level 10, three options each; each option's stat pool is fully free to allocate, with an option-specific size and caps. The evolution lines (for example Brute, Stalker), their packages and names are Mario's call when the content is written in M3.
+Default: Level 5 and Level 10, three options each; each option's stat pool is fully free to allocate, with an option-specific size and caps. The evolution lines (for example Brute, Stalker), their packages and names are Mario's call when the content is written in M3. Resolved in M3: Brute, Stalker and Bulwark, see D-059; their stat gains became bound in the playtest, see D-067.
 
 ### O-011: Skill perks in v1
 
-Default: one perk per skill at skill level 10, defined as data on the `SkillSpec`. More perks and branching later.
+Default: one perk per skill at skill level 10, defined as data on the `SkillSpec`. More perks and branching later. Resolved in M3: see D-057.
 
 ### O-010: Chrysalis demon evolution lines as inspiration
 

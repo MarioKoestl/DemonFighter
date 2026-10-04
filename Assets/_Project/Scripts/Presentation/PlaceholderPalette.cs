@@ -24,6 +24,8 @@ namespace DemonFighter.Presentation
         [SerializeField] private Material _corpse = null!;
         [SerializeField] private Material _blood = null!;
         [SerializeField] private Material _maw = null!;
+        [SerializeField] private Material _eye = null!;
+        [SerializeField] private Material _plate = null!;
 
         public Material Ground => _ground;
 
@@ -47,6 +49,12 @@ namespace DemonFighter.Presentation
 
         /// <summary>The snout that marks the front of every placeholder demon.</summary>
         public Material Maw => _maw;
+
+        /// <summary>Eyes on a placeholder body.</summary>
+        public Material Eye => _eye;
+
+        /// <summary>Plates and spines: dark, hard, a little metallic.</summary>
+        public Material Plate => _plate;
 
         /// <summary>Picks the material for a demon: teal for the player, by tier for AI, near black for elders.</summary>
         public Material ForDemon(Demon demon)
@@ -77,7 +85,9 @@ namespace DemonFighter.Presentation
             Material elder,
             Material corpse,
             Material blood,
-            Material maw)
+            Material maw,
+            Material eye,
+            Material plate)
         {
             _ground = ground;
             _wall = wall;
@@ -92,6 +102,8 @@ namespace DemonFighter.Presentation
             _corpse = corpse;
             _blood = blood;
             _maw = maw;
+            _eye = eye;
+            _plate = plate;
         }
     }
 }

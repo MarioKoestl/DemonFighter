@@ -36,6 +36,9 @@ namespace DemonFighter.Simulation.Anatomy
 
         public BodyPartSpec Spec { get; }
 
+        /// <summary>Upgrade level from 0 to the spec maximum; raises max HP and every bonus of the part.</summary>
+        public int UpgradeLevel { get; private set; }
+
         /// <summary>Hit points after Constitution scaling.</summary>
         public float MaxHp { get; private set; }
 
@@ -141,6 +144,33 @@ namespace DemonFighter.Simulation.Anatomy
             }
 
             return drain;
+        }
+
+        /// <summary>Sets the upgrade level and the max HP that comes with it; health keeps its fraction.</summary>
+        internal void SetUpgrade(int level, float newMaxHp)
+        {
+            if (level < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(level), level, "Upgrade levels are never negative.");
+            }
+
+            UpgradeLevel = level;
+            Rescale(newMaxHp);
+        }
+
+        /// <summary>Brings a lost part back at full health with no open wounds.</summary>
+        internal void Regrow(float newMaxHp)
+        {
+            if (newMaxHp <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(newMaxHp), newMaxHp, "A part needs positive HP.");
+            }
+
+            IsLost = false;
+            MaxHp = newMaxHp;
+            Hp = newMaxHp;
+            BleedSecondsLeft = 0f;
+            BleedDamagePerSecond = 0f;
         }
 
         /// <summary>Changes the maximum after a Constitution change, keeping the same fraction of health.</summary>

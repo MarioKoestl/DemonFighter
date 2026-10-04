@@ -1,8 +1,10 @@
 #nullable enable
 using System;
+using DemonFighter.Data;
 using DemonFighter.Simulation;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Events;
+using DemonFighter.Simulation.Mutation;
 using DemonFighter.Simulation.Worldgen;
 using UnityEngine.InputSystem;
 
@@ -21,6 +23,8 @@ namespace DemonFighter.App
             BiomeSpec biome,
             IWorldGenerator worldGenerator,
             ContentCatalog catalog,
+            ContentCatalogDefinition catalogDefinition,
+            IMutationOfferPolicy offerPolicy,
             InputActionAsset actions)
         {
             SimulationConfig = simulationConfig ?? throw new ArgumentNullException(nameof(simulationConfig));
@@ -28,6 +32,8 @@ namespace DemonFighter.App
             Biome = biome ?? throw new ArgumentNullException(nameof(biome));
             WorldGenerator = worldGenerator ?? throw new ArgumentNullException(nameof(worldGenerator));
             Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+            CatalogDefinition = catalogDefinition != null ? catalogDefinition : throw new ArgumentNullException(nameof(catalogDefinition));
+            OfferPolicy = offerPolicy ?? throw new ArgumentNullException(nameof(offerPolicy));
             Actions = actions != null ? actions : throw new ArgumentNullException(nameof(actions));
         }
 
@@ -45,6 +51,12 @@ namespace DemonFighter.App
 
         /// <summary>Every spec the simulation can refer to, built once from the catalog asset.</summary>
         public ContentCatalog Catalog { get; }
+
+        /// <summary>The catalog asset itself; views read the placeholder visuals of parts from its definitions.</summary>
+        public ContentCatalogDefinition CatalogDefinition { get; }
+
+        /// <summary>Which mutations the menu lists: the shop in v1 (GAME_DESIGN, "Mutation").</summary>
+        public IMutationOfferPolicy OfferPolicy { get; }
 
         /// <summary>The input actions asset the player input adapter reads.</summary>
         public InputActionAsset Actions { get; }

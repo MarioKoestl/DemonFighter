@@ -39,10 +39,11 @@ namespace DemonFighter.Simulation.Tests
         public void MaxSpeed_Sprinting_AppliesTheSprintMultiplier()
         {
             Demon demon = new DemonBuilder().SpawnInto(new RunStateBuilder().Build());
+            demon.AttachPart(TestContent.Legs);
 
             demon.SetIntent(new MovementIntent(new Vector2(1f, 0f), sprint: true));
 
-            float expected = DemonBuilder.Blob.MoveSpeed * DemonBuilder.Blob.SprintMultiplier;
+            float expected = DemonBuilder.Blob.MoveSpeed * DemonBuilder.Blob.SprintMultiplier * (1f + TestContent.Legs.MoveSpeedBonus);
             demon.MaxSpeed.Should().BeApproximately(expected, Tolerance);
         }
 

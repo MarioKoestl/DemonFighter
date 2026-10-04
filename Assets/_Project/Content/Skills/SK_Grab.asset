@@ -1,0 +1,62 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 966119decc932194986e3617df286d22, type: 3}
+  m_Name: SK_Grab
+  m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.SkillDefinition
+  _id: skill.grab
+  _displayName: Grab
+  _behaviourId: grab
+  _inputSlot: 2
+  _slotPriority: 0
+  _isPassive: 0
+  _enablesSprint: 0
+  _damageType: 2
+  _baseDamage: 0
+  _staminaCost: 20
+  _staminaCostPerSecond: 0
+  _reachPerMeter: 1.4
+  _arcDegrees: 70
+  _bleedSeconds: 0
+  _bleedDamagePerSecond: 2
+  _staggerSeconds: 0
+  _holdSeconds: 1.5
+  _dashMeters: 0
+  _knockbackMeters: 0
+  _windupSeconds: 0.15
+  _activeSeconds: 0.2
+  _recoverySeconds: 0.35
+  _cooldownSeconds: 4
+  _skillXpPerHit: 10
+  _skillXpPerSecond: 0
+  _levelBaseXp: 100
+  _levelExponent: 1.5
+  _maxLevel: 20
+  _damageBonusPerLevel: 0.05
+  _staminaCostReductionPerLevel: 0.03
+  _minStaminaCostFraction: 0.5
+  _cooldownReductionPerLevel: 0.02
+  _minCooldownFraction: 0.5
+  _speedBonusPerLevel: 0.02
+  _reachBonusPerLevel: 0.01
+  _perk:
+    _enabled: 1
+    _level: 10
+    _name: Iron Grip
+    _description: Grab holds for two seconds.
+    _damageMultiplier: 1
+    _bleedDurationMultiplier: 1
+    _recoveryMultiplier: 1
+    _cooldownMultiplier: 1
+    _staminaMultiplier: 1
+    _reachMultiplier: 1
+    _effectMultiplier: 1.3333334
+  _contentVersion: 3

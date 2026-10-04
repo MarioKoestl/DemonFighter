@@ -29,6 +29,7 @@ namespace DemonFighter.Presentation.Cameras
         private DemonView? _target;
         private float _yawDegrees;
         private float _pitchDegrees;
+        private float _appliedSize;
 
         /// <inheritdoc />
         public float YawRadians => _yawDegrees * Mathf.Deg2Rad;
@@ -52,14 +53,10 @@ namespace DemonFighter.Presentation.Cameras
             _target = target;
             _settings = settings != null ? settings : throw new ArgumentNullException(nameof(settings));
 
-            float size = target.Demon.SizeMeters;
-            Vector3 lookOffset = Vector3.up * (size * settings.LookHeightPerMeter);
             _thirdPerson.Target.TrackingTarget = target.transform;
             _thirdPerson.Target.CustomLookAtTarget = false;
-            _orbit.Radius = settings.OrbitRadiusBase + size * settings.OrbitRadiusPerMeter;
-            _orbit.TargetOffset = lookOffset;
             _orbit.VerticalAxis.Range = new Vector2(settings.PitchMinDegrees, settings.PitchMaxDegrees);
-            _composer.TargetOffset = lookOffset;
+            ApplyFraming(target.Demon.SizeMeters);
             _brain.DefaultBlend = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, settings.BlendSeconds);
 
             _yawDegrees = WrapDegrees(target.transform.eulerAngles.y);
@@ -95,7 +92,27 @@ namespace DemonFighter.Presentation.Cameras
                 return;
             }
 
+            if (_target.Demon != null && !Mathf.Approximately(_target.Demon.SizeMeters, _appliedSize))
+            {
+                ApplyFraming(_target.Demon.SizeMeters);
+            }
+
             ApplyAxes();
+        }
+
+        // Orbit radius and look height follow the body size (D-018), also when the demon grows mid-run.
+        private void ApplyFraming(float size)
+        {
+            if (_settings == null)
+            {
+                return;
+            }
+
+            _appliedSize = size;
+            Vector3 lookOffset = Vector3.up * (size * _settings.LookHeightPerMeter);
+            _orbit.Radius = _settings.OrbitRadiusBase + size * _settings.OrbitRadiusPerMeter;
+            _orbit.TargetOffset = lookOffset;
+            _composer.TargetOffset = lookOffset;
         }
 
         private void ApplyAxes()

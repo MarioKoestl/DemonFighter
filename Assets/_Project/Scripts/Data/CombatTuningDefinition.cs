@@ -39,8 +39,9 @@ namespace DemonFighter.Data
         [SerializeField] private float _killXpBase = 50f;
         [SerializeField] private float _rewardBonusPerTierAbove = 0.5f;
         [SerializeField] private float _rewardFactorFarBelow = 0.1f;
-        [SerializeField] private float _levelXpBase = 100f;
-        [SerializeField] private float _levelXpExponent = 1.5f;
+        // Playtest pace (D-062): a level comes quicker than with the design baseline the CombatTuning record keeps.
+        [SerializeField] private float _levelXpBase = 30f;
+        [SerializeField] private float _levelXpExponent = 1.2f;
         [SerializeField] private int _statPointsPerLevel = 3;
         [SerializeField] private float _characterXpPerSkillXp = 0.5f;
 
@@ -49,6 +50,25 @@ namespace DemonFighter.Data
         [SerializeField] private float _eatReachPerMeter = 1.5f;
         [SerializeField] private float _corpseBiomassPerTier = 20f;
         [SerializeField] private float _foodDecaySeconds = 90f;
+
+        [Header("Body")]
+        [SerializeField] private int _tierInvestmentStep = 4;
+        [SerializeField] private float _sizeStepPerTier = 0.5f;
+        [SerializeField] private float _partHpPerUpgradeLevel = 0.15f;
+
+        [Header("Mutation")]
+        [SerializeField] private float _transformationSeconds = 2f;
+        [SerializeField] private float _repeatCostMultiplier = 1.5f;
+        [SerializeField] private float _upgradeCostFraction = 0.5f;
+        [SerializeField] private float _regrowCostFraction = 0.5f;
+        [SerializeField] private int _characterLevelPerUpgradeLevel = 2;
+        [SerializeField] private float _knockbackSeconds = 0.3f;
+
+        [Header("Evolution")]
+        [SerializeField] private int _firstEvolutionLevel = 5;
+        [SerializeField] private int _secondEvolutionLevel = 10;
+        [SerializeField] private int _baseStatCap = 10;
+        [SerializeField] private float _perceptionPerSenseLevel = 0.3f;
 
         [Header("Stats")]
         [SerializeField] private StatDefinition[] _stats = Array.Empty<StatDefinition>();
@@ -91,6 +111,18 @@ namespace DemonFighter.Data
                 EatReachPerMeter = _eatReachPerMeter,
                 CorpseBiomassPerTier = _corpseBiomassPerTier,
                 FoodDecaySeconds = _foodDecaySeconds,
+                TierInvestmentStep = _tierInvestmentStep,
+                SizeStepPerTier = _sizeStepPerTier,
+                PartHpPerUpgradeLevel = _partHpPerUpgradeLevel,
+                TransformationSeconds = _transformationSeconds,
+                RepeatCostMultiplier = _repeatCostMultiplier,
+                UpgradeCostFraction = _upgradeCostFraction,
+                RegrowCostFraction = _regrowCostFraction,
+                CharacterLevelPerUpgradeLevel = _characterLevelPerUpgradeLevel,
+                KnockbackSeconds = _knockbackSeconds,
+                EvolutionLevels = new[] { _firstEvolutionLevel, _secondEvolutionLevel },
+                BaseStatCap = _baseStatCap,
+                PerceptionPerSenseLevel = _perceptionPerSenseLevel,
                 Stats = stats,
             };
             tuning.Validate();
@@ -126,6 +158,19 @@ namespace DemonFighter.Data
             _eatReachPerMeter = spec.EatReachPerMeter;
             _corpseBiomassPerTier = spec.CorpseBiomassPerTier;
             _foodDecaySeconds = spec.FoodDecaySeconds;
+            _tierInvestmentStep = spec.TierInvestmentStep;
+            _sizeStepPerTier = spec.SizeStepPerTier;
+            _partHpPerUpgradeLevel = spec.PartHpPerUpgradeLevel;
+            _transformationSeconds = spec.TransformationSeconds;
+            _repeatCostMultiplier = spec.RepeatCostMultiplier;
+            _upgradeCostFraction = spec.UpgradeCostFraction;
+            _regrowCostFraction = spec.RegrowCostFraction;
+            _characterLevelPerUpgradeLevel = spec.CharacterLevelPerUpgradeLevel;
+            _knockbackSeconds = spec.KnockbackSeconds;
+            _firstEvolutionLevel = spec.EvolutionLevels.Count > 0 ? spec.EvolutionLevels[0] : 5;
+            _secondEvolutionLevel = spec.EvolutionLevels.Count > 1 ? spec.EvolutionLevels[1] : 10;
+            _baseStatCap = spec.BaseStatCap;
+            _perceptionPerSenseLevel = spec.PerceptionPerSenseLevel;
             _stats = new StatDefinition[spec.Stats.Count];
             for (int i = 0; i < _stats.Length; i++)
             {

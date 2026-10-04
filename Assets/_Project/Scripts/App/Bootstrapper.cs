@@ -4,6 +4,7 @@ using DemonFighter.Common;
 using DemonFighter.Data;
 using DemonFighter.Simulation;
 using DemonFighter.Simulation.Events;
+using DemonFighter.Simulation.Mutation;
 using DemonFighter.Simulation.Worldgen;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -41,6 +42,8 @@ namespace DemonFighter.App
                     _biome.ToSpec(),
                     new CavernWorldGenerator(),
                     _catalog.Build(),
+                    _catalog,
+                    new ShopOfferPolicy(),
                     _actions);
                 _runController = new RunController(services);
                 _sceneFlow = new SceneFlow(_runController);

@@ -361,26 +361,39 @@ namespace DemonFighter.Simulation.Ai
             Vector2 toPrey = Planar(prey.Position - Demon.Position);
             float distance = toPrey.Length();
             Vector2 facing = distance > 0f ? toPrey / distance : Demon.FacingDirection;
-            SkillInstance? skill = PickAttack();
-            float reach = skill != null
-                ? skill.Spec.ReachPerMeter * Demon.SizeMeters + prey.SizeMeters * TargetRadiusPerMeter
+            SkillInstance? strike = PickStrike();
+            float reach = strike != null
+                ? strike.Spec.ReachPerMeter * Demon.SizeMeters + prey.SizeMeters * TargetRadiusPerMeter
                 : Archetype.ArriveDistance;
             if (distance > reach)
             {
+                // Out of reach: a leap closes the gap when the body has one, otherwise walk.
+                SkillInstance? dash = PickDash();
+                if (dash != null && distance <= reach + dash.Spec.DashMeters && CanUse(dash, state.Tick))
+                {
+                    commands.Submit(new MoveCommand(Demon.Id, Vector2.Zero, sprint: false, facing));
+                    commands.Submit(new UseSkillCommand(Demon.Id, dash.Spec.Id));
+                    return;
+                }
+
                 commands.Submit(new MoveCommand(Demon.Id, facing, sprint: false));
                 return;
             }
 
-            // In reach: stand, face the prey and bite whenever the skill allows. The view detects the hit itself.
+            // In reach: stand, face the prey and strike whenever the skill allows. The view detects the hit itself.
             commands.Submit(new MoveCommand(Demon.Id, Vector2.Zero, sprint: false, facing));
-            if (skill != null
-                && Demon.CurrentSkillUse == null
-                && !skill.IsOnCooldown(state.Tick)
-                && !Demon.IsStaggered(state.Tick)
-                && Demon.Stamina >= skill.StaminaCost)
+            if (strike != null && CanUse(strike, state.Tick))
             {
-                commands.Submit(new UseSkillCommand(Demon.Id, skill.Spec.Id));
+                commands.Submit(new UseSkillCommand(Demon.Id, strike.Spec.Id));
             }
+        }
+
+        private bool CanUse(SkillInstance skill, long tick)
+        {
+            return Demon.CurrentSkillUse == null
+                && !skill.IsOnCooldown(tick)
+                && !Demon.IsStaggered(tick)
+                && Demon.Stamina >= skill.StaminaCost;
         }
 
         private void ActEat(RunState state, CommandQueue commands)
@@ -417,13 +430,34 @@ namespace DemonFighter.Simulation.Ai
             commands.Submit(new MoveCommand(Demon.Id, direction, sprint));
         }
 
-        // The first skill the body still grants; choosing between several skills comes with M3.
-        private SkillInstance? PickAttack()
+        // The hardest granted strike that is no leap and no mere hold; Grab is a combo tool the AI leaves to the player.
+        private SkillInstance? PickStrike()
+        {
+            SkillInstance? best = null;
+            IReadOnlyList<SkillInstance> skills = Demon.Skills;
+            for (int i = 0; i < skills.Count; i++)
+            {
+                SkillInstance skill = skills[i];
+                if (skill.Spec.IsPassive || skill.Spec.DashMeters > 0f || skill.Spec.BaseDamage <= 0f || !skill.IsGrantedBy(Demon.Body))
+                {
+                    continue;
+                }
+
+                if (best == null || skill.Spec.BaseDamage > best.Spec.BaseDamage)
+                {
+                    best = skill;
+                }
+            }
+
+            return best;
+        }
+
+        private SkillInstance? PickDash()
         {
             IReadOnlyList<SkillInstance> skills = Demon.Skills;
             for (int i = 0; i < skills.Count; i++)
             {
-                if (skills[i].IsGrantedBy(Demon.Body))
+                if (!skills[i].Spec.IsPassive && skills[i].Spec.DashMeters > 0f && skills[i].IsGrantedBy(Demon.Body))
                 {
                     return skills[i];
                 }

@@ -6,6 +6,7 @@ using AwesomeAssertions;
 using DemonFighter.Simulation.Commands;
 using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Tests.Builders;
+using DemonFighter.Simulation.Tests.Content;
 using NUnit.Framework;
 
 namespace DemonFighter.Simulation.Tests.Movement
@@ -51,6 +52,8 @@ namespace DemonFighter.Simulation.Tests.Movement
             RunState state = new RunStateBuilder().Build();
             Demon walker = new DemonBuilder().SpawnInto(state);
             Demon sprinter = new DemonBuilder().SpawnInto(state);
+            walker.AttachPart(TestContent.Legs);
+            sprinter.AttachPart(TestContent.Legs);
             var ticker = new SimulationTicker(state, new SimulationEvents());
             ticker.Commands.Submit(new MoveCommand(walker.Id, new Vector2(0f, 1f), sprint: false));
             ticker.Commands.Submit(new MoveCommand(sprinter.Id, new Vector2(0f, 1f), sprint: true));

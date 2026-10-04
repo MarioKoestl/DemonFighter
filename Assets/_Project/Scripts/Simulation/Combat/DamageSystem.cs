@@ -39,29 +39,41 @@ namespace DemonFighter.Simulation.Combat
                 throw new ArgumentOutOfRangeException(nameof(skillLevel), skillLevel, "Skill levels start at 1.");
             }
 
-            if (!target.IsAlive || part.IsLost)
+            if (!target.IsAlive || part.IsLost || target.IsTransforming(_state.Tick))
             {
                 return;
             }
 
-            float levelBonus = 1f + skill.DamageBonusPerLevel * (skillLevel - 1);
+            SkillPerkSpec? perk = skill.PerkAt(skillLevel);
+            float levelBonus = (1f + skill.DamageBonusPerLevel * (skillLevel - 1)) * (perk != null ? perk.DamageMultiplier : 1f);
             float armor = Tuning.Multiplier(skill.DamageType, target.Body.EffectiveDefense(part));
-            float amount = skill.BaseDamage * levelBonus * attacker.Derived.DamageMultiplier * armor;
+            float partBonus = 1f + attacker.Body.SkillDamageBonus(skill.Id);
+            float amount = skill.BaseDamage * levelBonus * partBonus * attacker.Derived.DamageMultiplier * armor;
             bool alive = ApplyDamage(target, part, amount, skill.DamageType, attacker.Id);
+
+            // Spines give a share of the hit back as Pierce (D-058); plain damage, so thorns never chain.
+            float thorns = target.Body.ReturnDamageFraction;
+            if (thorns > 0f && attacker.IsAlive)
+            {
+                ApplyDamage(attacker, attacker.Body.Core, amount * thorns, DamageType.Pierce, target.Id);
+            }
+
             if (!alive)
             {
                 return;
             }
 
-            if (skill.BleedSeconds > 0f && !part.IsLost)
+            float bleedSeconds = skill.BleedSeconds * (perk != null ? perk.BleedDurationMultiplier : 1f);
+            if (bleedSeconds > 0f && !part.IsLost)
             {
-                part.StartBleeding(skill.BleedSeconds * target.Derived.BleedDurationFactor, skill.BleedDamagePerSecond, skill.DamageType);
+                part.StartBleeding(bleedSeconds * target.Derived.BleedDurationFactor, skill.BleedDamagePerSecond, skill.DamageType);
             }
 
             // Blunt hits interrupt actions (GAME_DESIGN, "Stagger"): the running skill is lost, the stamina stays spent.
-            if (skill.StaggerSeconds > 0f)
+            float staggerSeconds = skill.StaggerSeconds * (perk != null ? perk.EffectMultiplier : 1f);
+            if (staggerSeconds > 0f)
             {
-                target.Stagger(_state.Tick + _state.Config.TicksFor(skill.StaggerSeconds));
+                target.Stagger(_state.Tick + _state.Config.TicksFor(staggerSeconds));
                 target.ClearSkillUse();
             }
         }
@@ -82,7 +94,8 @@ namespace DemonFighter.Simulation.Combat
                 throw new ArgumentNullException(nameof(part));
             }
 
-            if (!target.IsAlive || part.IsLost || amount <= 0f)
+            // A transforming body is invulnerable (D-014); the time is short and the menu cannot be opened in combat.
+            if (!target.IsAlive || part.IsLost || amount <= 0f || target.IsTransforming(_state.Tick))
             {
                 return target.IsAlive;
             }

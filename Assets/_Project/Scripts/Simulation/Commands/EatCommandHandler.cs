@@ -13,6 +13,8 @@ namespace DemonFighter.Simulation.Commands
         internal const string UnknownActor = "Unknown actor";
         internal const string ActorDead = "Actor is dead";
         internal const string Staggered = "Staggered";
+        internal const string Transforming = "Transforming";
+        internal const string Held = "Held";
         internal const string Busy = "Busy with a skill";
         internal const string UnknownFood = "No such food";
         internal const string OutOfReach = "Out of reach";
@@ -30,6 +32,16 @@ namespace DemonFighter.Simulation.Commands
                 return CommandResult.Rejected(ActorDead);
             }
 
+            if (demon.IsTransforming(state.Tick))
+            {
+                return CommandResult.Rejected(Transforming);
+            }
+
+            if (demon.IsHeld(state.Tick))
+            {
+                return CommandResult.Rejected(Held);
+            }
+
             if (demon.IsStaggered(state.Tick))
             {
                 return CommandResult.Rejected(Staggered);
@@ -45,7 +57,7 @@ namespace DemonFighter.Simulation.Commands
                 return CommandResult.Rejected(UnknownFood);
             }
 
-            float reach = state.Catalog.Tuning.EatReachPerMeter * demon.SizeMeters;
+            float reach = state.Catalog.Tuning.EatReachPerMeter * demon.SizeMeters * demon.ReachMultiplier;
             Vector3 offset = food.Position - demon.Position;
             if (new Vector2(offset.X, offset.Z).Length() > reach)
             {

@@ -11,14 +11,13 @@ using UnityEngine.UIElements;
 namespace DemonFighter.UI
 {
     /// <summary>
-    /// The Stats tab of the mutation menu (GAME_DESIGN, "Mutation"), reachable with C. Points are planned first with
-    /// plus and minus per stat, a preview shows what the plan would change, and Apply commits every planned point at
-    /// once; nothing is spent before Apply. The panel only raises the requests; the simulation applies them and the
-    /// panel reads the result back from the demon. Built in code like the other screens until M5 moves styling to USS.
+    /// The Stats tab of the mutation menu (GAME_DESIGN, "Mutation"). Points are planned first with plus and minus per
+    /// stat, a preview shows what the plan would change, and Apply commits every planned point at once; nothing is
+    /// spent before Apply. Caps from evolutions bound every stat. The panel only raises the requests; the simulation
+    /// applies them and the panel reads the result back from the demon. Built in code until M5 moves styling to USS.
     /// </summary>
     public sealed class StatsPanel
     {
-        private static readonly Color Background = new Color(0.05f, 0.02f, 0.02f, 0.92f);
         private static readonly Color TitleColor = new Color(0.8f, 0.1f, 0.1f);
         private static readonly Color ValueColor = new Color(0.95f, 0.8f, 0.3f);
         private static readonly Color PlanColor = new Color(0.4f, 0.9f, 0.4f);
@@ -36,19 +35,9 @@ namespace DemonFighter.UI
         {
             _tuning = tuning ?? throw new ArgumentNullException(nameof(tuning));
             Root = new VisualElement { name = "stats-panel" };
-            Root.style.position = Position.Absolute;
-            Root.style.left = Length.Percent(50f);
-            Root.style.top = Length.Percent(50f);
-            Root.style.translate = new Translate(Length.Percent(-50f), Length.Percent(-50f));
-            Root.style.width = 640;
-            Root.style.paddingLeft = 24;
-            Root.style.paddingRight = 24;
-            Root.style.paddingTop = 16;
-            Root.style.paddingBottom = 16;
-            Root.style.backgroundColor = Background;
 
             var title = new Label("STATS") { name = "title" };
-            title.style.fontSize = 32;
+            title.style.fontSize = 28;
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
             title.style.color = TitleColor;
             title.style.marginBottom = 8;
@@ -100,12 +89,6 @@ namespace DemonFighter.UI
             buttons.Add(_reset);
             buttons.Add(_apply);
             Root.Add(buttons);
-
-            var hint = new Label("C closes the panel; an unapplied plan is dropped") { name = "hint" };
-            hint.style.fontSize = 16;
-            hint.style.color = MutedText;
-            hint.style.marginTop = 12;
-            Root.Add(hint);
             SetVisible(false);
         }
 
@@ -114,7 +97,7 @@ namespace DemonFighter.UI
         /// <summary>Raised once per planned point when Apply is clicked.</summary>
         public event Action<StatId>? SpendRequested;
 
-        /// <summary>The element to add to the HUD.</summary>
+        /// <summary>The element to add to the menu.</summary>
         public VisualElement Root { get; }
 
         /// <summary>True while the panel is shown.</summary>
@@ -146,7 +129,7 @@ namespace DemonFighter.UI
             }
         }
 
-        /// <summary>Reads the current values and points from the demon and recomputes the preview.</summary>
+        /// <summary>Reads the current values, caps and points from the demon and recomputes the preview.</summary>
         public void Refresh(Demon demon)
         {
             if (demon == null)
@@ -172,10 +155,11 @@ namespace DemonFighter.UI
             {
                 StatRow row = _rows[i];
                 int current = demon.Stats.Has(row.Id) ? demon.Stats.Get(row.Id) : 0;
-                row.Value.text = current.ToString(CultureInfo.InvariantCulture);
+                int cap = demon.StatCap(row.Id);
+                row.Value.text = current.ToString(CultureInfo.InvariantCulture) + " / " + cap.ToString(CultureInfo.InvariantCulture);
                 row.Plan.text = row.Planned > 0 ? "+" + row.Planned : string.Empty;
                 row.Minus.SetEnabled(row.Planned > 0);
-                row.Plus.SetEnabled(planned < unspent);
+                row.Plus.SetEnabled(planned < unspent && current + row.Planned < cap);
             }
 
             _apply.text = planned > 0 ? "Apply " + planned + (planned == 1 ? " point" : " points") : "Apply";
@@ -190,7 +174,7 @@ namespace DemonFighter.UI
             DerivedStats next = current;
             if (hasPlan)
             {
-                BaseStats planned = demon.Stats;
+                BaseStats planned = demon.EffectiveStats();
                 for (int i = 0; i < _rows.Count; i++)
                 {
                     if (_rows[i].Planned > 0 && planned.Has(_rows[i].Id))
@@ -267,9 +251,9 @@ namespace DemonFighter.UI
             name.style.fontSize = 22;
             name.style.color = Color.white;
 
-            var value = new Label("0");
-            value.style.width = 40;
-            value.style.fontSize = 22;
+            var value = new Label("0 / 10");
+            value.style.width = 80;
+            value.style.fontSize = 20;
             value.style.color = ValueColor;
             value.style.unityTextAlign = TextAnchor.MiddleRight;
 
