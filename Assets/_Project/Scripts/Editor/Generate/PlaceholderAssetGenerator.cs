@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections.Generic;
 using System.IO;
 using DemonFighter.Common;
 using DemonFighter.Data;
@@ -16,9 +17,10 @@ namespace DemonFighter.Editor.Generate
 {
     /// <summary>
     /// Creates the primitive-stage assets from code so they can be regenerated after a change (ASSET_PIPELINE): the
-    /// URP materials, the palette that maps roles to them, the settings assets, the first content assets (core,
-    /// Bite, two demon kinds, combat tuning, the ash cavern biome) and the demon prefab, then rebuilds the content
-    /// catalog. Materials are rewritten every run; every other asset is created once and keeps its Inspector values.
+    /// URP materials, the palette that maps roles to them, the settings assets, the content assets (parts, skills,
+    /// evolutions, two demon kinds, combat tuning, the ash cavern biome) and the demon prefab, then rebuilds the
+    /// content catalog. Materials are rewritten every run; every other asset is created once and keeps its Inspector
+    /// values, except that assets from an earlier milestone receive the fields a later one added, once.
     /// Public because the -executeMethod command line switch of Unity has to find it.
     /// </summary>
     public static class PlaceholderAssetGenerator
@@ -39,8 +41,7 @@ namespace DemonFighter.Editor.Generate
         private const string BodyPartsFolder = ContentFolder + "/BodyParts";
         private const string SkillsFolder = ContentFolder + "/Skills";
         private const string DemonsFolder = ContentFolder + "/Demons";
-        private const string CorePartPath = BodyPartsFolder + "/BP_Core.asset";
-        private const string BiteSkillPath = SkillsFolder + "/SK_Bite.asset";
+        private const string EvolutionsFolder = ContentFolder + "/Evolutions";
         private const string BlobDemonPath = DemonsFolder + "/DM_Blob.asset";
         private const string ElderDemonPath = DemonsFolder + "/DM_Elder.asset";
         private const string CombatTuningPath = ContentCatalogRebuilder.CatalogFolder + "/CombatTuning.asset";
@@ -54,20 +55,6 @@ namespace DemonFighter.Editor.Generate
         private static readonly Vector3 SnoutLocalPosition = new Vector3(0f, 0.3f, 0.45f);
         private static readonly Vector3 SnoutLocalScale = new Vector3(0.45f, 0.3f, 0.35f);
 
-        // The first content: the blob is born as this core, which grants Bite (GAME_DESIGN, "The run").
-        private static readonly SkillSpec BiteSpec = new SkillSpec { Id = "skill.bite", Name = "Bite" };
-
-        private static readonly BodyPartSpec CoreSpec = new BodyPartSpec
-        {
-            Id = "part.core",
-            Name = "Core",
-            Socket = SocketKind.Core,
-            MaxHp = 100f,
-            Fate = PartFate.Destroyed,
-            GrantedSkillIds = new[] { BiteSpec.Id },
-            BiomassValue = 20f,
-        };
-
         [MenuItem(MenuPath)]
         public static void Generate()
         {
@@ -78,6 +65,7 @@ namespace DemonFighter.Editor.Generate
             EditorAssets.EnsureFolder(BodyPartsFolder);
             EditorAssets.EnsureFolder(SkillsFolder);
             EditorAssets.EnsureFolder(DemonsFolder);
+            EditorAssets.EnsureFolder(EvolutionsFolder);
             EditorAssets.EnsureFolder(ContentCatalogRebuilder.CatalogFolder);
 
             PlaceholderPalette palette = GenerateMaterials();
@@ -114,19 +102,73 @@ namespace DemonFighter.Editor.Generate
             Material corpse = Lit("M_Corpse", new Color(0.13f, 0.09f, 0.08f), 0.2f);
             Material blood = Lit("M_Blood", new Color(0.28f, 0.01f, 0.01f), 0.65f);
             Material maw = Lit("M_DemonMaw", new Color(0.35f, 0.03f, 0.03f), 0.3f);
+            Material eye = Lit("M_Eye", new Color(0.9f, 0.88f, 0.8f), 0.7f);
+            Material plate = Lit("M_Plate", new Color(0.2f, 0.2f, 0.22f), 0.55f);
 
             PlaceholderPalette palette = EditorAssets.LoadOrCreate<PlaceholderPalette>(PalettePath);
-            palette.SetMaterials(ground, wall, rock, fissure, lava, water, bone, player, tiers, elder, corpse, blood, maw);
+            palette.SetMaterials(ground, wall, rock, fissure, lava, water, bone, player, tiers, elder, corpse, blood, maw, eye, plate);
             EditorUtility.SetDirty(palette);
             return palette;
         }
 
-        // Each asset is initialized from the spec defaults once; afterwards the asset is the truth.
+        // Each asset is initialized from its spec once; afterwards the asset is the truth. Parts are created in the
+        // order of PlaceholderContent so a part that requires another finds it, and M2 assets get the M3 fields once.
         private static void GenerateContent()
         {
-            SkillDefinition bite = EditorAssets.LoadOrCreate<SkillDefinition>(BiteSkillPath, skill => skill.Configure(BiteSpec));
-            BodyPartDefinition core = EditorAssets.LoadOrCreate<BodyPartDefinition>(CorePartPath, part => part.Configure(CoreSpec, new[] { bite }));
+            var skills = new Dictionary<string, SkillDefinition>();
+            foreach (SkillSpec spec in PlaceholderContent.Skills)
+            {
+                SkillDefinition skill = EditorAssets.LoadOrCreate<SkillDefinition>(SkillsFolder + "/SK_" + FileName(spec.Name) + ".asset", s => s.Configure(spec));
+                if (skill.NeedsM3Defaults)
+                {
+                    skill.ApplyM3Defaults(spec);
+                    EditorUtility.SetDirty(skill);
+                }
+
+                skills[spec.Id] = skill;
+            }
+
+            var parts = new Dictionary<string, BodyPartDefinition>();
+            foreach (BodyPartSpec spec in PlaceholderContent.Parts)
+            {
+                SkillDefinition[] granted = Resolve(skills, spec.GrantedSkillIds);
+                var bonusSkills = new SkillDefinition[spec.SkillDamageBonusesPerLevel.Count];
+                for (int i = 0; i < bonusSkills.Length; i++)
+                {
+                    bonusSkills[i] = Resolve(skills, new[] { spec.SkillDamageBonusesPerLevel[i].SkillId })[0];
+                }
+
+                BodyPartDefinition[] required = Resolve(parts, spec.RequiredPartIds);
+                PlaceholderContent.PartVisual visual = PlaceholderContent.Visuals[spec.Id];
+                BodyPartDefinition part = EditorAssets.LoadOrCreate<BodyPartDefinition>(BodyPartsFolder + "/BP_" + FileName(spec.Name) + ".asset", p =>
+                {
+                    p.Configure(spec, granted, bonusSkills, required);
+                    p.ConfigureVisual(visual.Kind, visual.Material, visual.Position, visual.Scale, visual.Euler, visual.MirrorSecondCopy);
+                });
+                if (part.NeedsM3Defaults)
+                {
+                    part.ApplyM3Defaults(spec, bonusSkills, required);
+                    part.ConfigureVisual(visual.Kind, visual.Material, visual.Position, visual.Scale, visual.Euler, visual.MirrorSecondCopy);
+                    EditorUtility.SetDirty(part);
+                }
+
+                parts[spec.Id] = part;
+            }
+
+            foreach (EvolutionSpec spec in PlaceholderContent.Evolutions)
+            {
+                EvolutionDefinition evolution = EditorAssets.LoadOrCreate<EvolutionDefinition>(EvolutionsFolder + "/EV_" + FileName(spec.Name) + spec.Stage + ".asset", e =>
+                    e.Configure(spec, Resolve(parts, spec.FreeMutationPartIds), Resolve(parts, spec.UnlockedPartIds), Resolve(skills, spec.ExtraSkillIds)));
+                if (evolution.NeedsPackageDefaults)
+                {
+                    // Evolutions written before D-067 carried a free pool only; they get the bound package once.
+                    evolution.Configure(spec, Resolve(parts, spec.FreeMutationPartIds), Resolve(parts, spec.UnlockedPartIds), Resolve(skills, spec.ExtraSkillIds));
+                    EditorUtility.SetDirty(evolution);
+                }
+            }
+
             EditorAssets.LoadOrCreate<CombatTuningDefinition>(CombatTuningPath, tuning => tuning.Configure(new CombatTuning()));
+            BodyPartDefinition core = parts[PlaceholderContent.CoreId];
             DemonDefinition blob = EditorAssets.LoadOrCreate<DemonDefinition>(BlobDemonPath, demon => demon.Configure(BiomeSpec.AshCavern.BlobDemon, core));
             DemonDefinition elder = EditorAssets.LoadOrCreate<DemonDefinition>(ElderDemonPath, demon => demon.Configure(BiomeSpec.AshCavern.ElderDemon, core));
             EditorAssets.LoadOrCreate<BiomeDefinition>(AshCavernPath, biome =>
@@ -142,6 +184,28 @@ namespace DemonFighter.Editor.Generate
                 existingBiome.SetDemons(blob, elder);
                 EditorUtility.SetDirty(existingBiome);
             }
+        }
+
+        private static T[] Resolve<T>(Dictionary<string, T> byId, IReadOnlyList<string> ids)
+            where T : Object
+        {
+            var result = new T[ids.Count];
+            for (int i = 0; i < result.Length; i++)
+            {
+                if (!byId.TryGetValue(ids[i], out T definition))
+                {
+                    throw new IOException("Content refers to " + ids[i] + " before it exists; order PlaceholderContent so dependencies come first.");
+                }
+
+                result[i] = definition;
+            }
+
+            return result;
+        }
+
+        private static string FileName(string displayName)
+        {
+            return displayName.Replace(" ", string.Empty);
         }
 
         private static Material Lit(string name, Color color, float smoothness)

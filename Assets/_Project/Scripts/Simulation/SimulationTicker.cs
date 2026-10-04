@@ -4,8 +4,10 @@ using DemonFighter.Simulation.Ai;
 using DemonFighter.Simulation.Combat;
 using DemonFighter.Simulation.Commands;
 using DemonFighter.Simulation.Events;
+using DemonFighter.Simulation.Evolution;
 using DemonFighter.Simulation.Food;
 using DemonFighter.Simulation.Movement;
+using DemonFighter.Simulation.Mutation;
 using DemonFighter.Simulation.Skills;
 using DemonFighter.Simulation.Spawning;
 
@@ -28,10 +30,12 @@ namespace DemonFighter.Simulation
             Behaviours.Validate(state.Catalog);
             Commands = new CommandQueue();
             Commands.RegisterHandler(new MoveCommandHandler());
-            Commands.RegisterHandler(new UseSkillCommandHandler(events));
+            Commands.RegisterHandler(new UseSkillCommandHandler(events, Behaviours));
             Commands.RegisterHandler(new ReportHitCommandHandler(Damage, Behaviours, events));
             Commands.RegisterHandler(new EatCommandHandler());
             Commands.RegisterHandler(new SpendStatPointCommandHandler(events));
+            Commands.RegisterHandler(new MutateCommandHandler(events));
+            Commands.RegisterHandler(new EvolveCommandHandler(events));
             Ai = new AiSystem();
             Spawning = new SpawnSystem(events, Ai);
         }
@@ -62,9 +66,12 @@ namespace DemonFighter.Simulation
         {
             float seconds = State.Config.TickSeconds;
             Commands.ApplyAll(State, Events);
+            HoldSystem.Advance(State, seconds);
             MovementSystem.Advance(State, seconds);
+            SprintSystem.Advance(State, Events, seconds);
             StatusSystem.Advance(State, Damage, seconds);
             SkillSystem.Advance(State);
+            TransformationSystem.Advance(State, Events);
             EatingSystem.Advance(State, Events, seconds);
             Ai.Think(State, Commands);
             Spawning.Advance(State);

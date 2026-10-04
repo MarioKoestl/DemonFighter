@@ -61,7 +61,7 @@ namespace DemonFighter.Simulation.Tests.Combat
         public void ApplyHit_CutAgainstThickHide_IsWeakened()
         {
             var scenario = new CombatScenario();
-            scenario.Target.Body.AddPart(TestContent.ThickHide, 1f);
+            scenario.Target.Body.Attach(TestContent.ThickHide);
 
             scenario.HitCore(Claw);
 
@@ -72,7 +72,7 @@ namespace DemonFighter.Simulation.Tests.Combat
         public void ApplyHit_BluntAgainstThickHide_IsStrengthenedAndStaggers()
         {
             var scenario = new CombatScenario();
-            scenario.Target.Body.AddPart(TestContent.ThickHide, 1f);
+            scenario.Target.Body.Attach(TestContent.ThickHide);
 
             scenario.HitCore(Slam);
 
@@ -111,7 +111,7 @@ namespace DemonFighter.Simulation.Tests.Combat
         public void ApplyHit_ArmToZero_SeversItIntoFood()
         {
             var scenario = new CombatScenario();
-            BodyPart arm = scenario.Target.Body.AddPart(TestContent.Arm, 1f);
+            BodyPart arm = scenario.Target.Body.Attach(TestContent.Arm);
 
             scenario.DamageSystem.ApplyHit(scenario.Attacker, scenario.Target, arm, TestContent.Bite, 1);
             scenario.DamageSystem.ApplyHit(scenario.Attacker, scenario.Target, arm, TestContent.Bite, 1);
@@ -132,7 +132,7 @@ namespace DemonFighter.Simulation.Tests.Combat
         public void ApplyHit_HideToZero_DestroysItWithoutFood()
         {
             var scenario = new CombatScenario();
-            BodyPart hide = scenario.Target.Body.AddPart(TestContent.ThickHide, 1f);
+            BodyPart hide = scenario.Target.Body.Attach(TestContent.ThickHide);
 
             for (int i = 0; i < 5; i++)
             {

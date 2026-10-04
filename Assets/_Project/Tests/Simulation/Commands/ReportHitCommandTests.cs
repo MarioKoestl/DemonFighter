@@ -91,6 +91,27 @@ namespace DemonFighter.Simulation.Tests.Commands
         }
 
         [Test]
+        public void Tick_TargetJustBeyondReach_EyesExtendTheReach()
+        {
+            var plain = new CombatScenario();
+            plain.Target.SetPose(new Vector3(0f, 0f, 2.8f), 0f);
+            plain.StartBiteAndReachActiveWindow();
+            plain.Submit(new ReportHitCommand(plain.Attacker.Id, plain.Target.Id, 0));
+            plain.Tick(1);
+
+            var sighted = new CombatScenario();
+            sighted.Attacker.AttachPart(TestContent.Eyes);
+            sighted.Target.SetPose(new Vector3(0f, 0f, 2.8f), 0f);
+            sighted.StartBiteAndReachActiveWindow();
+            sighted.Submit(new ReportHitCommand(sighted.Attacker.Id, sighted.Target.Id, 0));
+            sighted.Tick(1);
+
+            plain.Rejections.Should().ContainSingle().Which.Reason.Should().Be(ReportHitCommandHandler.OutOfReach);
+            sighted.Rejections.Should().BeEmpty();
+            sighted.DamageFrom(sighted.Attacker.Id).Should().ContainSingle();
+        }
+
+        [Test]
         public void Tick_TargetBehindTheAttacker_IsRejected()
         {
             var scenario = new CombatScenario();
@@ -108,7 +129,7 @@ namespace DemonFighter.Simulation.Tests.Commands
         public void Tick_HitOnALostPart_IsRejected()
         {
             var scenario = new CombatScenario();
-            BodyPart arm = scenario.Target.Body.AddPart(TestContent.Arm, 1f);
+            BodyPart arm = scenario.Target.Body.Attach(TestContent.Arm);
             arm.ApplyDamage(1000f);
             scenario.StartBiteAndReachActiveWindow();
 

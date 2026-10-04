@@ -31,14 +31,8 @@ namespace DemonFighter.Simulation.Commands
         /// <summary>One tick of grace, because a report detected at the last active tick arrives one tick later.</summary>
         private const long ActiveGraceTicks = 1;
 
-        /// <summary>Slack on top of the reach, so a touching hitbox is never refused by rounding.</summary>
-        private const float ReachToleranceMeters = 0.5f;
-
         /// <summary>Slack on top of the arc for the same reason.</summary>
         private const float ArcToleranceDegrees = 15f;
-
-        /// <summary>Half the body size counts as the target's radius.</summary>
-        private const float TargetRadiusPerMeter = 0.3f;
 
         private readonly DamageSystem _damage;
         private readonly SkillBehaviourRegistry _behaviours;
@@ -104,7 +98,7 @@ namespace DemonFighter.Simulation.Commands
 
             Vector2 toTarget = new Vector2(target.Position.X - actor.Position.X, target.Position.Z - actor.Position.Z);
             float distance = toTarget.Length();
-            float reach = use.Skill.Spec.ReachPerMeter * actor.SizeMeters + target.SizeMeters * TargetRadiusPerMeter + ReachToleranceMeters;
+            float reach = SkillReach.Meters(actor, target, use.Skill);
             if (distance > reach)
             {
                 return CommandResult.Rejected(OutOfReach);
@@ -124,9 +118,10 @@ namespace DemonFighter.Simulation.Commands
 
             use.MarkHit();
             ISkillBehaviour behaviour = _behaviours.Get(use.Skill.Spec.BehaviourId);
-            behaviour.OnHit(new SkillHitContext(state, _damage, actor, target, part, use.Skill));
+            behaviour.OnHit(new SkillHitContext(state, _events, _damage, actor, target, part, use.Skill));
 
-            float xp = use.Skill.Spec.SkillXpPerHit;
+            // Harder targets teach more (GAME_DESIGN, "Skill levels"): the same tier gap rule as for kills.
+            float xp = use.Skill.Spec.SkillXpPerHit * state.Catalog.Tuning.RewardFactor(actor.Tier, target.Tier);
             if (xp > 0f)
             {
                 int levels = use.Skill.GainXp(xp);

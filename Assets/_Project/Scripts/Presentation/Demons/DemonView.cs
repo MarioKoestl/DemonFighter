@@ -11,10 +11,10 @@ namespace DemonFighter.Presentation.Demons
     /// <summary>
     /// The Unity body of one demon (ARCHITECTURE, "Presentation"). Every frame it moves the CharacterController with
     /// the velocity the simulation decided, lets the controller resolve collisions and gravity, turns the body, and
-    /// writes the resulting pose back into the simulation, which trusts it. Its part views show the condition of
-    /// every part; on death it becomes a corpse that lies flat and no longer moves. Per frame rather than per physics
-    /// step, so the camera that follows it never stutters. Capsule and controller scale with the size of the demon,
-    /// so a 1 m blob and a 15 m elder use the same prefab.
+    /// writes the resulting pose back into the simulation, which trusts it. Parts the demon grows get a primitive
+    /// each, sized and placed by their definition; the body, the controller, the material and the parts follow the
+    /// size and tier of the demon as it mutates. On death it becomes a corpse that lies flat and no longer moves.
+    /// Per frame rather than per physics step, so the camera that follows it never stutters.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     public sealed class DemonView : MonoBehaviour
@@ -22,18 +22,29 @@ namespace DemonFighter.Presentation.Demons
         private const float CapsuleMeshHeight = 2f;
         private const float CapsuleMeshRadius = 0.5f;
         private const float EyeHeightFraction = 0.9f;
-        private const float PulseSeconds = 0.2f;
-        private const float PulseScale = 0.15f;
+        private const float AttackPulseSeconds = 0.2f;
+        private const float AttackPulseScale = 0.15f;
+        private const float TransformationPulseScale = 0.25f;
+        private const int TransformationPulses = 3;
 
         [SerializeField] private Transform _body = null!;
 
+        private readonly List<BodyPartView> _parts = new List<BodyPartView>();
+        private readonly List<bool> _ownerColored = new List<bool>();
         private CharacterController _controller = null!;
-        private BodyPartView[] _parts = Array.Empty<BodyPartView>();
         private Renderer[] _decorations = Array.Empty<Renderer>();
         private Demon? _demon;
         private DemonViewSettings? _settings;
+        private PartVisuals? _visuals;
+        private Material? _ownerMaterial;
         private float _verticalVelocity;
+        private float _appliedSize;
+        private int _appliedTier;
+        private bool _bodyVisible = true;
         private float _pulseLeft;
+        private float _pulseSeconds;
+        private float _pulseScale;
+        private int _pulseCycles;
 
         /// <summary>The demon this body belongs to; null before binding.</summary>
         public Demon? Demon => _demon;
@@ -47,13 +58,14 @@ namespace DemonFighter.Presentation.Demons
         /// <summary>True once the demon died and this body lies on the ground as food.</summary>
         public bool IsCorpse { get; private set; }
 
-        /// <summary>The part views, one per body part in part order.</summary>
+        /// <summary>The part views that exist right now, the core first.</summary>
         public IReadOnlyList<BodyPartView> Parts => _parts;
 
         /// <summary>Shows or hides the body and its decorations; first person hides the player's own capsule.</summary>
         public void SetBodyVisible(bool visible)
         {
-            for (int i = 0; i < _parts.Length; i++)
+            _bodyVisible = visible;
+            for (int i = 0; i < _parts.Count; i++)
             {
                 _parts[i].SetVisible(visible);
             }
@@ -64,8 +76,8 @@ namespace DemonFighter.Presentation.Demons
             }
         }
 
-        /// <summary>Takes over the demon: sizes the body, places it at the simulation pose and starts moving it.</summary>
-        public void Bind(Demon demon, DemonViewSettings settings, Material material)
+        /// <summary>Takes over the demon: sizes the body, colors it, grows its parts, places it at the simulation pose and starts moving it.</summary>
+        public void Bind(Demon demon, DemonViewSettings settings, PartVisuals visuals)
         {
             if (_demon != null)
             {
@@ -74,16 +86,18 @@ namespace DemonFighter.Presentation.Demons
 
             _demon = demon ?? throw new ArgumentNullException(nameof(demon));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            if (_parts.Length != demon.Body.Parts.Count)
+            _visuals = visuals ?? throw new ArgumentNullException(nameof(visuals));
+            if (_parts.Count != 1)
             {
-                throw new InvalidOperationException("The prefab has " + _parts.Length + " part views but the body has " + demon.Body.Parts.Count + " parts.");
+                throw new InvalidOperationException("The demon prefab needs exactly one part view, the core; found " + _parts.Count + ".");
             }
 
+            _ownerMaterial = visuals.Palette.ForDemon(demon);
+            _appliedTier = demon.Tier;
             ApplySize(demon.SizeMeters);
-            for (int i = 0; i < _parts.Length; i++)
-            {
-                _parts[i].Initialize(this, demon.Body.Parts[i].Index, material);
-            }
+            _parts[0].Initialize(this, demon.Body.Core.Index, _ownerMaterial);
+            _parts[0].RememberBaseScale();
+            SyncParts();
 
             // Moving a CharacterController by transform only takes effect while it is disabled.
             _controller.enabled = false;
@@ -96,13 +110,19 @@ namespace DemonFighter.Presentation.Demons
         /// <summary>Punches the body scale for a moment, so a bite reads even without animation.</summary>
         public void PlayAttackPulse()
         {
-            _pulseLeft = PulseSeconds;
+            PlayPulse(AttackPulseSeconds, AttackPulseScale, 1);
+        }
+
+        /// <summary>Throbs the body for the transformation time of a mutation or evolution (D-014).</summary>
+        public void PlayTransformation(float seconds)
+        {
+            PlayPulse(Mathf.Max(0.1f, seconds), TransformationPulseScale, TransformationPulses);
         }
 
         /// <summary>The view of a body part by its simulation index, or null when there is none.</summary>
         public BodyPartView? FindPart(int partIndex)
         {
-            for (int i = 0; i < _parts.Length; i++)
+            for (int i = 0; i < _parts.Count; i++)
             {
                 if (_parts[i].PartIndex == partIndex)
                 {
@@ -130,7 +150,7 @@ namespace DemonFighter.Presentation.Demons
             float radius = _settings != null ? _demon.SizeMeters * _settings.RadiusPerMeter : _demon.SizeMeters * 0.3f;
             _body.localRotation = Quaternion.Euler(-90f, 0f, 0f);
             _body.localPosition = Vector3.up * radius;
-            for (int i = 0; i < _parts.Length; i++)
+            for (int i = 0; i < _parts.Count; i++)
             {
                 BodyPartView view = _parts[i];
                 if (_demon.Body.HasPart(view.PartIndex))
@@ -149,7 +169,12 @@ namespace DemonFighter.Presentation.Demons
         private void Awake()
         {
             _controller = GetComponent<CharacterController>();
-            _parts = GetComponentsInChildren<BodyPartView>(true);
+            _parts.AddRange(GetComponentsInChildren<BodyPartView>(true));
+            for (int i = 0; i < _parts.Count; i++)
+            {
+                _ownerColored.Add(true);
+            }
+
             Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
             var decorations = new List<Renderer>(renderers.Length);
             for (int i = 0; i < renderers.Length; i++)
@@ -171,6 +196,11 @@ namespace DemonFighter.Presentation.Demons
             }
 
             float deltaTime = Time.deltaTime;
+            if (!IsCorpse)
+            {
+                FollowSizeAndTier();
+            }
+
             RefreshParts(deltaTime);
             if (IsCorpse)
             {
@@ -202,28 +232,99 @@ namespace DemonFighter.Presentation.Demons
             }
         }
 
+        // A grown demon is bigger and, past the player, wears the color of its tier (D-018).
+        private void FollowSizeAndTier()
+        {
+            if (!Mathf.Approximately(_demon!.SizeMeters, _appliedSize))
+            {
+                ApplySize(_demon.SizeMeters);
+            }
+
+            if (_demon.Tier != _appliedTier && _visuals != null)
+            {
+                _appliedTier = _demon.Tier;
+                _ownerMaterial = _visuals.Palette.ForDemon(_demon);
+                for (int i = 0; i < _parts.Count; i++)
+                {
+                    if (_ownerColored[i])
+                    {
+                        _parts[i].ReplaceMaterial(_ownerMaterial);
+                    }
+                }
+            }
+        }
+
         // Conditions are polled, which costs a comparison per part and needs no bookkeeping of missed events.
         private void RefreshParts(float deltaTime)
         {
+            SyncParts();
             float pulse = 1f;
             if (_pulseLeft > 0f)
             {
                 _pulseLeft = Mathf.Max(0f, _pulseLeft - deltaTime);
-                float progress = 1f - _pulseLeft / PulseSeconds;
-                pulse = 1f + PulseScale * Mathf.Sin(progress * Mathf.PI);
+                float progress = 1f - _pulseLeft / _pulseSeconds;
+                pulse = 1f + _pulseScale * Mathf.Abs(Mathf.Sin(progress * Mathf.PI * _pulseCycles));
+            }
+
+            Body body = _demon!.Body;
+            for (int i = 0; i < _parts.Count; i++)
+            {
+                BodyPartView view = _parts[i];
+                if (body.HasPart(view.PartIndex))
+                {
+                    view.ShowCondition(body.GetPart(view.PartIndex).Condition);
+                }
+
+                view.SetPulse(pulse);
+            }
+        }
+
+        // Every simulation part gets a primitive once; the core is the capsule the prefab already has.
+        private void SyncParts()
+        {
+            if (_visuals == null || _ownerMaterial == null)
+            {
+                return;
             }
 
             IReadOnlyList<BodyPart> parts = _demon!.Body.Parts;
-            for (int i = 0; i < _parts.Length; i++)
+            for (int i = 0; i < parts.Count; i++)
             {
-                BodyPart? part = i < parts.Count ? parts[i] : null;
-                if (part != null)
+                BodyPart part = parts[i];
+                if (part.Spec.IsCore || FindPart(part.Index) != null)
                 {
-                    _parts[i].ShowCondition(part.Condition);
+                    continue;
                 }
 
-                _parts[i].SetPulse(pulse);
+                int copyIndex = 0;
+                for (int j = 0; j < i; j++)
+                {
+                    if (string.Equals(parts[j].Spec.Id, part.Spec.Id, StringComparison.Ordinal))
+                    {
+                        copyIndex++;
+                    }
+                }
+
+                BodyPartView? view = _visuals.Create(part, _body, _ownerMaterial, copyIndex, out Material material, out bool ownerColored);
+                if (view == null)
+                {
+                    continue;
+                }
+
+                view.Initialize(this, part.Index, material);
+                view.RememberBaseScale();
+                view.SetVisible(_bodyVisible);
+                _parts.Add(view);
+                _ownerColored.Add(ownerColored);
             }
+        }
+
+        private void PlayPulse(float seconds, float scale, int cycles)
+        {
+            _pulseSeconds = seconds;
+            _pulseLeft = seconds;
+            _pulseScale = scale;
+            _pulseCycles = cycles;
         }
 
         private void ApplySize(float sizeMeters)
@@ -233,6 +334,7 @@ namespace DemonFighter.Presentation.Demons
                 return;
             }
 
+            _appliedSize = sizeMeters;
             float radius = sizeMeters * _settings.RadiusPerMeter;
             _controller.height = sizeMeters;
             _controller.radius = radius;
@@ -244,9 +346,9 @@ namespace DemonFighter.Presentation.Demons
             // The capsule mesh is 2 units tall with radius 0.5; scale it to the controller's shape.
             _body.localScale = new Vector3(radius / CapsuleMeshRadius, sizeMeters / CapsuleMeshHeight, radius / CapsuleMeshRadius);
             _body.localPosition = Vector3.up * (sizeMeters * 0.5f);
-            for (int i = 0; i < _parts.Length; i++)
+            if (_parts.Count > 0)
             {
-                _parts[i].RememberBaseScale();
+                _parts[0].RememberBaseScale();
             }
         }
     }

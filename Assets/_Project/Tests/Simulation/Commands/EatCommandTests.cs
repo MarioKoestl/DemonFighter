@@ -194,6 +194,23 @@ namespace DemonFighter.Simulation.Tests.Commands
             scenario.Rejections.Should().ContainSingle().Which.Reason.Should().Be(EatCommandHandler.ActorDead);
         }
 
+        [Test]
+        public void Tick_FoodJustBeyondReach_EyesExtendTheReach()
+        {
+            var plain = new CombatScenario();
+            FoodItem plainFood = plain.State.SpawnFood(FoodKind.Corpse, new Vector3(0f, 0f, 2.1f), 20f, plain.Target.Id, 0);
+            HoldEat(plain, plainFood.Id, 1);
+
+            var sighted = new CombatScenario();
+            sighted.Attacker.AttachPart(TestContent.Eyes);
+            FoodItem sightedFood = sighted.State.SpawnFood(FoodKind.Corpse, new Vector3(0f, 0f, 2.1f), 20f, sighted.Target.Id, 0);
+            HoldEat(sighted, sightedFood.Id, 1);
+
+            plain.Rejections.Should().ContainSingle().Which.Reason.Should().Be(EatCommandHandler.OutOfReach);
+            sighted.Rejections.Should().BeEmpty();
+            sighted.Attacker.IsEating.Should().BeTrue();
+        }
+
         private static FoodItem SpawnCorpseNear(CombatScenario scenario, float biomass = 20f, int sourceTier = 0)
         {
             return scenario.State.SpawnFood(FoodKind.Corpse, new Vector3(0f, 0f, 1f), biomass, scenario.Target.Id, sourceTier);

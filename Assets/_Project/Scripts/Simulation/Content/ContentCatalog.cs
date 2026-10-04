@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace DemonFighter.Simulation.Content
 {
@@ -13,12 +14,14 @@ namespace DemonFighter.Simulation.Content
         private readonly Dictionary<string, BodyPartSpec> _bodyParts = new Dictionary<string, BodyPartSpec>(StringComparer.Ordinal);
         private readonly Dictionary<string, SkillSpec> _skills = new Dictionary<string, SkillSpec>(StringComparer.Ordinal);
         private readonly Dictionary<string, DemonSpec> _demons = new Dictionary<string, DemonSpec>(StringComparer.Ordinal);
+        private readonly Dictionary<string, EvolutionSpec> _evolutions = new Dictionary<string, EvolutionSpec>(StringComparer.Ordinal);
 
         public ContentCatalog(
             CombatTuning tuning,
             IEnumerable<BodyPartSpec> bodyParts,
             IEnumerable<SkillSpec> skills,
-            IEnumerable<DemonSpec> demons)
+            IEnumerable<DemonSpec> demons,
+            IEnumerable<EvolutionSpec>? evolutions = null)
         {
             Tuning = tuning ?? throw new ArgumentNullException(nameof(tuning));
             tuning.Validate();
@@ -75,6 +78,46 @@ namespace DemonFighter.Simulation.Content
                     }
                 }
             }
+
+            foreach (EvolutionSpec evolution in evolutions ?? Array.Empty<EvolutionSpec>())
+            {
+                evolution.Validate();
+                if (!_evolutions.TryAdd(evolution.Id, evolution))
+                {
+                    throw new ContentException("Duplicate evolution id " + evolution.Id + ".");
+                }
+
+                foreach (string partId in evolution.FreeMutationPartIds)
+                {
+                    RequirePart(partId, "Evolution " + evolution.Id + " grants unknown part ");
+                }
+
+                foreach (string partId in evolution.UnlockedPartIds)
+                {
+                    RequirePart(partId, "Evolution " + evolution.Id + " unlocks unknown part ");
+                }
+
+                foreach (string skillId in evolution.ExtraSkillIds)
+                {
+                    if (!_skills.ContainsKey(skillId))
+                    {
+                        throw new ContentException("Evolution " + evolution.Id + " grants unknown skill " + skillId + ".");
+                    }
+                }
+
+                foreach (StatValue cap in evolution.StatCapBonuses)
+                {
+                    if (!HasStat(cap.Stat))
+                    {
+                        throw new ContentException("Evolution " + evolution.Id + " raises unknown stat " + cap.Stat + ".");
+                    }
+                }
+
+                if (!HasStat(evolution.FitStat))
+                {
+                    throw new ContentException("Evolution " + evolution.Id + " favors unknown stat " + evolution.FitStat + ".");
+                }
+            }
         }
 
         /// <summary>The numbers of the combat and growth rules.</summary>
@@ -88,6 +131,9 @@ namespace DemonFighter.Simulation.Content
 
         /// <summary>Every demon kind.</summary>
         public IReadOnlyCollection<DemonSpec> Demons => _demons.Values;
+
+        /// <summary>Every evolution option.</summary>
+        public IReadOnlyCollection<EvolutionSpec> Evolutions => _evolutions.Values;
 
         /// <summary>The body part with this id; a missing id is a content error.</summary>
         public BodyPartSpec GetBodyPart(string id)
@@ -108,15 +154,35 @@ namespace DemonFighter.Simulation.Content
         }
 
         /// <summary>Looks a skill up without throwing.</summary>
-        public bool TryGetSkill(string id, out SkillSpec? spec)
+        public bool TryGetSkill(string id, [NotNullWhen(true)] out SkillSpec? spec)
         {
             return _skills.TryGetValue(id, out spec);
         }
 
         /// <summary>Looks a body part up without throwing.</summary>
-        public bool TryGetBodyPart(string id, out BodyPartSpec? spec)
+        public bool TryGetBodyPart(string id, [NotNullWhen(true)] out BodyPartSpec? spec)
         {
             return _bodyParts.TryGetValue(id, out spec);
+        }
+
+        /// <summary>The evolution with this id; a missing id is a content error.</summary>
+        public EvolutionSpec GetEvolution(string id)
+        {
+            return _evolutions.TryGetValue(id, out EvolutionSpec spec) ? spec : throw new ContentException("Unknown evolution " + id + ".");
+        }
+
+        /// <summary>Looks an evolution up without throwing.</summary>
+        public bool TryGetEvolution(string id, [NotNullWhen(true)] out EvolutionSpec? spec)
+        {
+            return _evolutions.TryGetValue(id, out spec);
+        }
+
+        private void RequirePart(string partId, string message)
+        {
+            if (!_bodyParts.ContainsKey(partId))
+            {
+                throw new ContentException(message + partId + ".");
+            }
         }
 
         private bool HasStat(StatId id)

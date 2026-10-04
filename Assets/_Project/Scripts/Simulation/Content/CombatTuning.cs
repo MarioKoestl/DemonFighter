@@ -84,6 +84,42 @@ namespace DemonFighter.Simulation.Content
 
         public float FoodDecaySeconds { get; init; } = 90f;
 
+        /// <summary>Body investment points (parts and upgrade levels) per tier gained (D-054).</summary>
+        public int TierInvestmentStep { get; init; } = 4;
+
+        /// <summary>Fraction of the spawn size a demon grows per tier gained (D-018).</summary>
+        public float SizeStepPerTier { get; init; } = 0.5f;
+
+        /// <summary>Fraction of base HP a part gains per upgrade level.</summary>
+        public float PartHpPerUpgradeLevel { get; init; } = 0.15f;
+
+        /// <summary>Seconds a demon transforms after confirming a mutation or evolution, invulnerable and unable to act (D-014).</summary>
+        public float TransformationSeconds { get; init; } = 2f;
+
+        /// <summary>Cost factor for a further copy of a part the body already holds.</summary>
+        public float RepeatCostMultiplier { get; init; } = 1.5f;
+
+        /// <summary>Fraction of the base cost one upgrade level costs, times the level reached.</summary>
+        public float UpgradeCostFraction { get; init; } = 0.5f;
+
+        /// <summary>Fraction of the base cost regrowing a lost part costs.</summary>
+        public float RegrowCostFraction { get; init; } = 0.5f;
+
+        /// <summary>Character levels needed per upgrade level: +2 needs level 4.</summary>
+        public int CharacterLevelPerUpgradeLevel { get; init; } = 2;
+
+        /// <summary>Seconds a knockback keeps pushing; the knockback distance of the skill is covered in this time.</summary>
+        public float KnockbackSeconds { get; init; } = 0.3f;
+
+        /// <summary>Character levels at which an evolution is offered, ascending (GAME_DESIGN, "Evolution": 5 and 10 in v1).</summary>
+        public IReadOnlyList<int> EvolutionLevels { get; init; } = new[] { 5, 10 };
+
+        /// <summary>Points a stat can hold before evolutions raise its cap.</summary>
+        public int BaseStatCap { get; init; } = 10;
+
+        /// <summary>Perception bonus per sense level, what a demon learns about a target it aims at (D-066); one pair of Eyes is one level.</summary>
+        public float PerceptionPerSenseLevel { get; init; } = 0.3f;
+
         /// <summary>The base stats of v1 in display order.</summary>
         public IReadOnlyList<StatSpec> Stats { get; init; } = new[]
         {
@@ -157,6 +193,14 @@ namespace DemonFighter.Simulation.Content
             Require(LevelXpBase > 0f && LevelXpExponent >= 0f && StatPointsPerLevel >= 0, "Level values are out of range.");
             Require(CharacterXpPerSkillXp >= 0f, "CharacterXpPerSkillXp is never negative.");
             Require(EatBiomassPerSecond > 0f && EatReachPerMeter > 0f && CorpseBiomassPerTier >= 0f && FoodDecaySeconds > 0f, "Food values are out of range.");
+            Require(TierInvestmentStep >= 1 && SizeStepPerTier >= 0f && PartHpPerUpgradeLevel >= 0f, "Body values are out of range.");
+            Require(TransformationSeconds >= 0f && RepeatCostMultiplier >= 1f && UpgradeCostFraction >= 0f && RegrowCostFraction >= 0f && CharacterLevelPerUpgradeLevel >= 0, "Mutation values are out of range.");
+            Require(KnockbackSeconds >= 0f, "KnockbackSeconds is never negative.");
+            Require(EvolutionLevels != null && BaseStatCap >= 1, "Evolution values are out of range.");
+            for (int i = 0; i < EvolutionLevels.Count; i++)
+            {
+                Require(EvolutionLevels[i] >= 1 && (i == 0 || EvolutionLevels[i] > EvolutionLevels[i - 1]), "EvolutionLevels must be positive and ascending.");
+            }
             Require(Stats != null && Stats.Count > 0, "At least one stat is required.");
         }
 

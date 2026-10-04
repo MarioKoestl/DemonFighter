@@ -4,7 +4,7 @@ Milestones are ordered. Each has acceptance criteria that Mario can check in Pla
 
 ## Current milestone
 
-**M2: Combat, death and eating.** M1 is merged and verified. All Claude Code items of M2 are done on branch `feat/m2-combat-death-eating` (2026-10-04): body model with core and parts, base and derived stats; Pierce, Cut and Blunt against the three hide types, bleeding, stagger, regeneration, severed and destroyed parts, death and corpses; Bite as data plus an attribute-found behaviour with windup, active window and recovery, hit detection in Unity judged by the simulation, skill XP and levels; held-key eating with reward scaling and food decay; kill XP, level-ups, stat points and the Stats panel (C); AI goals Hunt, Eat and Flee with the one-tier rule; placeholder gore (wounded parts, corpses, fallen parts, blood); death freeze with run summary and Back to Menu; 277 EditMode and 2 PlayMode tests. Open: the four Play Mode acceptance checks are Mario's. Next: M3 mutation.
+**M3: Mutation.** M2 is merged and verified. All Claude Code items of M3 are done on branch `feat/m3-mutation` (2026-10-04): sockets with capacities on the core and ten body parts as assets with upgrade levels, costs and requirements (Jaws, Arm, Legs, Thick Hide, Plates, Elastic Tissue, Eyes, Spines, Tail); Claw, Grab, Lunge, passive Sprint and Tail Swing as data plus behaviours, bound through skill slots (left mouse, right mouse, Space, Shift, Q); skill levels that scale damage, cost, cooldown, speed and reach, one perk per skill at level 10, levels frozen while the granting part is lost; the mutation menu (Tab, C) with the tabs Mutate, Evolve, Stats and Skills, the shop offer policy and a stubbed random policy; the calm rule and the 2 second transformation; two evolution thresholds with three lines (Brute, Stalker, Bulwark) and their packages; part primitives on the body, size and camera scaling with the tier. First playtest round: readable tabs, a live 3D preview of the own body in the menu (D-063), offers grouped into new parts, upgrades and regrows and selected together for one Apply (D-064), the combat rule suspended (D-060), quicker leveling (D-062), grabbed demons dragged along (D-061); second round: Grab on equal size and an aim marker (D-065), the Analyze key with sense levels (D-066), evolution packages with bound stat gains (D-067); 372 EditMode and 3 PlayMode tests. Open: the Play Mode acceptance checks from Legs onward are Mario's; AI mutation and evolution come with M4. Next: M4 ecosystem.
 
 (Claude Code: update this section when a milestone completes. Do not rewrite other sections without asking.)
 
@@ -87,14 +87,14 @@ Acceptance:
 
 Goal: spend Biomass, grow a body, see it, use it.
 
-- [ ] Content: 8 to 10 body parts (Jaws upgrade, Arm, second Arm, Legs, Thick Hide, Plates, Elastic Tissue, Eyes, Spines, Tail) with upgrade levels, as ScriptableObjects, loaded through the catalog (tests on specs and requirements)
-- [ ] Skills Claw, Grab, Lunge, Sprint, Tail Swing as data plus behaviour classes found by attribute
-- [ ] Skill progression: skill XP per use, level curve on `SkillSpec`, numbers scale with level, one perk per skill at level 10, levels freeze when the granting part is severed; Skills tab shows it (tests)
-- [ ] Mutation menu (UI Toolkit, tabs Mutate / Evolve / Stats / Skills): pauses the game, shows the body silhouette with sockets, lists eligible mutations with cost and preview (Option A); regrow buttons for severed parts; `IMutationOfferPolicy` with the shop implementation and a stubbed offers implementation
-- [ ] Confirming requires being out of combat (5 seconds without damage dealt or taken); then a 2 second transformation, invulnerable and unable to act (tests on the rule)
-- [ ] Evolution: two thresholds (Level 5, Level 10), three generated options each from `EvolutionSpec` assets; evolving reshapes the core placeholder, grants a package (stat point pool with caps, free mutations, extra skills, unlocked part categories) and grows the size step (tests)
-- [ ] Body part views attach primitives to sockets and show them in third-person
-- [ ] Tier derived from body investment and evolutions; size step scales the view, the `CharacterController` and the camera; shown in HUD and on AI demons
+- [x] Content: 8 to 10 body parts (Jaws upgrade, Arm, second Arm, Legs, Thick Hide, Plates, Elastic Tissue, Eyes, Spines, Tail) with upgrade levels, as ScriptableObjects, loaded through the catalog (tests on specs and requirements)
+- [x] Skills Claw, Grab, Lunge, Sprint, Tail Swing as data plus behaviour classes found by attribute
+- [x] Skill progression: skill XP per use, level curve on `SkillSpec`, numbers scale with level, one perk per skill at level 10, levels freeze when the granting part is severed; Skills tab shows it (tests)
+- [x] Mutation menu (UI Toolkit, tabs Mutate / Evolve / Stats / Skills): pauses the game, shows the body silhouette with sockets, lists eligible mutations with cost and preview (Option A); regrow buttons for severed parts; `IMutationOfferPolicy` with the shop implementation and a stubbed offers implementation
+- [x] Confirming requires being out of combat (5 seconds without damage dealt or taken); then a 2 second transformation, invulnerable and unable to act (tests on the rule). The combat rule is suspended in the playtest (D-060)
+- [x] Evolution: two thresholds (Level 5, Level 10), three generated options each from `EvolutionSpec` assets; evolving reshapes the core placeholder, grants a package (stat point pool with caps, free mutations, extra skills, unlocked part categories) and grows the size step (tests)
+- [x] Body part views attach primitives to sockets and show them in third-person
+- [x] Tier derived from body investment and evolutions; size step scales the view, the `CharacterController` and the camera; shown in HUD and on AI demons
 
 Acceptance:
 

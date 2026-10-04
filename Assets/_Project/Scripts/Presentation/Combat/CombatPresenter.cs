@@ -9,6 +9,7 @@ using DemonFighter.Simulation.Commands;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Food;
+using DemonFighter.Simulation.Skills;
 using UnityEngine;
 using Object = UnityEngine.Object;
 using Random = UnityEngine.Random;
@@ -26,6 +27,7 @@ namespace DemonFighter.Presentation.Combat
     {
         private const float AimRayExtraMeters = 1.5f;
         private const float AimedFoodExtraMeters = 3f;
+        private const float FocusRangePerMeter = 8f;
         private const float CrosshairSweepRadiusPerMeter = 0.1f;
         private const float FrontVolumeCenterPerReach = 0.5f;
         private const float FrontVolumeRadiusPerReach = 0.6f;
@@ -52,6 +54,7 @@ namespace DemonFighter.Presentation.Combat
         private readonly RaycastHit[] _hits = new RaycastHit[16];
         private readonly Collider[] _colliders = new Collider[32];
         private Camera? _camera;
+        private BodyPartView? _focusedPart;
 
         public CombatPresenter(RunState state, SimulationEvents events, PlaceholderPalette palette, DemonId player, Transform root)
         {
@@ -71,10 +74,30 @@ namespace DemonFighter.Presentation.Combat
             _subscriptions.Add(events.Subscribe<PartDestroyed>(OnPartDestroyed));
             _subscriptions.Add(events.Subscribe<DemonDied>(OnDemonDied));
             _subscriptions.Add(events.Subscribe<FoodRemoved>(OnFoodRemoved));
+            _subscriptions.Add(events.Subscribe<MutationStarted>(OnMutationStarted));
+            _subscriptions.Add(events.Subscribe<Evolved>(OnEvolved));
         }
 
         /// <summary>The food under the crosshair of the player and within eat reach, or None; HUD prompt and Eat key use it.</summary>
         public FoodId AimedFood { get; private set; }
+
+        /// <summary>The demon under the crosshair of the player within the aim range, or None (D-065).</summary>
+        public DemonId FocusedDemon { get; private set; }
+
+        /// <summary>Index of the body part under the crosshair; -1 when none.</summary>
+        public int FocusedPartIndex { get; private set; } = -1;
+
+        /// <summary>True when the primary skill of the player reaches the focused demon from where it stands.</summary>
+        public bool FocusInReach { get; private set; }
+
+        /// <summary>The demon the Analyze key locked for the HUD, or None; the lock drops when it dies (D-066).</summary>
+        public DemonId LockedDemon { get; private set; }
+
+        /// <summary>Locks the demon under the crosshair for analysis, or releases the current lock.</summary>
+        public void ToggleLock()
+        {
+            LockedDemon = LockedDemon.IsValid ? DemonId.None : FocusedDemon;
+        }
 
         /// <summary>Makes a spawned body known, so events for its demon reach it.</summary>
         public void Register(DemonView view)
@@ -102,6 +125,8 @@ namespace DemonFighter.Presentation.Combat
 
             ScanActiveSkills(_state.Tick);
             AimedFood = FindAimedFood();
+            UpdateFocus();
+            _blood.Update(Time.time);
         }
 
         /// <inheritdoc />
@@ -124,7 +149,59 @@ namespace DemonFighter.Presentation.Combat
             }
 
             _subscriptions.Clear();
+            if (_focusedPart != null)
+            {
+                _focusedPart.SetHighlighted(false);
+                _focusedPart = null;
+            }
+
             _blood.Destroy();
+        }
+
+        // The part under the crosshair within the aim range glows and is reported to the HUD every frame, with whether
+        // the primary attack would land from here; a locked demon stays locked until it dies or the key releases it.
+        private void UpdateFocus()
+        {
+            BodyPartView? part = null;
+            bool inReach = false;
+            if (_camera != null && _views.TryGetValue(_player, out DemonView? playerView) && playerView.Demon != null && playerView.Demon.IsAlive && !playerView.IsCorpse)
+            {
+                Demon demon = playerView.Demon;
+                float range = demon.SizeMeters * FocusRangePerMeter * demon.ReachMultiplier;
+                Ray crosshair = _camera.ViewportPointToRay(ViewportCenter);
+                float fromCamera = range + Vector3.Distance(_camera.transform.position, playerView.transform.position);
+                if (Sweep(playerView, crosshair, demon.SizeMeters * CrosshairSweepRadiusPerMeter, fromCamera, out BodyPartView hit, out _) && hit.Owner != null && hit.Owner.Demon != null)
+                {
+                    part = hit;
+                    SkillInstance? primary = SkillSlots.Find(demon, SkillSlot.Primary);
+                    Vector3 toTarget = hit.Owner.transform.position - playerView.transform.position;
+                    toTarget.y = 0f;
+                    inReach = primary != null && toTarget.magnitude <= SkillReach.Meters(demon, hit.Owner.Demon, primary);
+                }
+            }
+
+            if (part != _focusedPart)
+            {
+                if (_focusedPart != null)
+                {
+                    _focusedPart.SetHighlighted(false);
+                }
+
+                if (part != null)
+                {
+                    part.SetHighlighted(true);
+                }
+
+                _focusedPart = part;
+            }
+
+            FocusedDemon = part != null && part.Owner != null && part.Owner.Demon != null ? part.Owner.Demon.Id : DemonId.None;
+            FocusedPartIndex = part != null ? part.PartIndex : -1;
+            FocusInReach = inReach;
+            if (LockedDemon.IsValid && (!_state.TryGetDemon(LockedDemon, out Demon? locked) || !locked.IsAlive))
+            {
+                LockedDemon = DemonId.None;
+            }
         }
 
         // One report per use, in the active window; the simulation checks reach and arc again and may still refuse.
@@ -172,7 +249,7 @@ namespace DemonFighter.Presentation.Combat
         {
             Demon demon = attacker.Demon!;
             float size = demon.SizeMeters;
-            float reach = skill.ReachPerMeter * size + AimRayExtraMeters;
+            float reach = skill.ReachPerMeter * size * demon.ReachMultiplier + AimRayExtraMeters;
             if (demon.Id == _player && _camera != null)
             {
                 Ray crosshair = _camera.ViewportPointToRay(ViewportCenter);
@@ -262,7 +339,7 @@ namespace DemonFighter.Presentation.Combat
                 return FoodId.None;
             }
 
-            float reach = _state.Catalog.Tuning.EatReachPerMeter * playerView.Demon.SizeMeters;
+            float reach = _state.Catalog.Tuning.EatReachPerMeter * playerView.Demon.SizeMeters * playerView.Demon.ReachMultiplier;
             float maxDistance = reach + AimedFoodExtraMeters + Vector3.Distance(_camera.transform.position, playerView.transform.position);
             Ray ray = _camera.ViewportPointToRay(ViewportCenter);
             if (!Physics.Raycast(ray, out RaycastHit hit, maxDistance, Layers.FoodMask, QueryTriggerInteraction.Collide))
@@ -296,6 +373,11 @@ namespace DemonFighter.Presentation.Combat
         private void OnDamageApplied(DamageApplied evt)
         {
             if (!_views.TryGetValue(evt.Target, out DemonView? view) || view.Demon == null)
+            {
+                return;
+            }
+
+            if (evt.Amount <= 0f)
             {
                 return;
             }
@@ -376,6 +458,25 @@ namespace DemonFighter.Presentation.Combat
             for (int i = 0; i < DeathSplashes; i++)
             {
                 _blood.SplashGround(view.transform.position + RandomOffset(size), size * 1.5f);
+            }
+        }
+
+        private void OnMutationStarted(MutationStarted evt)
+        {
+            Throb(evt.Demon, evt.UntilTick);
+        }
+
+        private void OnEvolved(Evolved evt)
+        {
+            Throb(evt.Demon, evt.UntilTick);
+        }
+
+        // The body throbs for the transformation time, so a mutation reads as growth and not as a popped-in part.
+        private void Throb(DemonId demon, long untilTick)
+        {
+            if (_views.TryGetValue(demon, out DemonView? view))
+            {
+                view.PlayTransformation((untilTick - _state.Tick) * _state.Config.TickSeconds);
             }
         }
 

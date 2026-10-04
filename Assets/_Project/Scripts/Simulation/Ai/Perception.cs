@@ -56,7 +56,7 @@ namespace DemonFighter.Simulation.Ai
                 }
 
                 float distance = PlanarDistance(self.Position, other.Position);
-                if (distance > archetype.PerceptionRadius)
+                if (distance > Radius(self, archetype))
                 {
                     continue;
                 }
@@ -69,7 +69,7 @@ namespace DemonFighter.Simulation.Ai
                     reward = MathF.Max(1f, reward);
                 }
 
-                float candidate = reward * preference * Proximity(distance, archetype.PerceptionRadius);
+                float candidate = reward * preference * Proximity(distance, Radius(self, archetype));
                 if (candidate > score)
                 {
                     score = candidate;
@@ -96,12 +96,12 @@ namespace DemonFighter.Simulation.Ai
                 }
 
                 float distance = PlanarDistance(self.Position, item.Position);
-                if (distance > archetype.PerceptionRadius)
+                if (distance > Radius(self, archetype))
                 {
                     continue;
                 }
 
-                float candidate = tuning.RewardFactor(self.Tier, item.SourceTier) * Proximity(distance, archetype.PerceptionRadius);
+                float candidate = tuning.RewardFactor(self.Tier, item.SourceTier) * Proximity(distance, Radius(self, archetype));
                 if (candidate > score)
                 {
                     score = candidate;
@@ -128,7 +128,7 @@ namespace DemonFighter.Simulation.Ai
                 }
 
                 float distance = PlanarDistance(self.Position, other.Position);
-                if (distance <= archetype.PerceptionRadius && distance < nearestDistance)
+                if (distance <= Radius(self, archetype) && distance < nearestDistance)
                 {
                     nearestDistance = distance;
                     nearest = other;
@@ -152,7 +152,7 @@ namespace DemonFighter.Simulation.Ai
                 return null;
             }
 
-            return PlanarDistance(self.Position, attacker.Position) <= archetype.PerceptionRadius * LeashFactor ? attacker : null;
+            return PlanarDistance(self.Position, attacker.Position) <= Radius(self, archetype) * LeashFactor ? attacker : null;
         }
 
         /// <summary>True when any part is wounded or lost.</summary>
@@ -176,6 +176,12 @@ namespace DemonFighter.Simulation.Ai
             float dx = a.X - b.X;
             float dz = a.Z - b.Z;
             return MathF.Sqrt(dx * dx + dz * dz);
+        }
+
+        // Sensory parts widen what the archetype allows (Eyes).
+        private static float Radius(Demon self, ArchetypeSpec archetype)
+        {
+            return archetype.PerceptionRadius * (1f + self.Body.PerceptionBonus);
         }
 
         // Nearer things score higher: 1 at zero distance, 0.5 at the edge of perception.

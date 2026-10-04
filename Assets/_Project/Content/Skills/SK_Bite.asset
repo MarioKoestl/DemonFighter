@@ -15,22 +15,48 @@ MonoBehaviour:
   _id: skill.bite
   _displayName: Bite
   _behaviourId: melee-strike
+  _inputSlot: 1
+  _slotPriority: 0
+  _isPassive: 0
+  _enablesSprint: 0
   _damageType: 0
   _baseDamage: 12
   _staminaCost: 15
+  _staminaCostPerSecond: 0
   _reachPerMeter: 1.4
   _arcDegrees: 70
   _bleedSeconds: 3
   _bleedDamagePerSecond: 2
   _staggerSeconds: 0
+  _holdSeconds: 0
+  _dashMeters: 0
+  _knockbackMeters: 0
   _windupSeconds: 0.15
   _activeSeconds: 0.2
   _recoverySeconds: 0.35
   _cooldownSeconds: 0.6
   _skillXpPerHit: 10
+  _skillXpPerSecond: 0
   _levelBaseXp: 100
   _levelExponent: 1.5
   _maxLevel: 20
   _damageBonusPerLevel: 0.05
   _staminaCostReductionPerLevel: 0.03
   _minStaminaCostFraction: 0.5
+  _cooldownReductionPerLevel: 0.02
+  _minCooldownFraction: 0.5
+  _speedBonusPerLevel: 0.02
+  _reachBonusPerLevel: 0.01
+  _perk:
+    _enabled: 1
+    _level: 10
+    _name: Deep Bite
+    _description: Bite wounds bleed half again as long.
+    _damageMultiplier: 1
+    _bleedDurationMultiplier: 1.5
+    _recoveryMultiplier: 1
+    _cooldownMultiplier: 1
+    _staminaMultiplier: 1
+    _reachMultiplier: 1
+    _effectMultiplier: 1
+  _contentVersion: 3

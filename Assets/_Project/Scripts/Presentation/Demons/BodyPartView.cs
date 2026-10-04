@@ -15,6 +15,8 @@ namespace DemonFighter.Presentation.Demons
     {
         private const float WoundedScale = 0.8f;
         private const float WoundedDarkening = 0.5f;
+        private const float HighlightBlend = 0.55f;
+        private static readonly Color HighlightColor = new Color(1f, 0.85f, 0.35f);
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         private Renderer _renderer = null!;
@@ -26,6 +28,7 @@ namespace DemonFighter.Presentation.Demons
         private bool _visible = true;
         private bool _lost;
         private bool _corpse;
+        private bool _highlighted;
         private bool _hasShown;
         private PartCondition _shown;
 
@@ -47,18 +50,22 @@ namespace DemonFighter.Presentation.Demons
             _shown = condition;
             _lost = condition == PartCondition.Lost;
             _conditionScale = condition == PartCondition.Wounded ? WoundedScale : 1f;
-            _block.Clear();
-            if (condition == PartCondition.Wounded)
-            {
-                Color darker = _renderer.sharedMaterial.color * WoundedDarkening;
-                darker.a = 1f;
-                _block.SetColor(BaseColorId, darker);
-            }
-
-            _renderer.SetPropertyBlock(_block);
+            ApplyTint();
             _collider.enabled = !_lost;
             ApplyVisibility();
             ApplyScale();
+        }
+
+        /// <summary>Marks the part the crosshair of the player rests on with a gold tint (D-065); the tint lifts when the aim moves on.</summary>
+        internal void SetHighlighted(bool highlighted)
+        {
+            if (_highlighted == highlighted)
+            {
+                return;
+            }
+
+            _highlighted = highlighted;
+            ApplyTint();
         }
 
         internal void Initialize(DemonView owner, int partIndex, Material material)
@@ -115,11 +122,48 @@ namespace DemonFighter.Presentation.Demons
             ApplyScale();
         }
 
+        /// <summary>Swaps the material and keeps the look of the current condition; a demon that grows a tier recolors.</summary>
+        internal void ReplaceMaterial(Material material)
+        {
+            if (_corpse)
+            {
+                return;
+            }
+
+            _renderer.sharedMaterial = material;
+            _hasShown = false;
+            ShowCondition(_shown);
+        }
+
         private void Awake()
         {
             _renderer = GetComponent<Renderer>();
             _collider = GetComponent<Collider>();
             _block = new MaterialPropertyBlock();
+        }
+
+        // Wounded parts darken, the aimed part glows; a corpse keeps its dead flesh color whatever the aim does.
+        private void ApplyTint()
+        {
+            _block.Clear();
+            if (!_corpse && (_shown == PartCondition.Wounded || _highlighted))
+            {
+                Color color = _renderer.sharedMaterial.color;
+                if (_shown == PartCondition.Wounded)
+                {
+                    color *= WoundedDarkening;
+                }
+
+                if (_highlighted)
+                {
+                    color = Color.Lerp(color, HighlightColor, HighlightBlend);
+                }
+
+                color.a = 1f;
+                _block.SetColor(BaseColorId, color);
+            }
+
+            _renderer.SetPropertyBlock(_block);
         }
 
         private void ApplyVisibility()

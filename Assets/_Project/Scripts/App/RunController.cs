@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using DemonFighter.Common;
 using DemonFighter.Input;
@@ -10,6 +11,8 @@ using DemonFighter.Simulation;
 using DemonFighter.Simulation.Commands;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Events;
+using DemonFighter.Simulation.Evolution;
+using DemonFighter.Simulation.Mutation;
 using DemonFighter.Simulation.Worldgen;
 using DemonFighter.UI;
 using UnityEngine;
@@ -36,6 +39,7 @@ namespace DemonFighter.App
         private IDisposable? _deathSubscription;
         private IDisposable? _spawnSubscription;
         private DemonViewFactory? _factory;
+        private BodyPreviewRig? _preview;
 
         public RunController(GameServices services)
         {
@@ -75,8 +79,18 @@ namespace DemonFighter.App
             _combat = combat;
             DemonView playerView = SpawnViews(state, player, root, combat);
             root.CameraRig.Follow(playerView, root.CameraSettings);
-            root.Hud.Bind(state, player, () => combat.AimedFood);
+            BodyPreviewRig preview = BodyPreviewRig.Create(root.transform, root.DemonPrefab, root.Palette, root.DemonSettings, _services.CatalogDefinition, root.Palette.ForDemon(player));
+            _preview = preview;
+            root.Hud.Bind(
+                state,
+                player,
+                () => combat.AimedFood,
+                _services.OfferPolicy,
+                new BodyPreviewAdapter(preview),
+                () => new TargetFocus(combat.FocusedDemon, combat.FocusedPartIndex, combat.FocusInReach, combat.LockedDemon));
             root.Hud.StatPointRequested += OnStatPointRequested;
+            root.Hud.MutationsRequested += OnMutationsRequested;
+            root.Hud.EvolutionRequested += OnEvolutionRequested;
             root.Hud.BackToMenuRequested += OnBackToMenuRequested;
             _hud = root.Hud;
             _ticker = ticker;
@@ -85,7 +99,8 @@ namespace DemonFighter.App
             _spawnSubscription = _services.Events.Subscribe<DemonSpawned>(OnDemonSpawned);
 
             _input = new PlayerInputAdapter(_services.Actions, player, root.CameraRig, root.CameraRig, new CombatAim(combat));
-            _input.StatsMenuToggled += OnStatsMenuToggled;
+            _input.MenuToggled += OnMenuToggled;
+            _input.AnalyzeRequested += OnAnalyzeRequested;
             SetCursorLocked(true);
 
             var runnerObject = new GameObject(nameof(SimulationRunner));
@@ -113,7 +128,8 @@ namespace DemonFighter.App
 
             if (_input != null)
             {
-                _input.StatsMenuToggled -= OnStatsMenuToggled;
+                _input.MenuToggled -= OnMenuToggled;
+                _input.AnalyzeRequested -= OnAnalyzeRequested;
                 _input.Dispose();
                 _input = null;
             }
@@ -121,6 +137,8 @@ namespace DemonFighter.App
             if (_hud != null)
             {
                 _hud.StatPointRequested -= OnStatPointRequested;
+                _hud.MutationsRequested -= OnMutationsRequested;
+                _hud.EvolutionRequested -= OnEvolutionRequested;
                 _hud.BackToMenuRequested -= OnBackToMenuRequested;
                 _hud = null;
             }
@@ -146,6 +164,12 @@ namespace DemonFighter.App
                 Object.Destroy(_demons.gameObject);
             }
 
+            if (_preview != null)
+            {
+                Object.Destroy(_preview.gameObject);
+                _preview = null;
+            }
+
             _world?.Destroy();
             _runner = null;
             _demons = null;
@@ -153,17 +177,68 @@ namespace DemonFighter.App
             CurrentRun = null;
         }
 
-        // C opens the Stats panel and freezes the run; its plus buttons drop commands the paused runner still applies.
-        private void OnStatsMenuToggled()
+        // Tab and C open the mutation menu and freeze the run; any menu key closes it again (GAME_DESIGN, "Mutation").
+        private void OnMenuToggled(MenuTab tab)
         {
             if (_runner == null || _hud == null || _player == null || !_player.IsAlive)
             {
                 return;
             }
 
-            bool open = _hud.ToggleStatsPanel();
+            bool open = _hud.ToggleMenu(tab);
             _runner.Paused = open;
             SetCursorLocked(!open);
+        }
+
+        // The selected mutations are queued together and close the menu; the simulation applies them in order on the
+        // next tick and reshapes the body once (D-064).
+        private void OnMutationsRequested(IReadOnlyList<MutateCommand> commands)
+        {
+            if (_ticker == null || _player == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < commands.Count; i++)
+            {
+                _ticker.Commands.Submit(commands[i]);
+            }
+
+            CloseMenuAndResume();
+        }
+
+        private void OnEvolutionRequested(string evolutionId)
+        {
+            if (_ticker == null || _player == null)
+            {
+                return;
+            }
+
+            _ticker.Commands.Submit(new EvolveCommand(_player.Id, evolutionId));
+            CloseMenuAndResume();
+        }
+
+        private void CloseMenuAndResume()
+        {
+            if (_runner == null || _hud == null || _player == null || !_player.IsAlive)
+            {
+                return;
+            }
+
+            _hud.CloseMenu();
+            _runner.Paused = false;
+            SetCursorLocked(true);
+        }
+
+        // F locks the demon under the crosshair for the analysis panel, or releases it (D-066); not while paused.
+        private void OnAnalyzeRequested()
+        {
+            if (_combat == null || _player == null || !_player.IsAlive || (_runner != null && _runner.Paused))
+            {
+                return;
+            }
+
+            _combat.ToggleLock();
         }
 
         private void OnStatPointRequested(StatId stat)
@@ -230,7 +305,7 @@ namespace DemonFighter.App
 
         private DemonView SpawnViews(RunState state, Demon player, RunSceneRoot root, CombatPresenter combat)
         {
-            var factory = new DemonViewFactory(root.DemonPrefab, root.Palette, root.DemonSettings);
+            var factory = new DemonViewFactory(root.DemonPrefab, root.Palette, root.DemonSettings, _services.CatalogDefinition);
             _factory = factory;
             _demons = new GameObject("Demons").transform;
             _demons.SetParent(root.transform, false);

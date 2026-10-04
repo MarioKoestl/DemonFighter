@@ -34,7 +34,8 @@ namespace DemonFighter.Editor.Generate
                 tunings[0],
                 EditorAssets.FindAll<BodyPartDefinition>(),
                 EditorAssets.FindAll<SkillDefinition>(),
-                EditorAssets.FindAll<DemonDefinition>());
+                EditorAssets.FindAll<DemonDefinition>(),
+                EditorAssets.FindAll<EvolutionDefinition>());
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();
 
@@ -42,7 +43,7 @@ namespace DemonFighter.Editor.Generate
             Log.Info(
                 LogCategory.Editor,
                 "Content catalog rebuilt: " + built.BodyParts.Count + " body parts, " + built.Skills.Count + " skills, " +
-                built.Demons.Count + " demons.");
+                built.Demons.Count + " demons, " + built.Evolutions.Count + " evolutions.");
         }
     }
 }

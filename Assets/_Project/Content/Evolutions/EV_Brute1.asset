@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 456dd76e25d58c74db5992596139d702, type: 3}
+  m_Name: EV_Brute1
+  m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.EvolutionDefinition
+  _id: evolution.brute.1
+  _displayName: Brute
+  _description: Mass and muscle. +10 Strength, Plates and Tail unlocked, a Thick
+    Hide for free.
+  _stage: 1
+  _fitStatId: stat.strength
+  _statPoints: 0
+  _statBonuses:
+  - _statId: stat.strength
+    _value: 10
+  _statCapBonuses:
+  - _statId: stat.strength
+    _value: 5
+  _freeMutations:
+  - {fileID: 11400000, guid: 5a9d7a7e1c6f1554c9384a00e6895b83, type: 2}
+  _unlockedParts:
+  - {fileID: 11400000, guid: ee9dc45147885264a85ba7acdfa714c4, type: 2}
+  - {fileID: 11400000, guid: 98675ea31519f7b45a631c799cd3dde2, type: 2}
+  _extraSkills: []
+  _contentVersion: 2

@@ -7,8 +7,9 @@ using UnityEngine;
 namespace DemonFighter.Editor.Setup
 {
     /// <summary>
-    /// Makes sure the physics layers the views need exist in the project settings (Demon for body parts, Food for
-    /// corpses and severed parts), written through the TagManager asset the way the Inspector does it.
+    /// Makes sure the layers the views need exist in the project settings (Demon for body parts, Food for corpses and
+    /// severed parts, Preview for the body preview of the menu), written through the TagManager asset the way the
+    /// Inspector does it.
     /// </summary>
     internal static class ProjectLayers
     {
@@ -34,6 +35,7 @@ namespace DemonFighter.Editor.Setup
 
             bool changed = Ensure(layers, Layers.DemonLayerName);
             changed |= Ensure(layers, Layers.FoodLayerName);
+            changed |= Ensure(layers, Layers.PreviewLayerName);
             if (changed)
             {
                 serialized.ApplyModifiedPropertiesWithoutUndo();

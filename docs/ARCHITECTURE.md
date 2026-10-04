@@ -31,7 +31,7 @@ Assets/_Project/
     PlayMode/        DemonFighter.PlayMode.Tests    PlayMode, needs scenes, slow
     Plugins/         test library DLLs: AwesomeAssertions, NSubstitute, Castle.Core (D-039)
   Analyzers/         Roslyn analyzer DLLs: Microsoft.Unity.Analyzers (D-039)
-  Content/           ScriptableObject assets: BodyParts/, Skills/, Mutations/, Archetypes/, Biomes/, Catalog/
+  Content/           ScriptableObject assets: BodyParts/, Skills/, Evolutions/, Demons/, Biomes/, Catalog/
   Prefabs/           generated or hand-made prefabs
   Scenes/            Bootstrap.unity, MainMenu.unity, Run.unity
   Art/               Models/, Textures/, Materials/, Animations/, VFX/ (see ASSET_PIPELINE.md)
@@ -69,16 +69,15 @@ RunState
 Demon
   Id (DemonId, a simulation id, never a Unity instance id)
   ControllerKind: Player | Ai
-  Level, Xp, UnspentStatPoints, Biomass, Tier (derived), SizeStep (derived from tier and evolutions)
-  BaseStats (Strength, Constitution, Agility; extensible as data)
-  DerivedStats (computed from base stats + Core + parts + evolutions, cached, recomputed on change)
+  Level, Xp, Biomass, Tier (derived from body investment and evolutions, D-054), SizeMeters (derived from the tier)
+  BaseStats (Strength, Constitution, Agility; extensible as data; unspent points; caps raised by evolutions)
+  DerivedStats (computed from the effective stats: base stats plus part bonuses; recomputed on change)
   Body
-    Core (hp, sockets, evolution line)
-    Parts: List<BodyPart> (spec, socket, hp, condition, upgradeLevel, child sockets)
-    SeveredParts: List<BodyPartSpecId> (regrowable on request)
-  Evolutions: List<EvolutionSpecId> (taken, in order)
-  Skills: List<SkillInstance> (spec, skillXp, skillLevel, perksTaken, cooldown, frozen when the granting part is severed)
-  Status: bleeding, stamina, eating target, transforming (mutation or evolution), lastCombatTick
+    Core (hp, the sockets with their capacities)
+    Parts: List<BodyPart> (spec, socket, hp, condition, upgradeLevel; a lost part keeps its slot until it is regrown)
+  Evolutions (count), UnlockedPartIds (from evolutions)
+  Skills: List<SkillInstance> (spec, skillXp, skillLevel, cooldown; the perk follows from the level; frozen while the granting part is lost)
+  Status: bleeding, stamina, eating target, transforming (mutation or evolution), held, pushed (knockback, dash), lastCombatTick, lastAttackedBy
   Position, Facing (mirrored from Unity each tick, see "Movement")
 
 FoodItem
@@ -88,9 +87,10 @@ FoodItem
 Specs are immutable `record` classes (C# 9) created from ScriptableObjects at load time:
 
 ```
-BodyPartSpec, SkillSpec (with level curve and PerkSpecs), MutationSpec,
-EvolutionSpec (stat point pool, caps, granted mutations, granted skills, unlocked part categories),
-ArchetypeSpec, BiomeSpec, StatSpec
+BodyPartSpec (socket, HP, defense, granted skills, bonuses per upgrade level, cost and requirements),
+SkillSpec (slot, timings, level scaling, one SkillPerkSpec),
+EvolutionSpec (stage, bound stat gains, free stat points, cap bonuses, free parts, extra skills, unlocked parts, fit stat),
+DemonSpec, ArchetypeSpec, BiomeSpec, StatSpec, CombatTuning
 ContentCatalog (lookup by id for all of the above)
 ```
 
@@ -110,24 +110,26 @@ public readonly struct MoveCommand : ICommand
     public MoveCommand(DemonId actor, Vec2 direction, bool sprint) { Actor = actor; Direction = direction; Sprint = sprint; }
 }
 // Same shape for:
-// UseSkillCommand(actor, skill, target), EatCommand(actor, food), MutateCommand(actor, mutation),
-// RegrowPartCommand(actor, part), EvolveCommand(actor, evolution), SpendStatPointCommand(actor, stat)
+// UseSkillCommand(actor, skill), ReportHitCommand(actor, target, part), EatCommand(actor, food),
+// MutateCommand(actor, kind: Attach | Upgrade | Regrow, partId, partIndex), EvolveCommand(actor, evolution),
+// SpendStatPointCommand(actor, stat)
 ```
 
-Mutate, RegrowPart and Evolve are rejected while the actor is in combat (`lastCombatTick` within the out-of-combat window, 5 seconds). On success they start a transformation: the demon is invulnerable and ignores other commands for 2 seconds, then the change applies. The rule lives in the simulation so the AI and the player cannot bypass it.
+Mutate (attach, upgrade, regrow) and Evolve are rejected while the actor is dead or transforming (the out-of-combat rule of D-014 is suspended, D-060), and when a cost, level, socket, unlock or requirement rule fails (`MutationRules`, `EvolutionRules`; the menu shows the same reasons). On success the change applies at once, the Biomass is spent and a transformation starts: the demon is invulnerable and ignores other commands for 2 seconds while the view morphs; mutations that start in the same tick share that one transformation (D-064). The rules live in the simulation so the AI and the player cannot bypass them; the offer policies (`IMutationOfferPolicy`) only read them.
 
 The player's input and the AI both produce commands. The simulation does not know or care which is which.
 
 Everything the outside world needs to show goes out as an event:
 
 ```csharp
-DamageApplied(target, part, amount, damageType, attacker)
-PartWounded(demon, part), PartSevered(demon, part, foodId)
-DemonDied(demon, killer), FoodSpawned(food), FoodConsumed(food, eater, biomass)
-TransformationStarted(demon), MutationApplied(demon, mutation), PartRegrown(demon, part)
-EvolutionApplied(demon, evolution, newSizeStep), LevelUp(demon, statPointsGranted), StatPointSpent(demon, stat)
-SkillXpGained(demon, skill, amount), SkillLevelUp(demon, skill, newLevel), SkillPerkUnlocked(demon, skill, perk)
-ThreatLevelChanged(level)
+CommandRejected(actor, command, reason)
+DamageApplied(target, part, amount, damageType, attacker), PartWounded, PartSevered(demon, part, foodId), PartDestroyed
+DemonDied(demon, killer), DemonSpawned(demon), DemonHeld(target, by, untilTick)
+FoodSpawned(food), FoodConsumed(food, eater, biomass), FoodRemoved(food, reason)
+SkillActivated(actor, skill, ...), SkillXpGained(demon, skill, amount), SkillLevelUp(demon, skill, newLevel)
+XpGained, LevelUp(demon, level, statPoints), StatPointSpent(demon, stat)
+MutationStarted(demon, kind, partIndex, partId, cost, untilTick), MutationCompleted(demon, ...), Evolved(demon, evolution, stage, untilTick)
+ThreatLevelChanged(level)   (M4)
 ```
 
 Events are structs published on a `SimulationEvents` bus. Presentation, UI and audio subscribe. Nothing subscribes from inside the simulation.
@@ -136,24 +138,29 @@ Events are structs published on a `SimulationEvents` bus. Presentation, UI and a
 
 The simulation advances in fixed steps (`SimulationTick`, 20 Hz for v1, configurable). One tick:
 
-1. Apply queued commands (validated: does the actor exist and live, is it staggered or busy, is the cooldown over, is the stamina there; a hit report counts only inside the active window, within reach and arc). Skill XP and its character XP share are granted here and may raise a level.
-2. Movement: integrate the demons that have no Unity body.
-3. Status effects: bleeding drains, passive regeneration heals, stamina refills; finished skill uses end.
-4. Eating: Biomass flows for every demon that held Eat this tick.
-5. Run AI decisions for AI demons (every N ticks per brain; held actions continue between decisions). Commands land in the next tick.
-6. Spawning: top the Tier 0 population up to the biome count, one demon per interval, out of sight of the player (D-053); the threat level that scales it comes in M4.
-7. Decay food.
-8. Flush events.
+1. Apply queued commands (validated: does the actor exist and live, is it transforming, held, staggered or busy, is the cooldown over, is the stamina there; a hit report counts only inside the active window, within reach and arc). Skill XP and its character XP share are granted here and may raise a level. Mutate and Evolve apply here and start a transformation; a skill behaviour may hold or push a demon.
+2. Hold: a grabbed demon is pushed toward its spot beside the holder, or released when the hold ended or a side died (D-061).
+3. Movement: integrate the demons that have no Unity body; expired knockback and dash velocities end.
+4. Sprint: a sprinting demon drains stamina and earns Sprint XP.
+5. Status effects: bleeding drains, passive regeneration heals, stamina refills.
+6. Skills: finished skill uses end.
+7. Transformation: a transformation whose time is up ends (`MutationCompleted`).
+8. Eating: Biomass flows for every demon that held Eat this tick.
+9. Run AI decisions for AI demons (every N ticks per brain; held actions continue between decisions; dead, transforming and held demons are skipped). Commands land in the next tick.
+10. Spawning: top the Tier 0 population up to the biome count, one demon per interval, out of sight of the player (D-053); the threat level that scales it comes in M4.
+11. Decay food.
+12. Flush events.
 
-A `SimulationRunner` MonoBehaviour in the App assembly calls `Tick` from `FixedUpdate` with an accumulator, so the simulation rate is independent of the frame rate.
+A `SimulationRunner` MonoBehaviour in the App assembly calls `Tick` from `FixedUpdate` with an accumulator, so the simulation rate is independent of the frame rate. While a menu pauses it, `ApplyPendingCommands` still applies queued commands without advancing time, so the Stats tab spends points through the same path as everything else.
 
 ### Movement, collision and hits
 
 This is the deliberate exception to "rules in the simulation". Unity's `CharacterController` and physics move the bodies and detect hits:
 
 - `MoveCommand` is consumed by the Presentation layer (the demon's view) which moves the Unity object. After the physics step, the view writes the resulting position and facing back into the simulation entity (`Demon.Position`). The simulation trusts this.
-- Skill hit detection happens in Unity during the active ticks a `SkillActivated` event announces: `CombatPresenter` sweeps a sphere along the crosshair ray for the player and along the facing for AI, against `BodyPartView` trigger colliders on the `Demon` layer. The touch becomes a `ReportHitCommand`; the simulation accepts it only inside the window, once per use, within reach and arc, then applies the damage and emits events (D-046).
+- Skill hit detection happens in Unity during the active ticks a `SkillActivated` event announces: `CombatPresenter` sweeps a sphere along the crosshair ray for the player, then falls back to a volume in front of the body (which is all AI uses), against `BodyPartView` trigger colliders on the `Demon` layer. The touch becomes a `ReportHitCommand`; the simulation accepts it only inside the window, once per use, within reach and arc, then applies the damage and emits events (D-046). Reach is the skill reach per meter of body size times `Demon.ReachMultiplier` (Eyes, D-058) in both places.
 - Perception for AI is a distance scan of the run state inside the simulation (`Perception`, D-050), so AI tests need no Unity and every demon sees the same world.
+- A grabbed demon is dragged by its holder: `HoldSystem` gives it a push toward the grab spot every tick, and the view moves it like any pushed body (D-061).
 
 Why: writing our own 3D physics is out of scope, and Unity's physics also runs headless, so a future server could run the same code.
 
@@ -161,8 +168,8 @@ Why: writing our own 3D physics is out of scope, and Unity's physics also runs h
 
 `DemonFighter.Simulation.Ai`:
 
-- `UtilityBrain` picks a goal (`Hunt`, `Eat`, `Flee`, `Wander`, `Rest`, `Patrol`; `Mutate` and `Evolve` join in M3 and M4) by weighted chance from the `ArchetypeSpec` weights, scored by what `Perception` finds within the perception radius: prey at most one tier above, never two or more tiers below unless it attacked the demon, wounded or eating prey preferred, food by the reward factor (`CombatTuning.RewardFactor`). Low health near a fight overrides everything with `Flee`.
-- The chosen goal produces commands: move (with a facing toward the prey when standing), skill use when in reach, eat every tick while at food.
+- `UtilityBrain` picks a goal (`Hunt`, `Eat`, `Flee`, `Wander`, `Rest`, `Patrol`; `Mutate` and `Evolve` join in M4) by weighted chance from the `ArchetypeSpec` weights, scored by what `Perception` finds within the perception radius: prey at most one tier above, never two or more tiers below unless it attacked the demon, wounded or eating prey preferred, food by the reward factor (`CombatTuning.RewardFactor`). Low health near a fight overrides everything with `Flee`.
+- The chosen goal produces commands: move (with a facing toward the prey when standing), a strike or a dash chosen from the skills the body grants when in reach, eat every tick while at food. A demon that was hit turns on its attacker (D-052).
 - AI decisions run every N ticks per demon (staggered), not every tick, to keep cost flat with 50+ demons; between decisions `Hold` only keeps a meal going.
 - Elders use the same brain with a wider perception; the reward rule makes them ignore blobs until one bites them.
 
@@ -180,7 +187,7 @@ Why: writing our own 3D physics is out of scope, and Unity's physics also runs h
 2. The asset holds data (stats, cost, requirements, visual references) and, when the part needs custom behaviour, the string id of a behaviour class.
 3. Behaviour classes implement a small interface and are tagged, for example `[SkillBehaviour("bite")] sealed class BiteBehaviour : ISkillBehaviour`. A registry scans assemblies once at startup. No hand-maintained list.
 4. `ContentCatalog.asset` references all definitions. The editor menu `Demon Fighter > Rebuild Content Catalog` finds every definition asset and fills the catalog, so nobody edits it by hand.
-5. At bootstrap, `ContentLoader` converts definitions into immutable specs and builds the `ContentCatalog` used by the simulation.
+5. At bootstrap, `ContentCatalogDefinition.Build()` converts definitions into immutable specs (`ToSpec()` on each definition) and builds the `ContentCatalog` used by the simulation. The placeholder generator creates the v1 assets once from `PlaceholderContent`; after that the assets are the truth and one-time migrations bring older assets up to the current fields.
 
 Rules: ScriptableObjects are never mutated at runtime. Specs are immutable records. The simulation only sees specs.
 
@@ -188,10 +195,11 @@ Addressables are not used in v1 (see `DECISIONS.md`). All content loads with the
 
 ## Presentation
 
-- `DemonView` (MonoBehaviour): binds a `Demon` to a Unity object. Owns the `CharacterController` and the body part views, plays the attack pulse and becomes the corpse on death (flat, dark, on the `Food` layer, carrying the `FoodView`).
+- `DemonView` (MonoBehaviour): binds a `Demon` to a Unity object. Owns the `CharacterController` and the body part views, builds a primitive for every attached part from the `PartVisualDefinition` of its asset (`PartVisuals`), follows the size and tier of the demon, plays the attack pulse and the transformation morph, and becomes the corpse on death (flat, dark, on the `Food` layer, carrying the `FoodView`).
 - `BodyPartView`: one per part with a trigger collider on the `Demon` layer for hit detection. Shows the condition (wounded darker and smaller, lost hidden); damage state meshes come in M5.
-- `CombatPresenter`: detects hits for active skills and reports them, and turns `DamageApplied`, `PartSevered`, `PartDestroyed`, `DemonDied` and `FoodRemoved` into blood (`BloodDecalPool`), fallen parts (`FoodView` with a rigidbody) and corpses.
-- `CameraRig`: Cinemachine, two virtual cameras (third-person default, first-person), toggled by an input event. Third-person uses the demon's own body with no culling of the player model. Camera distance, height and the `CharacterController` dimensions scale with the demon's `SizeStep`, so a 1 meter blob and a 15 meter elder use the same prefab.
+- `CombatPresenter`: detects hits for active skills and reports them, keeps the food under the crosshair for the eat prompt, highlights the body part under the crosshair and holds the Analyze lock for the HUD (D-065, D-066), and turns `DamageApplied`, `PartSevered`, `PartDestroyed`, `DemonDied`, `FoodRemoved`, `MutationStarted` and `Evolved` into blood (`BloodDecalPool`; body blood dries away after 15 seconds, D-068), fallen parts (`FoodView` with a rigidbody), corpses and the transformation throb.
+- `BodyPreviewRig`: a stage far below the world on the Preview layer with its own camera, light and RenderTexture; builds the prefab capsule and the part primitives for a body the menu composes, turns it, and switches fog off for its frames (D-063).
+- `CameraRig`: Cinemachine, two virtual cameras (third-person default, first-person), toggled by an input event. Third-person uses the demon's own body with no culling of the player model. Camera distance, height and the `CharacterController` dimensions scale with the demon's `SizeMeters` and follow it when a mutation or evolution grows the body, so a 1 meter blob and a 15 meter elder use the same prefab.
 - `WorldBuilder`: builds the world from `WorldLayout` at run start.
 - `AudioDirector`: later.
 
@@ -207,8 +215,12 @@ Presentation never changes simulation state directly. It sends commands or hit r
 ## Input
 
 - One Input Actions asset (`Settings/DemonFighter.inputactions`) with action maps `Gameplay` and `Menu`.
-- `PlayerInputAdapter` reads actions and produces commands for the demon of the player: move (facing the camera while attacking), skill use per attack press, eat while the key is held on the food Presentation found under the crosshair (`IPlayerAim`). It raises the stats menu toggle. Nothing else in the project reads input. No `Input.GetKey` anywhere.
+- `PlayerInputAdapter` reads actions and produces commands for the demon of the player: move (with the sprint flag, facing the camera while attacking), one skill use per attack key pressed, resolved through the skill slot the key stands for (`SkillSlots.Find`: left mouse Primary, right mouse Secondary, Space Lunge, Q Tail Swing), eat while the key is held on the food Presentation found under the crosshair (`IPlayerAim`). It raises `MenuToggled(MenuTab)` for Tab and C and `AnalyzeRequested` for F. Nothing else in the project reads input. No `Input.GetKey` anywhere.
 - Adding gamepad later means adding bindings to the asset, no code changes.
+
+## UI
+
+- `HudScreen` (UI Toolkit, built in code) shows the run and hosts the `MutationMenu`, the `StatsPanel` inside it and the `RunSummaryPanel`. The menu reads `RunState`, the offer policy and the rules every frame while open and only raises requests (`MutationsRequested` with every selected mutation, `EvolutionRequested`, `StatPointRequested`); `RunController` turns them into commands, pauses the runner while the menu is open and resumes it on confirm. The Mutate tab is a planner like Stats (D-064): it composes a preview `Body` (own parts plus selected offers) and hands it to an `IBodyPreview`, which the App layer implements over the `BodyPreviewRig`, so UI never references Presentation. The HUD names the aimed part under the crosshair and shows the analysis panel of a locked target through a `TargetFocus` callback composed the same way, revealing by the sense level of the player (D-066). The UI never changes simulation state directly.
 
 ## Multiplayer readiness
 

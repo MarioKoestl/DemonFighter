@@ -14,9 +14,30 @@ MonoBehaviour:
   m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.ContentCatalogDefinition
   _tuning: {fileID: 11400000, guid: 6d4f4c2ca9c70204ca05bbe2122b87a0, type: 2}
   _bodyParts:
+  - {fileID: 11400000, guid: e5e84f77c7102774c968a3b642951d26, type: 2}
   - {fileID: 11400000, guid: ad87b9563db02f349ab623f663a8804a, type: 2}
+  - {fileID: 11400000, guid: db0a82185e3648542b5d0c1431d9b1bb, type: 2}
+  - {fileID: 11400000, guid: 11757eb38de7f3943b78a5565822bf83, type: 2}
+  - {fileID: 11400000, guid: 7fa1f5875db20534695e8d4d4649abc7, type: 2}
+  - {fileID: 11400000, guid: 302ea2c3a8769c841997e940356b79e3, type: 2}
+  - {fileID: 11400000, guid: ee9dc45147885264a85ba7acdfa714c4, type: 2}
+  - {fileID: 11400000, guid: 64b1a580dd46a0742b7392388de724e8, type: 2}
+  - {fileID: 11400000, guid: 98675ea31519f7b45a631c799cd3dde2, type: 2}
+  - {fileID: 11400000, guid: 5a9d7a7e1c6f1554c9384a00e6895b83, type: 2}
   _skills:
   - {fileID: 11400000, guid: cef99d5b6e0d04b4187e63be439d52c4, type: 2}
+  - {fileID: 11400000, guid: 54cfb74525f6bc34f9de3ab5dfc6ef98, type: 2}
+  - {fileID: 11400000, guid: 3d419709725e86a45b3f3062905c0051, type: 2}
+  - {fileID: 11400000, guid: c1e91bb05108ace4e93554655b07cecd, type: 2}
+  - {fileID: 11400000, guid: 8d817c2e7f48261448ab9a7b8b9e8fde, type: 2}
+  - {fileID: 11400000, guid: 6f3bfcf7d81096a48b3fccd88c2d6aeb, type: 2}
   _demons:
   - {fileID: 11400000, guid: fb635abb7989bc04b96a3bb3acd0c14b, type: 2}
   - {fileID: 11400000, guid: 169b138920090944ab82b3f164e79137, type: 2}
+  _evolutions:
+  - {fileID: 11400000, guid: f1a638a39ff80c24bb56e9a6f9616c5c, type: 2}
+  - {fileID: 11400000, guid: 57bd98ca3fabb8940a377875343ac132, type: 2}
+  - {fileID: 11400000, guid: 9ad056affd8d2e24f9c30696915b7b98, type: 2}
+  - {fileID: 11400000, guid: 6f3f9c336184e284e969edd0e305922c, type: 2}
+  - {fileID: 11400000, guid: 66fc93e27d13bb64e8cc3a2d7a522f16, type: 2}
+  - {fileID: 11400000, guid: 268a87e10b5b97540b7e55271e4e752b, type: 2}

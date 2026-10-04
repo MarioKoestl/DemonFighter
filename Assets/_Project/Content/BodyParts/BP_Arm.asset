@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5e81c1c2a8865a4eb0cecfc36c3438e, type: 3}
+  m_Name: BP_Arm
+  m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.BodyPartDefinition
+  _id: part.arm
+  _displayName: Arm
+  _socket: 2
+  _maxHp: 25
+  _defense: 0
+  _fate: 0
+  _maxUpgrade: 5
+  _grantedSkills:
+  - {fileID: 11400000, guid: 54cfb74525f6bc34f9de3ab5dfc6ef98, type: 2}
+  - {fileID: 11400000, guid: 3d419709725e86a45b3f3062905c0051, type: 2}
+  _statBonusesPerLevel:
+  - _statId: stat.strength
+    _value: 1
+  _skillDamageBonusesPerLevel: []
+  _moveSpeedBonus: 0
+  _perceptionBonus: 0
+  _returnDamageFraction: 0
+  _sockets: []
+  _biomassValue: 6
+  _biomassCost: 30
+  _minLevel: 1
+  _repeatMinLevel: 3
+  _requiredParts: []
+  _requiresUnlock: 0
+  _visual:
+    _kind: 1
+    _material: 0
+    _localPosition: {x: 0.62, y: 0.1, z: 0.15}
+    _localScale: {x: 0.28, y: 0.55, z: 0.28}
+    _localEuler: {x: 0, y: 0, z: -30}
+    _mirrorSecondCopy: 1
+  _contentVersion: 3

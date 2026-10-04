@@ -73,7 +73,7 @@ The Universal Render Pipeline is Unity's standard renderer for most projects. Ma
 
 ## UI Toolkit
 
-The HUD and menus are built in code from `VisualElement`, `Label` and `Button` objects that live under a `UIDocument` component with a `PanelSettings` asset. Styles are set on `element.style` (positions, colors, `display` to show or hide). Elements must be created in `Awake` or `OnEnable`, never in a field initializer, because Unity constructs MonoBehaviours while it deserializes a scene and forbids UI creation then. An element with `pickingMode = PickingMode.Ignore` lets mouse clicks pass through, which the HUD overlay needs and the Stats panel does not.
+The HUD and menus are built in code from `VisualElement`, `Label` and `Button` objects that live under a `UIDocument` component with a `PanelSettings` asset. Styles are set on `element.style` (positions, colors, `display` to show or hide). Elements must be created in `Awake` or `OnEnable`, never in a field initializer, because Unity constructs MonoBehaviours while it deserializes a scene and forbids UI creation then. An element with `pickingMode = PickingMode.Ignore` lets mouse clicks pass through, which the HUD overlay needs and the mutation menu does not. `Button.SetEnabled(false)` greys a button out and swallows its clicks, a `ScrollView` scrolls content that does not fit, and `resolvedStyle` holds what the layout actually computed, which is what Play Mode tests assert on; `style` is only what the code asked for. A `VisualElement` can show a `RenderTexture` as its background image, which is how the mutation menu shows what a second camera sees of the body (D-063).
 
 ## Input System
 

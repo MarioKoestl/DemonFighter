@@ -131,8 +131,8 @@ The mutation menu is the only shop. It is one screen with tabs: **Mutate**, **Ev
 Rules:
 
 - Opening the menu pauses the game. Browsing and planning is always allowed.
-- Confirming a mutation requires being **out of combat**: no damage dealt or taken in the last 5 seconds. The button is disabled otherwise and says why.
-- After confirming, the transformation takes 2 seconds in the world. The demon is invulnerable and cannot act during it. Because it cannot be triggered in combat, this is not an escape move.
+- **(suspended, D-060)** Confirming a mutation was to require being **out of combat**: no damage dealt or taken in the last 5 seconds, with the button disabled and saying why. Opening a menu you could not use felt wrong in the M3 playtest, so the rule is switched off until a better one is found; for now a mutation can be confirmed at any time.
+- After confirming, the transformation takes 2 seconds in the world. The demon is invulnerable and cannot act during it. While the combat rule is suspended this doubles as an escape move; the replacement rule has to close that.
 - **(default, open)** Offer policy: v1 lists every mutation you qualify for (shop). Roguelike-style random offers are implemented behind `IMutationOfferPolicy` and playtested in M4.
 
 ### Evolution
@@ -140,11 +140,11 @@ Rules:
 At level thresholds the demon evolves: a big change of form, inspired by Chrysalis evolutions and Everything is Crab specializations.
 
 - The Evolve tab offers 3 evolution options generated from the demon's current body, stats, skills and archetype. Each option has a name, a description and a visual change to the core, and grants a **package**:
-  - a pool of **stat points to allocate** (the pool differs per option, for example a Brute option grants more points than a Stalker option but the Stalker option raises the Agility cap)
+  - **bound stat gains** (D-067): for example a Brute option gives +10 Strength, which raises the Strength cap by the same amount; a free pool of points is possible in the data, v1 uses none
   - one or more **free mutations** (parts or upgrades applied immediately, no Biomass)
   - one or more **extra skills** that no part grants (for example a roar, a burrow)
   - unlocked **part categories** (a Brute line unlocks heavy limbs and Plates, a Stalker line unlocks speed and sensory parts)
-- Evolving is confirmed like a mutation (out of combat, short transformation) and grows the body a size step.
+- Evolving is confirmed like a mutation (short transformation; the out-of-combat rule is suspended, D-060) and grows the body a size step.
 - AI demons evolve too, picking by archetype preference.
 - **(default, open)** v1 has two evolution thresholds, Level 5 and Level 10, three options each. Whether an option's stat pool is fully free or partly bound to a stat is decided when the first evolutions are written in M3; default: fully free pool, option-specific size and caps.
 
@@ -169,7 +169,7 @@ Skills are granted by parts or by evolutions and improve with use (see "Skill le
 | Crawl / Walk | Core / Legs | | Crawl is slow. Legs replace it with Walk. |
 | Eat | Core | | Hold on a corpse or severed part to convert it to Biomass over time. Interruptible. Only dead things. |
 | Claw | Arm | Cut | Faster than Bite, less damage, strong bleeding. |
-| Grab | Arm | | Hold a smaller demon in place for a short time, then Bite or Claw it. |
+| Grab | Arm | | Hold a demon no bigger than you for a short time and drag it along with you, then Bite or Claw it. |
 | Lunge | Legs | Blunt | Short dash attack, knocks back. |
 | Sprint | Legs | | Faster movement, burns stamina. |
 | Tail Swing | Tail | Blunt | Wide arc, staggers. |
@@ -241,6 +241,7 @@ Whatever the stage: every wound must be visible on the body.
 | Tab | Mutation menu (pauses) |
 | C | Stats and Skills (same menu, Stats tab) |
 | V | Toggle third / first person |
+| F | Analyze: lock the target under the crosshair and read what your senses reveal (D-066) |
 | Esc | Pause menu |
 
 Gamepad is not planned for v1. The Input System setup must not make it hard to add.
@@ -248,7 +249,8 @@ Gamepad is not planned for v1. The Input System setup must not make it hard to a
 ## UI
 
 - **HUD:** Health (with a per-part indicator), Stamina, Biomass, Level and XP, Tier, active skills with cooldowns, bleeding indicator, threat level as a subtle meter, seed in a corner.
-- **Mutation menu:** tabs Mutate, Evolve, Stats, Skills. Body silhouette with sockets, cost, requirements, preview of the stat change, regrow buttons for severed parts.
+- **Mutation menu:** tabs Mutate, Evolve, Stats, Skills. A turning 3D preview of the own body that shows the selected offers, the sockets and what fills them, and new parts, upgrades and regrows in separate groups with cost, requirements and effect. Mutations are selected and applied together with one Apply, like stat points (D-064).
+- **Aim and analysis (D-065, D-066):** the body part under the crosshair glows gold and is named under the crosshair with the kind and tier of its owner, plus "out of reach" when the primary attack would not land. F locks the target for analysis; what the panel reveals depends on the sense level of your body: dull senses see parts and visible wounds, one pair of Eyes adds health, bleeding and skills, two pairs add level, stats, evolutions and the worth as food.
 - **Death screen:** run summary.
 - **Main menu:** New Run (with optional seed), Continue (if a save exists), Settings (graphics, audio, mouse sensitivity, invert Y), Quit.
 - First-run hints: short on-screen prompts the first time a mechanic becomes relevant (first corpse, first Biomass, first level up). No tutorial level.

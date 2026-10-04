@@ -69,6 +69,11 @@ namespace DemonFighter.Simulation.Skills
 
             foreach (SkillSpec skill in catalog.Skills)
             {
+                if (skill.IsPassive)
+                {
+                    continue;
+                }
+
                 if (!_behaviours.ContainsKey(skill.BehaviourId))
                 {
                     throw new ContentException("Skill " + skill.Id + " names unknown behaviour " + skill.BehaviourId + ".");

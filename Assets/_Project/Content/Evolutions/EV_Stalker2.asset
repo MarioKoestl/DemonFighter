@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 456dd76e25d58c74db5992596139d702, type: 3}
+  m_Name: EV_Stalker2
+  m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.EvolutionDefinition
+  _id: evolution.stalker.2
+  _displayName: Stalker
+  _description: The Stalker grown. +10 Agility and +5 Strength, Eyes for free.
+  _stage: 2
+  _fitStatId: stat.agility
+  _statPoints: 0
+  _statBonuses:
+  - _statId: stat.agility
+    _value: 10
+  - _statId: stat.strength
+    _value: 5
+  _statCapBonuses:
+  - _statId: stat.agility
+    _value: 5
+  _freeMutations:
+  - {fileID: 11400000, guid: 11757eb38de7f3943b78a5565822bf83, type: 2}
+  _unlockedParts: []
+  _extraSkills: []
+  _contentVersion: 2
