@@ -1,0 +1,27 @@
+{
+  "name": "DemonFighter.Simulation.Tests",
+  "rootNamespace": "DemonFighter.Simulation.Tests",
+  "references": [
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "DemonFighter.Simulation"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll",
+    "AwesomeAssertions.dll",
+    "NSubstitute.dll",
+    "Castle.Core.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

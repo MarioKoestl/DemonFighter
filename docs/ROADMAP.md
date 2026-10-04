@@ -4,7 +4,7 @@ Milestones are ordered. Each has acceptance criteria that Mario can check in Pla
 
 ## Current milestone
 
-**M0: Project setup.** Nothing is ticked yet.
+**M0: Project setup.** All Claude Code items are done on branch `chore/m0-project-setup` (2026-10-04): packages, test libraries, analyzer, assemblies, generated scenes, composition root, simulation foundation with 44 EditMode tests and 1 PlayMode test, Input Actions asset, project settings. Open: the two Play Mode acceptance checks (Console without errors or warnings; Bootstrap opens MainMenu, New Run loads Run) are Mario's. Next: M1 walking skeleton.
 
 (Claude Code: update this section when a milestone completes. Do not rewrite other sections without asking.)
 
@@ -14,30 +14,30 @@ Goal: a Unity project in the repository that opens without errors, has the layer
 
 Done by Mario, in Unity Hub (cannot be done from the repository):
 
-- [ ] Install Unity Hub, the latest Unity 6 LTS, with "Windows Build Support (IL2CPP)" module
-- [ ] Create the project with the **Universal 3D** template, name `DemonFighter`, in a temp folder, then move `Assets`, `Packages` and `ProjectSettings` to the repository root `C:\Development\DemonFighter` (steps in README)
-- [ ] Edit > Project Settings > Editor: Asset Serialization = Force Text, Version Control = Visible Meta Files (both are the defaults, confirm)
-- [ ] Commit the fresh project (`chore(project): create Unity project`)
+- [x] Install Unity Hub, the latest Unity 6 LTS, with "Windows Build Support (IL2CPP)" module
+- [x] Create the project with the **Universal 3D** template, name `DemonFighter`, in a temp folder, then move `Assets`, `Packages` and `ProjectSettings` to the repository root `C:\Development\DemonFighter` (steps in README)
+- [x] Edit > Project Settings > Editor: Asset Serialization = Force Text, Version Control = Visible Meta Files (both are the defaults, confirm)
+- [x] Commit the fresh project (`chore(project): create Unity project`)
 
 Done by Claude Code:
 
-- [ ] Add packages to `Packages/manifest.json`: Input System, Cinemachine, Test Framework, UI Toolkit (built in), Newtonsoft JSON (`com.unity.nuget.newtonsoft-json`)
-- [ ] Test libraries: FluentAssertions 7.x or AwesomeAssertions, and NSubstitute, as DLLs under `Assets/_Project/Tests/Plugins` or as UPM packages; both free licenses, exact source and version recorded in `DECISIONS.md`
-- [ ] Microsoft.Unity.Analyzers installed as a Roslyn analyzer in the project
-- [ ] Create the folder structure and all assembly definitions from `ARCHITECTURE.md`, with `noEngineReferences` on Simulation and warnings as errors via `csc.rsp`
-- [ ] Add `Bootstrap.unity`, `MainMenu.unity`, `Run.unity` through an editor script (`Demon Fighter > Generate > Scenes`), and set the build scene list
-- [ ] `GameServices` composition root, `SimulationRunner` with a fixed tick and an empty `RunState`
-- [ ] `Log` helper, `Rng` wrapper, `DemonId` and friends, `SimulationEvents` bus
-- [ ] One EditMode test that creates a `RunState` with a seed and ticks it 100 times
-- [ ] Input Actions asset with the `Gameplay` and `Menu` maps and the bindings from `GAME_DESIGN.md`
-- [ ] `.editorconfig`, `.gitignore`, `.gitattributes` (LFS) in place; `git lfs install` documented in README; `dotnet format` runs clean
-- [ ] Project settings: Active Input Handling = Input System only, URP asset assigned, quality level "PC"
+- [x] Add packages to `Packages/manifest.json`: Input System, Cinemachine, Test Framework, UI Toolkit (built in), Newtonsoft JSON (`com.unity.nuget.newtonsoft-json`)
+- [x] Test libraries: FluentAssertions 7.x or AwesomeAssertions, and NSubstitute, as DLLs under `Assets/_Project/Tests/Plugins` or as UPM packages; both free licenses, exact source and version recorded in `DECISIONS.md`
+- [x] Microsoft.Unity.Analyzers installed as a Roslyn analyzer in the project
+- [x] Create the folder structure and all assembly definitions from `ARCHITECTURE.md`, with `noEngineReferences` on Simulation and warnings as errors via `csc.rsp`
+- [x] Add `Bootstrap.unity`, `MainMenu.unity`, `Run.unity` through an editor script (`Demon Fighter > Generate > Scenes`), and set the build scene list
+- [x] `GameServices` composition root, `SimulationRunner` with a fixed tick and an empty `RunState`
+- [x] `Log` helper, `Rng` wrapper, `DemonId` and friends, `SimulationEvents` bus
+- [x] One EditMode test that creates a `RunState` with a seed and ticks it 100 times
+- [x] Input Actions asset with the `Gameplay` and `Menu` maps and the bindings from `GAME_DESIGN.md`
+- [x] `.editorconfig`, `.gitignore`, `.gitattributes` (LFS) in place; `git lfs install` documented in README; `dotnet format` runs clean
+- [x] Project settings: Active Input Handling = Input System only, URP asset assigned, quality level "PC"
 
 Acceptance:
 
 - [ ] Project opens with zero errors and zero warnings in the Console
-- [ ] `dotnet build DemonFighter.sln` passes
-- [ ] EditMode test passes in the Test Runner
+- [x] `dotnet build DemonFighter.slnx` passes
+- [x] EditMode test passes in the Test Runner
 - [ ] Pressing Play in `Bootstrap.unity` loads `MainMenu.unity` and shows a "New Run" button that loads an empty `Run.unity`
 
 ## M1: Walking skeleton (be in a 3D world and see other demons)

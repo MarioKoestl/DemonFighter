@@ -13,7 +13,7 @@ Numbered steps for Mario: scene to open, what to press, what should happen. Writ
 ## Tests
 
 - [ ] EditMode tests added or updated for simulation changes
-- [ ] `dotnet build DemonFighter.sln` passes
+- [ ] `dotnet build DemonFighter.slnx` passes
 - [ ] No warnings in the Simulation assembly
 
 ## Housekeeping

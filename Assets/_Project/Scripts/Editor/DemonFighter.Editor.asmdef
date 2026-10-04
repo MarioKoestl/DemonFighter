@@ -1,0 +1,25 @@
+{
+  "name": "DemonFighter.Editor",
+  "rootNamespace": "DemonFighter.Editor",
+  "references": [
+    "DemonFighter.Simulation",
+    "DemonFighter.Data",
+    "DemonFighter.Presentation",
+    "DemonFighter.Input",
+    "DemonFighter.UI",
+    "DemonFighter.App",
+    "DemonFighter.Common",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
