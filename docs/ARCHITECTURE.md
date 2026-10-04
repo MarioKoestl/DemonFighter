@@ -136,13 +136,14 @@ Events are structs published on a `SimulationEvents` bus. Presentation, UI and a
 
 The simulation advances in fixed steps (`SimulationTick`, 20 Hz for v1, configurable). One tick:
 
-1. Apply queued commands (validated: does the actor exist, does it have the part, is the cooldown over).
-2. Advance status effects (bleeding, stamina regen, passive regeneration, eating progress, transformation timer).
-   Skill XP is granted inside the skill resolution step of (1) and may raise a skill level there (`SkillProgression`).
-3. Run AI decisions for AI demons (produces commands for the next tick).
-4. Advance threat level and spawning rules.
-5. Decay food.
-6. Flush events.
+1. Apply queued commands (validated: does the actor exist and live, is it staggered or busy, is the cooldown over, is the stamina there; a hit report counts only inside the active window, within reach and arc). Skill XP and its character XP share are granted here and may raise a level.
+2. Movement: integrate the demons that have no Unity body.
+3. Status effects: bleeding drains, passive regeneration heals, stamina refills; finished skill uses end.
+4. Eating: Biomass flows for every demon that held Eat this tick.
+5. Run AI decisions for AI demons (every N ticks per brain; held actions continue between decisions). Commands land in the next tick.
+6. Spawning: top the Tier 0 population up to the biome count, one demon per interval, out of sight of the player (D-053); the threat level that scales it comes in M4.
+7. Decay food.
+8. Flush events.
 
 A `SimulationRunner` MonoBehaviour in the App assembly calls `Tick` from `FixedUpdate` with an accumulator, so the simulation rate is independent of the frame rate.
 
@@ -151,8 +152,8 @@ A `SimulationRunner` MonoBehaviour in the App assembly calls `Tick` from `FixedU
 This is the deliberate exception to "rules in the simulation". Unity's `CharacterController` and physics move the bodies and detect hits:
 
 - `MoveCommand` is consumed by the Presentation layer (the demon's view) which moves the Unity object. After the physics step, the view writes the resulting position and facing back into the simulation entity (`Demon.Position`). The simulation trusts this.
-- Skill hit detection happens in Unity (a hitbox or sphere cast on the attacking part's view during the active frames). The hit result is converted into a `HitReport` and fed to the simulation, which decides the damage, applies it and emits events.
-- Perception for AI uses Unity overlap queries through an `IPerceptionProvider` interface. The simulation only sees a list of `PerceivedEntity(DemonId or FoodId, distance, tier, state)`.
+- Skill hit detection happens in Unity during the active ticks a `SkillActivated` event announces: `CombatPresenter` sweeps a sphere along the crosshair ray for the player and along the facing for AI, against `BodyPartView` trigger colliders on the `Demon` layer. The touch becomes a `ReportHitCommand`; the simulation accepts it only inside the window, once per use, within reach and arc, then applies the damage and emits events (D-046).
+- Perception for AI is a distance scan of the run state inside the simulation (`Perception`, D-050), so AI tests need no Unity and every demon sees the same world.
 
 Why: writing our own 3D physics is out of scope, and Unity's physics also runs headless, so a future server could run the same code.
 
@@ -160,10 +161,10 @@ Why: writing our own 3D physics is out of scope, and Unity's physics also runs h
 
 `DemonFighter.Simulation.Ai`:
 
-- `UtilityBrain` scores goals (`Hunt`, `Eat`, `Flee`, `Mutate`, `Evolve`, `Wander`, `Rest`) each AI tick from perception and own state. Weights and preferred mutation and evolution paths come from the `ArchetypeSpec`. Target selection applies the reward scaling rule (`RewardScaling.Factor(attackerTier, victimTier)`): prey more than one tier below is not worth hunting, which is what makes elders ignore the small.
-- The chosen goal produces one or more commands.
-- AI decisions run every N ticks per demon (staggered), not every tick, to keep cost flat with 50+ demons.
-- Elders use the same brain with an archetype that scores `Hunt` near zero for targets several tiers below.
+- `UtilityBrain` picks a goal (`Hunt`, `Eat`, `Flee`, `Wander`, `Rest`, `Patrol`; `Mutate` and `Evolve` join in M3 and M4) by weighted chance from the `ArchetypeSpec` weights, scored by what `Perception` finds within the perception radius: prey at most one tier above, never two or more tiers below unless it attacked the demon, wounded or eating prey preferred, food by the reward factor (`CombatTuning.RewardFactor`). Low health near a fight overrides everything with `Flee`.
+- The chosen goal produces commands: move (with a facing toward the prey when standing), skill use when in reach, eat every tick while at food.
+- AI decisions run every N ticks per demon (staggered), not every tick, to keep cost flat with 50+ demons; between decisions `Hold` only keeps a meal going.
+- Elders use the same brain with a wider perception; the reward rule makes them ignore blobs until one bites them.
 
 ### World generation
 
@@ -187,9 +188,9 @@ Addressables are not used in v1 (see `DECISIONS.md`). All content loads with the
 
 ## Presentation
 
-- `DemonView` (MonoBehaviour): binds a `DemonId` to a Unity object. Owns the `CharacterController`, the body part views, the animation driver and the damage visuals.
-- `BodyPartView`: one per part, attached to the socket transform. Switches damage state meshes, detaches on sever (spawns a `FoodView`).
-- `GoreSystem`: pooled blood decals and particles, reacts to `DamageApplied` and `PartSevered`.
+- `DemonView` (MonoBehaviour): binds a `Demon` to a Unity object. Owns the `CharacterController` and the body part views, plays the attack pulse and becomes the corpse on death (flat, dark, on the `Food` layer, carrying the `FoodView`).
+- `BodyPartView`: one per part with a trigger collider on the `Demon` layer for hit detection. Shows the condition (wounded darker and smaller, lost hidden); damage state meshes come in M5.
+- `CombatPresenter`: detects hits for active skills and reports them, and turns `DamageApplied`, `PartSevered`, `PartDestroyed`, `DemonDied` and `FoodRemoved` into blood (`BloodDecalPool`), fallen parts (`FoodView` with a rigidbody) and corpses.
 - `CameraRig`: Cinemachine, two virtual cameras (third-person default, first-person), toggled by an input event. Third-person uses the demon's own body with no culling of the player model. Camera distance, height and the `CharacterController` dimensions scale with the demon's `SizeStep`, so a 1 meter blob and a 15 meter elder use the same prefab.
 - `WorldBuilder`: builds the world from `WorldLayout` at run start.
 - `AudioDirector`: later.
@@ -206,7 +207,7 @@ Presentation never changes simulation state directly. It sends commands or hit r
 ## Input
 
 - One Input Actions asset (`Settings/DemonFighter.inputactions`) with action maps `Gameplay` and `Menu`.
-- `PlayerInputAdapter` reads actions and produces commands for the player's `DemonId`. Nothing else in the project reads input. No `Input.GetKey` anywhere.
+- `PlayerInputAdapter` reads actions and produces commands for the demon of the player: move (facing the camera while attacking), skill use per attack press, eat while the key is held on the food Presentation found under the crosshair (`IPlayerAim`). It raises the stats menu toggle. Nothing else in the project reads input. No `Input.GetKey` anywhere.
 - Adding gamepad later means adding bindings to the asset, no code changes.
 
 ## Multiplayer readiness

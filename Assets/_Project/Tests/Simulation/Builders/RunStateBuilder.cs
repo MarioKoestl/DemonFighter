@@ -1,4 +1,7 @@
 #nullable enable
+using DemonFighter.Simulation.Content;
+using DemonFighter.Simulation.Tests.Content;
+
 namespace DemonFighter.Simulation.Tests.Builders
 {
     /// <summary>
@@ -10,6 +13,7 @@ namespace DemonFighter.Simulation.Tests.Builders
 
         private int _seed = DefaultSeed;
         private SimulationConfig _config = SimulationConfig.Default;
+        private ContentCatalog? _catalog;
 
         public RunStateBuilder WithSeed(int seed)
         {
@@ -23,9 +27,15 @@ namespace DemonFighter.Simulation.Tests.Builders
             return this;
         }
 
+        public RunStateBuilder WithCatalog(ContentCatalog catalog)
+        {
+            _catalog = catalog;
+            return this;
+        }
+
         public RunState Build()
         {
-            return new RunState(_seed, _config);
+            return new RunState(_seed, _config, _catalog ?? TestContent.Catalog());
         }
     }
 }

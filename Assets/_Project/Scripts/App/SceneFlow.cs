@@ -9,8 +9,9 @@ using Object = UnityEngine.Object;
 namespace DemonFighter.App
 {
     /// <summary>
-    /// Moves the application between scenes: Bootstrap, then MainMenu, then Run (ARCHITECTURE, "App"). Scene objects
-    /// that need wiring get it here, right after their scene has loaded, instead of fetching services from a static.
+    /// Moves the application between scenes: Bootstrap, then MainMenu, then Run, and back to the menu when a run is
+    /// over (ARCHITECTURE, "App"). Scene objects that need wiring get it here, right after their scene has loaded,
+    /// instead of fetching services from a static.
     /// </summary>
     internal sealed class SceneFlow
     {
@@ -20,6 +21,7 @@ namespace DemonFighter.App
         public SceneFlow(RunController runController)
         {
             _runController = runController ?? throw new ArgumentNullException(nameof(runController));
+            _runController.ReturnToMenuRequested += OnReturnToMenuRequested;
         }
 
         /// <summary>Loads the main menu and listens for the New Run request.</summary>
@@ -52,6 +54,20 @@ namespace DemonFighter.App
             catch (Exception exception)
             {
                 Log.Error(LogCategory.App, "Starting a run failed.", exception);
+            }
+        }
+
+        // The death screen asked for the menu: the run is torn down first, then the menu scene replaces the Run scene.
+        private async void OnReturnToMenuRequested()
+        {
+            try
+            {
+                _runController.EndRun();
+                await ShowMainMenuAsync();
+            }
+            catch (Exception exception)
+            {
+                Log.Error(LogCategory.App, "Returning to the main menu failed.", exception);
             }
         }
 

@@ -70,6 +70,7 @@ namespace DemonFighter.Editor.Generate
             var bootstrapper = new GameObject(nameof(Bootstrapper)).AddComponent<Bootstrapper>();
             SetReference(bootstrapper, "_biome", LoadRequired<BiomeDefinition>(PlaceholderAssetGenerator.AshCavernPath));
             SetReference(bootstrapper, "_actions", LoadRequired<InputActionAsset>(ProjectWideInputActions.AssetPath));
+            SetReference(bootstrapper, "_catalog", LoadRequired<ContentCatalogDefinition>(ContentCatalogRebuilder.CatalogPath));
             return Save(scene, SceneNames.Bootstrap);
         }
 

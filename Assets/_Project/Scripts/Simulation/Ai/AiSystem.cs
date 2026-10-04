@@ -7,7 +7,7 @@ namespace DemonFighter.Simulation.Ai
 {
     /// <summary>
     /// Runs the brains of all AI demons, each every few ticks and staggered by index, so the cost stays flat as the
-    /// demon count grows (ARCHITECTURE, "AI"). Stage 3 of the tick.
+    /// demon count grows (ARCHITECTURE, "AI"). Between decisions a brain only keeps held actions going.
     /// </summary>
     public sealed class AiSystem
     {
@@ -31,9 +31,18 @@ namespace DemonFighter.Simulation.Ai
             for (int i = 0; i < _brains.Count; i++)
             {
                 UtilityBrain brain = _brains[i];
+                if (!brain.Demon.IsAlive)
+                {
+                    continue;
+                }
+
                 if ((tick + i) % brain.Archetype.DecisionIntervalTicks == 0)
                 {
                     brain.Decide(state, commands);
+                }
+                else
+                {
+                    brain.Hold(commands);
                 }
             }
         }

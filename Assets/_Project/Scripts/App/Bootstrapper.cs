@@ -17,6 +17,7 @@ namespace DemonFighter.App
     /// </summary>
     internal sealed class Bootstrapper : MonoBehaviour
     {
+        [SerializeField] private ContentCatalogDefinition _catalog = null!;
         [SerializeField] private BiomeDefinition _biome = null!;
         [SerializeField] private InputActionAsset _actions = null!;
 
@@ -26,9 +27,9 @@ namespace DemonFighter.App
         private void Awake()
         {
             DontDestroyOnLoad(gameObject);
-            if (_biome == null || _actions == null)
+            if (_catalog == null || _biome == null || _actions == null)
             {
-                Log.Error(LogCategory.App, "Bootstrapper is missing its biome or actions reference; run Demon Fighter > Generate > Scenes.", this);
+                Log.Error(LogCategory.App, "Bootstrapper is missing its catalog, biome or actions reference; run Demon Fighter > Generate > Scenes.", this);
                 return;
             }
 
@@ -39,10 +40,11 @@ namespace DemonFighter.App
                     new SimulationEvents(),
                     _biome.ToSpec(),
                     new CavernWorldGenerator(),
+                    _catalog.Build(),
                     _actions);
                 _runController = new RunController(services);
                 _sceneFlow = new SceneFlow(_runController);
-                Log.Info(LogCategory.App, "Bootstrap complete with biome " + services.Biome.Id + ".");
+                Log.Info(LogCategory.App, "Bootstrap complete with biome " + services.Biome.Id + " and " + services.Catalog.Demons.Count + " demon kinds.");
             }
             catch (Exception exception)
             {

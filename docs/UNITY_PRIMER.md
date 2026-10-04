@@ -68,6 +68,12 @@ The Universal Render Pipeline is Unity's standard renderer for most projects. Ma
 - `Rigidbody` makes an object move under physics. `Collider` gives it a shape for collisions. A `CharacterController` is a special capsule for characters that moves by code and handles slopes and steps without being thrown around by physics.
 - Physics runs in `FixedUpdate`. Querying "what is near me" is `Physics.OverlapSphere` and friends. Layers control what collides with what.
 - We use Unity physics for movement and hits, and feed the results into the simulation. See `ARCHITECTURE.md`, "Movement, collision and hits".
+- A collider marked `isTrigger` is a shape that queries and rays can find but that blocks nothing. Body parts use triggers on the `Demon` layer, so a sphere cast finds the part under the crosshair without the parts bumping into each other. Layers are plain project settings (Edit > Project Settings > Tags and Layers); our generator adds `Demon` and `Food`.
+- A `Rigidbody` falls asleep once it rests; `IsSleeping()` is how a severed part knows it has landed and can report its position.
+
+## UI Toolkit
+
+The HUD and menus are built in code from `VisualElement`, `Label` and `Button` objects that live under a `UIDocument` component with a `PanelSettings` asset. Styles are set on `element.style` (positions, colors, `display` to show or hide). Elements must be created in `Awake` or `OnEnable`, never in a field initializer, because Unity constructs MonoBehaviours while it deserializes a scene and forbids UI creation then. An element with `pickingMode = PickingMode.Ignore` lets mouse clicks pass through, which the HUD overlay needs and the Stats panel does not.
 
 ## Input System
 

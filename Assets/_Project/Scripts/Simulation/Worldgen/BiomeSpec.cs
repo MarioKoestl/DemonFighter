@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using DemonFighter.Simulation.Ai;
+using DemonFighter.Simulation.Content;
 
 namespace DemonFighter.Simulation.Worldgen
 {
@@ -87,6 +88,15 @@ namespace DemonFighter.Simulation.Worldgen
         /// <summary>No feature inside this distance of the spawn center, so the first minute is open ground.</summary>
         public float SpawnClearRadius { get; init; } = 30f;
 
+        /// <summary>Seconds between top-up spawns while fewer Tier 0 demons live than InitialBlobs; zero disables them (D-053).</summary>
+        public float RespawnSeconds { get; init; } = 12f;
+
+        /// <summary>A top-up spawn lands at least this far from the player, in meters.</summary>
+        public float RespawnMinDistance { get; init; } = 35f;
+
+        /// <summary>A top-up spawn lands at most this far from the player, in meters.</summary>
+        public float RespawnMaxDistance { get; init; } = 70f;
+
         /// <summary>Radius of the elder loop around the map center.</summary>
         public float ElderRouteRadius { get; init; } = 100f;
 
@@ -102,17 +112,31 @@ namespace DemonFighter.Simulation.Worldgen
         /// <summary>The elder starts at the waypoint nearest to the spawn cluster but at least this far away.</summary>
         public float ElderMinSpawnDistance { get; init; } = 40f;
 
-        public DemonTemplate BlobTemplate { get; init; } = new DemonTemplate("Blob", 0, 1.2f, 4f, 1.6f);
+        /// <summary>The Tier 0 kind the player and the start spawns are born as.</summary>
+        public DemonSpec BlobDemon { get; init; } = new DemonSpec { Id = "demon.blob", Name = "Blob" };
 
-        public DemonTemplate ElderTemplate { get; init; } = new DemonTemplate("Elder", 6, 15f, 3f, 1f);
+        /// <summary>The high-tier kind that walks the elder loop.</summary>
+        public DemonSpec ElderDemon { get; init; } = new DemonSpec
+        {
+            Id = "demon.elder",
+            Name = "Elder",
+            Tier = 6,
+            SizeMeters = 15f,
+            MoveSpeed = 3f,
+            SprintMultiplier = 1f,
+            StartingStats = new[] { new StatValue(StatIds.Strength, 10), new StatValue(StatIds.Constitution, 20) },
+        };
 
+        /// <summary>Fleeing is implemented but switched off in the M2 content (threshold 0): fights are hard to test when prey runs.</summary>
         public ArchetypeSpec BlobArchetype { get; init; } = new ArchetypeSpec(
-            "Blob", wanderWeight: 1f, restWeight: 0.6f, patrolWeight: 0f, wanderRadius: 20f,
-            restSecondsMin: 2f, restSecondsMax: 5f, decisionIntervalTicks: 10, arriveDistance: 1f);
+            "Blob", wanderWeight: 1f, restWeight: 0.8f, patrolWeight: 0f, wanderRadius: 20f,
+            restSecondsMin: 2f, restSecondsMax: 5f, decisionIntervalTicks: 10, arriveDistance: 1f,
+            huntWeight: 0.8f, eatWeight: 2.5f, fleeHealthFraction: 0f, perceptionRadius: 18f);
 
         public ArchetypeSpec ElderArchetype { get; init; } = new ArchetypeSpec(
             "Elder", wanderWeight: 0f, restWeight: 0.15f, patrolWeight: 1f, wanderRadius: 30f,
-            restSecondsMin: 3f, restSecondsMax: 6f, decisionIntervalTicks: 10, arriveDistance: 4f);
+            restSecondsMin: 3f, restSecondsMax: 6f, decisionIntervalTicks: 10, arriveDistance: 4f,
+            huntWeight: 1.5f, eatWeight: 1f, fleeHealthFraction: 0f, perceptionRadius: 60f);
 
         /// <summary>Throws with the first content error found; called by the generator and the asset's OnValidate.</summary>
         public void Validate()
@@ -136,14 +160,18 @@ namespace DemonFighter.Simulation.Worldgen
             RequireRange(BonePileRadiusMin, BonePileRadiusMax, "Bone pile radius");
             Require(InitialBlobs >= 0, "InitialBlobs is never negative.");
             Require(SpawnClusterRadius > 0f && SpawnClearRadius >= SpawnClusterRadius, "Spawn clear radius must cover the cluster.");
+            Require(RespawnSeconds >= 0f, "RespawnSeconds is never negative.");
+            Require(RespawnMinDistance > 0f && RespawnMaxDistance >= RespawnMinDistance, "Respawn distances must be positive and ordered.");
             Require(ElderRouteRadius > 0f && ElderRouteRadius + ElderRouteJitter < SizeMeters * 0.5f - WallInset - FeatureMargin, "Elder route must fit inside the feature area.");
             Require(ElderRouteWaypoints >= 3, "An elder route needs at least three waypoints.");
             Require(ElderRouteJitter >= 0f && ElderRouteClearance >= 0f && ElderMinSpawnDistance >= 0f, "Elder route distances are never negative.");
-            Require(BlobTemplate != null && ElderTemplate != null, "Both demon templates are required.");
+            Require(BlobDemon != null && ElderDemon != null, "Both demon kinds are required.");
             Require(BlobArchetype != null && ElderArchetype != null, "Both archetypes are required.");
+            BlobDemon.Validate();
+            ElderDemon.Validate();
         }
 
-        private void Require(bool condition, string message)
+        private void Require([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool condition, string message)
         {
             if (!condition)
             {

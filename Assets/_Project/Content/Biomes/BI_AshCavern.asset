@@ -43,33 +43,30 @@ MonoBehaviour:
   _initialBlobs: 10
   _spawnClusterRadius: 15
   _spawnClearRadius: 30
-  _blobTemplate:
-    _name: Blob
-    _tier: 0
-    _sizeMeters: 1.2
-    _moveSpeed: 4
-    _sprintMultiplier: 1.6
+  _respawnSeconds: 12
+  _respawnMinDistance: 35
+  _respawnMaxDistance: 70
+  _blobDemon: {fileID: 11400000, guid: fb635abb7989bc04b96a3bb3acd0c14b, type: 2}
   _blobArchetype:
     _name: Blob
     _wanderWeight: 1
-    _restWeight: 0.6
+    _restWeight: 0.8
     _patrolWeight: 0
     _wanderRadius: 20
     _restSecondsMin: 2
     _restSecondsMax: 5
     _decisionIntervalTicks: 10
     _arriveDistance: 1
+    _huntWeight: 0.8
+    _eatWeight: 2.5
+    _fleeHealthFraction: 0
+    _perceptionRadius: 18
   _elderRouteRadius: 100
   _elderRouteWaypoints: 12
   _elderRouteJitter: 12
   _elderRouteClearance: 12
   _elderMinSpawnDistance: 40
-  _elderTemplate:
-    _name: Elder
-    _tier: 6
-    _sizeMeters: 15
-    _moveSpeed: 3
-    _sprintMultiplier: 1
+  _elderDemon: {fileID: 11400000, guid: 169b138920090944ab82b3f164e79137, type: 2}
   _elderArchetype:
     _name: Elder
     _wanderWeight: 0
@@ -80,3 +77,7 @@ MonoBehaviour:
     _restSecondsMax: 6
     _decisionIntervalTicks: 10
     _arriveDistance: 4
+    _huntWeight: 1.5
+    _eatWeight: 1
+    _fleeHealthFraction: 0
+    _perceptionRadius: 60

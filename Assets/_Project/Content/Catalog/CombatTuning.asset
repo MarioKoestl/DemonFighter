@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b610420aabba9f45b860fc9c0782652, type: 3}
+  m_Name: CombatTuning
+  m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.CombatTuningDefinition
+  _strongMultiplier: 1.5
+  _weakMultiplier: 0.6
+  _neutralMultiplier: 1
+  _woundedThreshold: 0.5
+  _hpPerConstitution: 0.16666667
+  _damagePerStrength: 0.05
+  _speedPerAgility: 0.03
+  _attackSpeedPerAgility: 0.03
+  _staminaBase: 100
+  _staminaPerAgility: 10
+  _staminaRegenPerSecond: 12
+  _regenBasePerSecond: 1
+  _regenPerConstitution: 0.25
+  _bleedReductionPerConstitution: 0.05
+  _minBleedFraction: 0.2
+  _inCombatSeconds: 5
+  _killXpBase: 50
+  _rewardBonusPerTierAbove: 0.5
+  _rewardFactorFarBelow: 0.1
+  _levelXpBase: 100
+  _levelXpExponent: 1.5
+  _statPointsPerLevel: 3
+  _characterXpPerSkillXp: 0.5
+  _eatBiomassPerSecond: 15
+  _eatReachPerMeter: 1.5
+  _corpseBiomassPerTier: 20
+  _foodDecaySeconds: 90
+  _stats:
+  - _id: stat.strength
+    _name: Strength
+    _description: Damage, grab power and body slams.
+  - _id: stat.constitution
+    _name: Constitution
+    _description: Core and part HP, regeneration, bleeding resistance.
+  - _id: stat.agility
+    _name: Agility
+    _description: Movement speed, attack speed, stamina.

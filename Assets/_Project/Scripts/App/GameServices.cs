@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using DemonFighter.Simulation;
+using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Worldgen;
 using UnityEngine.InputSystem;
@@ -19,12 +20,14 @@ namespace DemonFighter.App
             SimulationEvents events,
             BiomeSpec biome,
             IWorldGenerator worldGenerator,
+            ContentCatalog catalog,
             InputActionAsset actions)
         {
             SimulationConfig = simulationConfig ?? throw new ArgumentNullException(nameof(simulationConfig));
             Events = events ?? throw new ArgumentNullException(nameof(events));
             Biome = biome ?? throw new ArgumentNullException(nameof(biome));
             WorldGenerator = worldGenerator ?? throw new ArgumentNullException(nameof(worldGenerator));
+            Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
             Actions = actions != null ? actions : throw new ArgumentNullException(nameof(actions));
         }
 
@@ -39,6 +42,9 @@ namespace DemonFighter.App
 
         /// <summary>Builds the world of a run from its seed.</summary>
         public IWorldGenerator WorldGenerator { get; }
+
+        /// <summary>Every spec the simulation can refer to, built once from the catalog asset.</summary>
+        public ContentCatalog Catalog { get; }
 
         /// <summary>The input actions asset the player input adapter reads.</summary>
         public InputActionAsset Actions { get; }

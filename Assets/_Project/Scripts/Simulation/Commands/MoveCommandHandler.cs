@@ -2,12 +2,13 @@
 namespace DemonFighter.Simulation.Commands
 {
     /// <summary>
-    /// Turns a move command into the demon's movement intent. The only validation in M1 is that the actor exists;
-    /// stamina and stagger rules join in M2.
+    /// Turns a move command into the demon's movement intent. Unknown and dead actors are refused; stamina and
+    /// stagger rules for movement join when sprinting costs stamina.
     /// </summary>
     internal sealed class MoveCommandHandler : ICommandHandler<MoveCommand>
     {
         internal const string UnknownActor = "Unknown actor";
+        internal const string ActorDead = "Actor is dead";
 
         /// <inheritdoc />
         public CommandResult Handle(in MoveCommand command, RunState state)
@@ -17,7 +18,12 @@ namespace DemonFighter.Simulation.Commands
                 return CommandResult.Rejected(UnknownActor);
             }
 
-            demon.SetIntent(new MovementIntent(command.Direction, command.Sprint));
+            if (!demon.IsAlive)
+            {
+                return CommandResult.Rejected(ActorDead);
+            }
+
+            demon.SetIntent(new MovementIntent(command.Direction, command.Sprint, command.Facing));
             return CommandResult.Accepted;
         }
     }

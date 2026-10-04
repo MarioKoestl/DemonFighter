@@ -21,6 +21,9 @@ namespace DemonFighter.Presentation
         [SerializeField] private Material _player = null!;
         [SerializeField] private Material[] _demonTiers = System.Array.Empty<Material>();
         [SerializeField] private Material _elder = null!;
+        [SerializeField] private Material _corpse = null!;
+        [SerializeField] private Material _blood = null!;
+        [SerializeField] private Material _maw = null!;
 
         public Material Ground => _ground;
 
@@ -35,6 +38,15 @@ namespace DemonFighter.Presentation
         public Material Water => _water;
 
         public Material Bone => _bone;
+
+        /// <summary>Dead flesh: corpses and severed parts.</summary>
+        public Material Corpse => _corpse;
+
+        /// <summary>Blood decals on ground and bodies.</summary>
+        public Material Blood => _blood;
+
+        /// <summary>The snout that marks the front of every placeholder demon.</summary>
+        public Material Maw => _maw;
 
         /// <summary>Picks the material for a demon: teal for the player, by tier for AI, near black for elders.</summary>
         public Material ForDemon(Demon demon)
@@ -62,7 +74,10 @@ namespace DemonFighter.Presentation
             Material bone,
             Material player,
             Material[] demonTiers,
-            Material elder)
+            Material elder,
+            Material corpse,
+            Material blood,
+            Material maw)
         {
             _ground = ground;
             _wall = wall;
@@ -74,6 +89,9 @@ namespace DemonFighter.Presentation
             _player = player;
             _demonTiers = demonTiers;
             _elder = elder;
+            _corpse = corpse;
+            _blood = blood;
+            _maw = maw;
         }
     }
 }

@@ -2,7 +2,9 @@
 using System;
 using System.Numerics;
 using AwesomeAssertions;
+using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Tests.Builders;
+using DemonFighter.Simulation.Tests.Content;
 using NUnit.Framework;
 
 namespace DemonFighter.Simulation.Tests
@@ -87,14 +89,88 @@ namespace DemonFighter.Simulation.Tests
         }
 
         [Test]
-        public void SizeMeters_AtSpawn_ComesFromTheTemplate()
+        public void SizeMeters_AtSpawn_ComesFromTheSpec()
         {
-            Demon demon = new DemonBuilder().WithTemplate(DemonBuilder.Elder).SpawnInto(new RunStateBuilder().Build());
+            Demon demon = new DemonBuilder().WithSpec(DemonBuilder.Elder).SpawnInto(new RunStateBuilder().Build());
 
             float size = demon.SizeMeters;
 
             size.Should().BeApproximately(15f, Tolerance);
             demon.Tier.Should().Be(6);
+        }
+
+        [Test]
+        public void Constructor_Blob_StartsAliveWithFullCoreAndStamina()
+        {
+            Demon demon = new DemonBuilder().SpawnInto(new RunStateBuilder().Build());
+
+            bool alive = demon.IsAlive;
+
+            alive.Should().BeTrue();
+            demon.Body.Core.Hp.Should().BeApproximately(60f, Tolerance);
+            demon.Stamina.Should().BeApproximately(100f, Tolerance);
+            demon.Level.Should().Be(1);
+            demon.Biomass.Should().BeApproximately(0f, Tolerance);
+        }
+
+        [Test]
+        public void Constructor_Elder_AppliesStartingStatsToBodyAndDamage()
+        {
+            Demon elder = new DemonBuilder().WithSpec(DemonBuilder.Elder).SpawnInto(new RunStateBuilder().Build());
+
+            float coreHp = elder.Body.Core.MaxHp;
+
+            coreHp.Should().BeApproximately(60f * (1f + 20f * 10f / 60f), 0.01f);
+            elder.Derived.DamageMultiplier.Should().BeApproximately(1.5f, Tolerance);
+            elder.Stats.Get(StatIds.Constitution).Should().Be(20);
+        }
+
+        [Test]
+        public void MaxSpeed_WithAgility_IsScaledByTheDerivedMultiplier()
+        {
+            DemonSpec quick = DemonBuilder.Blob with { StartingStats = new[] { new StatValue(StatIds.Agility, 10) } };
+            Demon demon = new DemonBuilder().WithSpec(quick).SpawnInto(new RunStateBuilder().Build());
+
+            float speed = demon.MaxSpeed;
+
+            speed.Should().BeApproximately(4f * 1.3f, Tolerance);
+        }
+
+        [Test]
+        public void GainXp_EnoughForOneLevel_GrantsStatPoints()
+        {
+            Demon demon = new DemonBuilder().SpawnInto(new RunStateBuilder().Build());
+
+            int levels = demon.GainXp(120f, TestContent.Tuning);
+
+            levels.Should().Be(1);
+            demon.Level.Should().Be(2);
+            demon.Xp.Should().BeApproximately(20f, Tolerance);
+            demon.Stats.UnspentPoints.Should().Be(3);
+        }
+
+        [Test]
+        public void TrySpendStamina_MoreThanAvailable_IsFalseAndKeepsStamina()
+        {
+            Demon demon = new DemonBuilder().SpawnInto(new RunStateBuilder().Build());
+
+            bool spent = demon.TrySpendStamina(150f);
+
+            spent.Should().BeFalse();
+            demon.Stamina.Should().BeApproximately(100f, Tolerance);
+        }
+
+        [Test]
+        public void RecomputeDerived_AfterConstitutionPoint_RescalesTheCore()
+        {
+            Demon demon = new DemonBuilder().SpawnInto(new RunStateBuilder().Build());
+            demon.Stats.GrantPoints(1);
+            demon.Stats.TrySpendPoint(StatIds.Constitution);
+
+            demon.RecomputeDerived(TestContent.Tuning);
+
+            demon.Body.Core.MaxHp.Should().BeApproximately(70f, 0.01f);
+            demon.Body.Core.Hp.Should().BeApproximately(70f, 0.01f);
         }
     }
 }

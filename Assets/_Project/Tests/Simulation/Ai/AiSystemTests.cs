@@ -35,6 +35,21 @@ namespace DemonFighter.Simulation.Tests.Ai
         }
 
         [Test]
+        public void Think_DeadDemon_IsSkipped()
+        {
+            RunState state = new RunStateBuilder().Build();
+            Demon demon = new DemonBuilder().SpawnInto(state);
+            var ai = new AiSystem();
+            ai.AddBrain(demon, TestArchetypes.Wanderer, Arena, null);
+            demon.Body.Core.ApplyDamage(1000f);
+            var commands = new CommandQueue();
+
+            ai.Think(state, commands);
+
+            commands.PendingCount.Should().Be(0);
+        }
+
+        [Test]
         public void Think_WithoutBrains_SubmitsNothing()
         {
             RunState state = new RunStateBuilder().Build();

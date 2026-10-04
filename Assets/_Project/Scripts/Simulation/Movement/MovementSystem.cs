@@ -17,7 +17,7 @@ namespace DemonFighter.Simulation.Movement
             for (int i = 0; i < demons.Count; i++)
             {
                 Demon demon = demons[i];
-                if (!demon.HasBody)
+                if (demon.IsAlive && !demon.HasBody)
                 {
                     demon.Integrate(tickSeconds);
                 }
