@@ -35,6 +35,18 @@ namespace DemonFighter.Simulation.Content
         /// <summary>Base stat points the demon starts with; unspecified stats start at zero.</summary>
         public IReadOnlyList<StatValue> StartingStats { get; init; } = Array.Empty<StatValue>();
 
+        /// <summary>Parts attached at spawn, free and without a transformation (D-070); a part without a free socket is skipped.</summary>
+        public IReadOnlyList<string> StartingPartIds { get; init; } = Array.Empty<string>();
+
+        /// <summary>Biomass the demon carries at spawn.</summary>
+        public float StartingBiomass { get; init; }
+
+        /// <summary>Character level at spawn; the levels above one grant their stat points unspent.</summary>
+        public int StartingLevel { get; init; } = 1;
+
+        /// <summary>Evolution applied at spawn as its package; empty for none.</summary>
+        public string StartingEvolutionId { get; init; } = string.Empty;
+
         /// <summary>Throws with the first content error found.</summary>
         public void Validate()
         {
@@ -46,6 +58,9 @@ namespace DemonFighter.Simulation.Content
             Require(SprintMultiplier >= 1f, "Sprinting is never slower than walking.");
             Require(!string.IsNullOrWhiteSpace(CoreId), "CoreId is required.");
             Require(StartingStats != null, "StartingStats must not be null.");
+            Require(StartingPartIds != null && StartingEvolutionId != null, "Starting lists must not be null.");
+            Require(StartingBiomass >= 0f, "StartingBiomass is never negative.");
+            Require(StartingLevel >= 1, "StartingLevel starts at 1.");
         }
 
         private void Require([DoesNotReturnIf(false)] bool condition, string message)

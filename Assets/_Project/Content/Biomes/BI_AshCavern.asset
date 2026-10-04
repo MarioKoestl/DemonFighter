@@ -40,12 +40,30 @@ MonoBehaviour:
   _bonePileCountMax: 14
   _bonePileRadiusMin: 1.5
   _bonePileRadiusMax: 3
-  _initialBlobs: 10
-  _spawnClusterRadius: 15
+  _initialBlobs: 16
+  _spawnClusterRadius: 30
   _spawnClearRadius: 30
-  _respawnSeconds: 12
-  _respawnMinDistance: 35
-  _respawnMaxDistance: 70
+  _respawnSeconds: 6
+  _respawnMinDistance: 25
+  _respawnMaxDistance: 55
+  _threatPerMinute: 0.5
+  _threatMaxLevel: 10
+  _blobsPerThreatLevel: 2
+  _respawnSpeedupPerThreat: 0.2
+  _contentVersion: 3
+  _spawnTable:
+  - _demon: {fileID: 11400000, guid: fb635abb7989bc04b96a3bb3acd0c14b, type: 2}
+    _minThreat: 0
+    _weight: 1
+  - _demon: {fileID: 11400000, guid: b633a434b1e5df04890507cac55d7ad0, type: 2}
+    _minThreat: 2
+    _weight: 0.6
+  - _demon: {fileID: 11400000, guid: 9ea4a16196916dd41997fd636b435351, type: 2}
+    _minThreat: 4
+    _weight: 0.5
+  - _demon: {fileID: 11400000, guid: a463578e3bc47e149971ada4d926eb5c, type: 2}
+    _minThreat: 6
+    _weight: 0.4
   _blobDemon: {fileID: 11400000, guid: fb635abb7989bc04b96a3bb3acd0c14b, type: 2}
   _blobArchetype:
     _name: Blob
@@ -61,6 +79,18 @@ MonoBehaviour:
     _eatWeight: 2.5
     _fleeHealthFraction: 0
     _perceptionRadius: 18
+    _routePullPerThreat: 0
+    _routePullMax: 0
+    _preferredParts: []
+    _preferredEvolutionStatId: stat.strength
+    _preferredStatId: stat.strength
+  _blobArchetypes:
+  - _archetype: {fileID: 11400000, guid: e79f52cc260ce7248a18c041f65e866e, type: 2}
+    _weight: 50
+  - _archetype: {fileID: 11400000, guid: 2abef5d534a67df4fbdb47aa521b8fe8, type: 2}
+    _weight: 30
+  - _archetype: {fileID: 11400000, guid: 7b685d93035e61f4798d9e13bfb3225e, type: 2}
+    _weight: 20
   _elderRouteRadius: 100
   _elderRouteWaypoints: 12
   _elderRouteJitter: 12
@@ -81,3 +111,8 @@ MonoBehaviour:
     _eatWeight: 1
     _fleeHealthFraction: 0
     _perceptionRadius: 60
+    _routePullPerThreat: 0.1
+    _routePullMax: 0.7
+    _preferredParts: []
+    _preferredEvolutionStatId: stat.strength
+    _preferredStatId: stat.strength

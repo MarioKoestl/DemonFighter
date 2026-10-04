@@ -387,6 +387,12 @@ namespace DemonFighter.Simulation.Anatomy
             }
         }
 
+        /// <summary>Adds a saved part at the next index without the socket check a purchase needs (D-073).</summary>
+        internal BodyPart AddRestored(BodyPartSpec spec)
+        {
+            return Add(spec ?? throw new ArgumentNullException(nameof(spec)));
+        }
+
         private BodyPart Add(BodyPartSpec spec)
         {
             var part = new BodyPart(_parts.Count, spec, MaxHpFor(spec, 0), _rules.WoundedThreshold);

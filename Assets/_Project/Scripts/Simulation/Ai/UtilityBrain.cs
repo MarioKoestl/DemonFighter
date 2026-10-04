@@ -2,8 +2,12 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Commands;
+using DemonFighter.Simulation.Content;
+using DemonFighter.Simulation.Evolution;
 using DemonFighter.Simulation.Food;
+using DemonFighter.Simulation.Mutation;
 using DemonFighter.Simulation.Skills;
 
 namespace DemonFighter.Simulation.Ai
@@ -12,7 +16,9 @@ namespace DemonFighter.Simulation.Ai
     /// Decides what one AI demon does and expresses it as the same commands a player sends (ARCHITECTURE, "AI").
     /// Goals are picked by weighted chance from the archetype weights, scored by what the demon perceives, whenever
     /// the current goal completes or something new comes into view; low health near a fight overrides everything
-    /// with fleeing. Demons with the same archetype still behave differently while the run stays deterministic.
+    /// with fleeing. In calm moments the demon grows by the preferences of its archetype: it spends stat points, takes
+    /// a pending evolution and buys, regrows or upgrades parts through the same commands as the player (D-072).
+    /// Demons with the same archetype still behave differently while the run stays deterministic.
     /// </summary>
     public sealed class UtilityBrain
     {
@@ -63,9 +69,10 @@ namespace DemonFighter.Simulation.Ai
         /// <summary>The demon being fled from; null outside the Flee goal.</summary>
         public Demon? Threat { get; private set; }
 
-        /// <summary>Thinks once: flees if it must, turns on an attacker, otherwise finishes or keeps the current goal, then acts.</summary>
+        /// <summary>Thinks once: spends a stat point, flees if it must, turns on an attacker, grows when calm, otherwise finishes or keeps the current goal, then acts.</summary>
         public void Decide(RunState state, CommandQueue commands)
         {
+            SpendStatPoint(state, commands);
             Demon? threat = FindThreatIfWeak(state);
             Demon? attacker = threat == null ? FindAttackerToPunish(state) : null;
             if (threat != null)
@@ -76,7 +83,7 @@ namespace DemonFighter.Simulation.Ai
             {
                 StartHunt(attacker);
             }
-            else
+            else if (!TryGrow(state, commands))
             {
                 ContinueGoal(state);
             }
@@ -144,9 +151,136 @@ namespace DemonFighter.Simulation.Ai
                     // Nothing to flee from any more: pick something to do.
                     ChooseGoal(state);
                     break;
+                case AiGoal.Mutate:
+                case AiGoal.Evolve:
+                    // The body is reshaped: pick something to do.
+                    ChooseGoal(state);
+                    break;
                 default:
                     throw new InvalidOperationException("Unknown goal " + CurrentGoal + ".");
             }
+        }
+
+        // Growth happens in calm moments only (D-072): never while hunting, eating or fleeing, and never within the
+        // combat window, so no demon stops mid-fight to become invulnerable for two seconds. One step per decision.
+        private bool TryGrow(RunState state, CommandQueue commands)
+        {
+            if (CurrentGoal == AiGoal.Hunt || CurrentGoal == AiGoal.Eat || CurrentGoal == AiGoal.Flee)
+            {
+                return false;
+            }
+
+            CombatTuning tuning = state.Catalog.Tuning;
+            if (Demon.IsInCombat(state.Tick, state.Config.TicksFor(tuning.InCombatSeconds)))
+            {
+                return false;
+            }
+
+            if (EvolutionRules.PendingStage(Demon, tuning) > 0)
+            {
+                EvolutionSpec? line = ChooseEvolution(EvolutionRules.Options(state, Demon));
+                if (line != null)
+                {
+                    ClearTargets();
+                    CurrentGoal = AiGoal.Evolve;
+                    commands.Submit(new EvolveCommand(Demon.Id, line.Id));
+                    return true;
+                }
+            }
+
+            MutateCommand? mutation = ChooseMutation(state);
+            if (mutation == null)
+            {
+                return false;
+            }
+
+            ClearTargets();
+            CurrentGoal = AiGoal.Mutate;
+            commands.Submit(mutation.Value);
+            return true;
+        }
+
+        // The offered line whose fit stat the personality favors, otherwise the best fit the rules offer.
+        private EvolutionSpec? ChooseEvolution(IReadOnlyList<EvolutionSpec> options)
+        {
+            for (int i = 0; i < options.Count; i++)
+            {
+                if (options[i].FitStat == Archetype.PreferredEvolutionStat)
+                {
+                    return options[i];
+                }
+            }
+
+            return options.Count > 0 ? options[0] : null;
+        }
+
+        // The first preferred part the rules allow, then regrowing what was lost, then the cheapest upgrade it can pay.
+        private MutateCommand? ChooseMutation(RunState state)
+        {
+            IReadOnlyList<string> preferred = Archetype.PreferredPartIds;
+            for (int i = 0; i < preferred.Count; i++)
+            {
+                if (state.Catalog.TryGetBodyPart(preferred[i], out BodyPartSpec? spec) && MutationRules.CanAttach(Demon, spec, state, out _, out _))
+                {
+                    return MutateCommand.Attach(Demon.Id, spec.Id);
+                }
+            }
+
+            IReadOnlyList<BodyPart> parts = Demon.Body.Parts;
+            for (int i = 0; i < parts.Count; i++)
+            {
+                if (parts[i].IsLost && MutationRules.CanRegrow(Demon, parts[i], state, out _, out _))
+                {
+                    return MutateCommand.Regrow(Demon.Id, parts[i].Index);
+                }
+            }
+
+            BodyPart? cheapest = null;
+            float cheapestCost = float.MaxValue;
+            for (int i = 0; i < parts.Count; i++)
+            {
+                BodyPart part = parts[i];
+                if (part.Spec.IsCore || part.IsLost || !MutationRules.CanUpgrade(Demon, part, state, out _, out float cost) || cost >= cheapestCost)
+                {
+                    continue;
+                }
+
+                cheapest = part;
+                cheapestCost = cost;
+            }
+
+            return cheapest != null ? MutateCommand.Upgrade(Demon.Id, cheapest.Index) : (MutateCommand?)null;
+        }
+
+        // One stat point per decision into the preferred stat, or the next stat with room; the rules check the cap again.
+        private void SpendStatPoint(RunState state, CommandQueue commands)
+        {
+            if (Demon.Stats.UnspentPoints <= 0)
+            {
+                return;
+            }
+
+            StatId stat = Archetype.PreferredStat;
+            if (!Demon.Stats.Has(stat) || Demon.Stats.Get(stat) >= Demon.StatCap(stat))
+            {
+                IReadOnlyList<StatSpec> stats = state.Catalog.Tuning.Stats;
+                bool found = false;
+                for (int i = 0; i < stats.Count && !found; i++)
+                {
+                    if (Demon.Stats.Get(stats[i].Id) < Demon.StatCap(stats[i].Id))
+                    {
+                        stat = stats[i].Id;
+                        found = true;
+                    }
+                }
+
+                if (!found)
+                {
+                    return;
+                }
+            }
+
+            commands.Submit(new SpendStatPointCommand(Demon.Id, stat));
         }
 
         private bool HasArrived()
@@ -261,7 +395,7 @@ namespace DemonFighter.Simulation.Ai
             }
             else
             {
-                StartPatrol();
+                StartPatrol(state);
             }
         }
 
@@ -325,11 +459,15 @@ namespace DemonFighter.Simulation.Ai
             _restUntilTick = state.Tick + (long)MathF.Ceiling(seconds * state.Config.TicksPerSecond);
         }
 
-        private void StartPatrol()
+        // The route shrinks toward the player as the threat rises (D-070): elders wander closer when the run runs long.
+        private void StartPatrol(RunState state)
         {
             ClearTargets();
             CurrentGoal = AiGoal.Patrol;
-            CurrentTarget = _route![RouteIndex];
+            Vector3 waypoint = _route![RouteIndex];
+            float pull = MathF.Min(Archetype.RoutePullMax, Archetype.RoutePullPerThreat * state.ThreatLevel);
+            Demon? player = pull > 0f ? Perception.FindPlayer(state) : null;
+            CurrentTarget = player != null ? _bounds.Clamp(Vector3.Lerp(waypoint, player.Position, pull)) : waypoint;
         }
 
         private void Act(RunState state, CommandQueue commands)
@@ -337,6 +475,8 @@ namespace DemonFighter.Simulation.Ai
             switch (CurrentGoal)
             {
                 case AiGoal.Rest:
+                case AiGoal.Mutate:
+                case AiGoal.Evolve:
                     commands.Submit(new MoveCommand(Demon.Id, Vector2.Zero, sprint: false));
                     break;
                 case AiGoal.Hunt:

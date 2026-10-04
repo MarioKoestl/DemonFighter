@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5d11693300e60f40862d23548276d43, type: 3}
+  m_Name: AR_Aggressive
+  m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.ArchetypeAsset
+  _archetype:
+    _name: Aggressive
+    _wanderWeight: 0.6
+    _restWeight: 0.3
+    _patrolWeight: 0
+    _wanderRadius: 20
+    _restSecondsMin: 2
+    _restSecondsMax: 4
+    _decisionIntervalTicks: 10
+    _arriveDistance: 1
+    _huntWeight: 2
+    _eatWeight: 1.5
+    _fleeHealthFraction: 0.15
+    _perceptionRadius: 20
+    _routePullPerThreat: 0
+    _routePullMax: 0
+    _preferredParts:
+    - {fileID: 11400000, guid: 7fa1f5875db20534695e8d4d4649abc7, type: 2}
+    - {fileID: 11400000, guid: e5e84f77c7102774c968a3b642951d26, type: 2}
+    - {fileID: 11400000, guid: 302ea2c3a8769c841997e940356b79e3, type: 2}
+    _preferredEvolutionStatId: stat.strength
+    _preferredStatId: stat.strength

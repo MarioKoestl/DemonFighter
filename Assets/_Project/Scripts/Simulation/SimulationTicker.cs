@@ -20,6 +20,8 @@ namespace DemonFighter.Simulation
     /// </summary>
     public sealed class SimulationTicker
     {
+        private HeadlessHitResolver? _headlessHits;
+
         /// <summary>Binds a run to the event bus its observers listen on and installs the systems and handlers.</summary>
         public SimulationTicker(RunState state, SimulationEvents events)
         {
@@ -37,6 +39,7 @@ namespace DemonFighter.Simulation
             Commands.RegisterHandler(new MutateCommandHandler(events));
             Commands.RegisterHandler(new EvolveCommandHandler(events));
             Ai = new AiSystem();
+            Threat = new ThreatSystem(events);
             Spawning = new SpawnSystem(events, Ai);
         }
 
@@ -55,11 +58,23 @@ namespace DemonFighter.Simulation
         /// <summary>The damage rules of this run; skills and status effects route all harm through it.</summary>
         internal DamageSystem Damage { get; }
 
+        /// <summary>Announces the threat level as it rises (D-069).</summary>
+        internal ThreatSystem Threat { get; }
+
         /// <summary>Tops the Tier 0 population up over time (D-053).</summary>
         internal SpawnSystem Spawning { get; }
 
         /// <summary>The skill behaviours found by attribute, validated against the content at start.</summary>
         internal SkillBehaviourRegistry Behaviours { get; }
+
+        /// <summary>
+        /// Lets the simulation report hits itself for runs without a frame (D-077): the autoplay harness and tests. The
+        /// game never calls this; there the CombatPresenter reports what the bodies touched (D-046).
+        /// </summary>
+        public void EnableHeadlessHits()
+        {
+            _headlessHits = new HeadlessHitResolver();
+        }
 
         /// <summary>Applies one fixed step. The caller invokes it TicksPerSecond times per simulated second.</summary>
         public void Tick()
@@ -74,6 +89,8 @@ namespace DemonFighter.Simulation
             TransformationSystem.Advance(State, Events);
             EatingSystem.Advance(State, Events, seconds);
             Ai.Think(State, Commands);
+            _headlessHits?.Advance(State, Commands);
+            Threat.Advance(State);
             Spawning.Advance(State);
             FoodDecaySystem.Advance(State, Events);
             State.AdvanceTick();

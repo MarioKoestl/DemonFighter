@@ -6,6 +6,7 @@ using AwesomeAssertions;
 using DemonFighter.Simulation.Ai;
 using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Tests.Builders;
+using DemonFighter.Simulation.Worldgen;
 using NUnit.Framework;
 
 namespace DemonFighter.Simulation.Tests.Ai
@@ -29,6 +30,35 @@ namespace DemonFighter.Simulation.Tests.Ai
             brain.CurrentGoal.Should().Be(AiGoal.Wander);
             demon.Intent.IsMoving.Should().BeTrue();
             Vector3.Distance(demon.Position, start).Should().BeGreaterThan(0f);
+        }
+
+        [Test]
+        public void Decide_PatrollerWithRoutePull_AimsBetweenTheWaypointAndThePlayerAsTheThreatRises()
+        {
+            BiomeSpec biome = BiomeSpec.AshCavern with { ThreatPerMinute = 60f };
+            RunState state = new RunStateBuilder().Build();
+            state.AttachWorld(new CavernWorldGenerator().Generate(state.Seed, biome));
+            var ticker = new SimulationTicker(state, new SimulationEvents());
+            state.SpawnDemon(ControllerKind.Player, biome.BlobDemon, Vector3.Zero, 0f);
+            for (int i = 0; i < 100; i++)
+            {
+                ticker.Tick();
+            }
+
+            var puller = new ArchetypeSpec(
+                "Puller", wanderWeight: 0f, restWeight: 0f, patrolWeight: 1f, wanderRadius: 30f,
+                restSecondsMin: 0f, restSecondsMax: 0f, decisionIntervalTicks: 1, arriveDistance: 2f,
+                routePullPerThreat: 0.1f, routePullMax: 0.7f);
+            Demon elder = state.SpawnDemon(ControllerKind.Ai, biome.BlobDemon, new Vector3(0f, 0f, -30f), 0f);
+            var route = new[] { new Vector3(40f, 0f, 0f), new Vector3(-40f, 0f, 0f), new Vector3(0f, 0f, 40f) };
+            UtilityBrain brain = ticker.Ai.AddBrain(elder, puller, state.World!.Bounds, route);
+
+            ticker.Tick();
+
+            state.ThreatLevel.Should().Be(5);
+            brain.CurrentGoal.Should().Be(AiGoal.Patrol);
+            brain.CurrentTarget.X.Should().BeApproximately(20f, 0.01f);
+            brain.CurrentTarget.Z.Should().BeApproximately(0f, 0.01f);
         }
 
         [Test]

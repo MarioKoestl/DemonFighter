@@ -8,8 +8,8 @@ namespace DemonFighter.Data
 {
     /// <summary>
     /// A demon kind as an asset: the body it is born as, its size, movement and starting stats, converted to an
-    /// immutable <see cref="DemonSpec"/> at load. The AI personality stays with the biome until archetype assets
-    /// arrive in M4.
+    /// immutable <see cref="DemonSpec"/> at load, plus the starting package of a stronger spawn: parts, Biomass,
+    /// level and an evolution (D-070). The AI personality stays with the biome until archetype assets arrive.
     /// </summary>
     [CreateAssetMenu(menuName = "Demon Fighter/Content/Demon", fileName = "DM_NewDemon")]
     public sealed class DemonDefinition : ScriptableObject
@@ -28,6 +28,12 @@ namespace DemonFighter.Data
         [Header("Starting stats")]
         [SerializeField] private StatValueDefinition[] _startingStats = Array.Empty<StatValueDefinition>();
 
+        [Header("Starting package")]
+        [SerializeField] private BodyPartDefinition[] _startingParts = Array.Empty<BodyPartDefinition>();
+        [SerializeField] private float _startingBiomass;
+        [SerializeField] private int _startingLevel = 1;
+        [SerializeField] private EvolutionDefinition? _startingEvolution;
+
         /// <summary>Stable content id.</summary>
         public string Id => _id;
 
@@ -45,6 +51,17 @@ namespace DemonFighter.Data
                 stats[i] = _startingStats[i].ToSpec();
             }
 
+            var startingParts = new string[_startingParts.Length];
+            for (int i = 0; i < startingParts.Length; i++)
+            {
+                if (_startingParts[i] == null)
+                {
+                    throw new ContentException("Demon " + _id + " has an empty starting part slot.");
+                }
+
+                startingParts[i] = _startingParts[i].Id;
+            }
+
             var spec = new DemonSpec
             {
                 Id = _id,
@@ -55,13 +72,21 @@ namespace DemonFighter.Data
                 SprintMultiplier = _sprintMultiplier,
                 CoreId = _core.Id,
                 StartingStats = stats,
+                StartingPartIds = startingParts,
+                StartingBiomass = _startingBiomass,
+                StartingLevel = _startingLevel,
+                StartingEvolutionId = _startingEvolution != null ? _startingEvolution.Id : string.Empty,
             };
             spec.Validate();
             return spec;
         }
 
-        internal void Configure(DemonSpec spec, BodyPartDefinition core)
+        internal void Configure(DemonSpec spec, BodyPartDefinition core, BodyPartDefinition[] startingParts, EvolutionDefinition? startingEvolution)
         {
+            _startingParts = startingParts;
+            _startingBiomass = spec.StartingBiomass;
+            _startingLevel = spec.StartingLevel;
+            _startingEvolution = startingEvolution;
             _id = spec.Id;
             _displayName = spec.Name;
             _tier = spec.Tier;

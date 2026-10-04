@@ -22,6 +22,12 @@ namespace DemonFighter.PlayMode.Tests
         private const string NewRunButtonName = "new-run";
         private const string WorldRootName = "World";
 
+        [TearDown]
+        public void LeaveNoRunBehind()
+        {
+            TestRuns.EndAll();
+        }
+
         [UnityTest]
         public IEnumerator NewRun_FromTheMainMenu_BuildsTheWorldAndSpawnsEveryDemon()
         {

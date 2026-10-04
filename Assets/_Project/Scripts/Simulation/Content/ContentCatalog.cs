@@ -77,6 +77,14 @@ namespace DemonFighter.Simulation.Content
                         throw new ContentException("Demon " + demon.Id + " starts with unknown stat " + starting.Stat + ".");
                     }
                 }
+
+                foreach (string partId in demon.StartingPartIds)
+                {
+                    if (!_bodyParts.ContainsKey(partId))
+                    {
+                        throw new ContentException("Demon " + demon.Id + " is born with unknown part " + partId + ".");
+                    }
+                }
             }
 
             foreach (EvolutionSpec evolution in evolutions ?? Array.Empty<EvolutionSpec>())

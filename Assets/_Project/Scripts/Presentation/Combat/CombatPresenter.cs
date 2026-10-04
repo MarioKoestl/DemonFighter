@@ -115,6 +115,58 @@ namespace DemonFighter.Presentation.Combat
             _views[view.Demon.Id] = view;
         }
 
+        /// <summary>
+        /// After a resume (D-074): dead demons whose corpse still lies there become corpses again, dead demons whose
+        /// corpse was eaten lose their body, and severed parts lie where they fell. Call once after every view exists.
+        /// </summary>
+        public void RestoreWorld()
+        {
+            var corpses = new Dictionary<DemonId, FoodItem>();
+            IReadOnlyList<FoodItem> food = _state.Food;
+            for (int i = 0; i < food.Count; i++)
+            {
+                if (food[i].Kind == FoodKind.Corpse)
+                {
+                    corpses[food[i].Source] = food[i];
+                }
+            }
+
+            IReadOnlyList<Demon> demons = _state.Demons;
+            for (int i = 0; i < demons.Count; i++)
+            {
+                Demon demon = demons[i];
+                if (demon.IsAlive || !_views.TryGetValue(demon.Id, out DemonView? view))
+                {
+                    continue;
+                }
+
+                if (corpses.TryGetValue(demon.Id, out FoodItem? corpse))
+                {
+                    view.BecomeCorpse(_palette.Corpse);
+                    FoodView foodView = view.gameObject.AddComponent<FoodView>();
+                    foodView.Bind(corpse, null);
+                    _foodViews[corpse.Id] = foodView;
+                }
+                else
+                {
+                    _views.Remove(demon.Id);
+                    Object.Destroy(view.gameObject);
+                }
+            }
+
+            for (int i = 0; i < food.Count; i++)
+            {
+                FoodItem item = food[i];
+                if (item.Kind == FoodKind.Corpse || _foodViews.ContainsKey(item.Id))
+                {
+                    continue;
+                }
+
+                float size = _state.TryGetDemon(item.Source, out Demon? source) ? source.SizeMeters : 1f;
+                CreateSeveredPiece(item, item.Position.ToUnity() + Vector3.up * (size * SeveredPartSizePerMeter * 0.5f), size, launch: false);
+            }
+        }
+
         /// <inheritdoc />
         public void UpdateFrame()
         {
@@ -410,6 +462,14 @@ namespace DemonFighter.Presentation.Combat
             float size = view.Demon.SizeMeters;
             BodyPartView? part = view.FindPart(evt.PartIndex);
             Vector3 position = part != null ? part.transform.position : view.transform.position + Vector3.up * (size * 0.5f);
+            CreateSeveredPiece(food, position, size, launch: true);
+            _blood.SplashBody(view.transform, position, size);
+            _blood.SplashGround(position, size);
+        }
+
+        // A severed part as a small dark sphere with a rigidbody; a fresh one flies off, a restored one just lies there.
+        private void CreateSeveredPiece(FoodItem food, Vector3 position, float size, bool launch)
+        {
             GameObject piece = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             piece.name = "Severed part " + food.Id.Value;
             piece.layer = Layers.Food;
@@ -418,12 +478,14 @@ namespace DemonFighter.Presentation.Combat
             piece.transform.localScale = Vector3.one * (size * SeveredPartSizePerMeter);
             piece.GetComponent<Renderer>().sharedMaterial = _palette.Corpse;
             Rigidbody body = piece.AddComponent<Rigidbody>();
-            body.AddForce((Random.insideUnitSphere + Vector3.up).normalized * SeveredPartImpulse, ForceMode.VelocityChange);
+            if (launch)
+            {
+                body.AddForce((Random.insideUnitSphere + Vector3.up).normalized * SeveredPartImpulse, ForceMode.VelocityChange);
+            }
+
             FoodView foodView = piece.AddComponent<FoodView>();
             foodView.Bind(food, body);
             _foodViews[food.Id] = foodView;
-            _blood.SplashBody(view.transform, position, size);
-            _blood.SplashGround(position, size);
         }
 
         private void OnPartDestroyed(PartDestroyed evt)

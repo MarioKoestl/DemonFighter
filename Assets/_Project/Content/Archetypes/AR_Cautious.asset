@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5d11693300e60f40862d23548276d43, type: 3}
+  m_Name: AR_Cautious
+  m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.ArchetypeAsset
+  _archetype:
+    _name: Cautious
+    _wanderWeight: 0.8
+    _restWeight: 1
+    _patrolWeight: 0
+    _wanderRadius: 20
+    _restSecondsMin: 2
+    _restSecondsMax: 5
+    _decisionIntervalTicks: 10
+    _arriveDistance: 1
+    _huntWeight: 0.6
+    _eatWeight: 2
+    _fleeHealthFraction: 0.4
+    _perceptionRadius: 22
+    _routePullPerThreat: 0
+    _routePullMax: 0
+    _preferredParts:
+    - {fileID: 11400000, guid: 5a9d7a7e1c6f1554c9384a00e6895b83, type: 2}
+    - {fileID: 11400000, guid: 11757eb38de7f3943b78a5565822bf83, type: 2}
+    - {fileID: 11400000, guid: 302ea2c3a8769c841997e940356b79e3, type: 2}
+    _preferredEvolutionStatId: stat.constitution
+    _preferredStatId: stat.constitution

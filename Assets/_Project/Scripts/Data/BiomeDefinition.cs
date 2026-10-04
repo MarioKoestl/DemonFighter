@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using DemonFighter.Common;
+using DemonFighter.Simulation.Ai;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Worldgen;
 using UnityEngine;
@@ -53,14 +54,23 @@ namespace DemonFighter.Data
         [SerializeField] private float _bonePileRadiusMax = 3f;
 
         [Header("Spawning")]
-        [SerializeField] private int _initialBlobs = 10;
-        [SerializeField] private float _spawnClusterRadius = 15f;
+        [SerializeField] private int _initialBlobs = 16;
+        [SerializeField] private float _spawnClusterRadius = 30f;
         [SerializeField] private float _spawnClearRadius = 30f;
-        [SerializeField] private float _respawnSeconds = 12f;
-        [SerializeField] private float _respawnMinDistance = 35f;
-        [SerializeField] private float _respawnMaxDistance = 70f;
+        [SerializeField] private float _respawnSeconds = 6f;
+        [SerializeField] private float _respawnMinDistance = 25f;
+        [SerializeField] private float _respawnMaxDistance = 55f;
+        [SerializeField] private float _threatPerMinute = 0.5f;
+        [SerializeField] private int _threatMaxLevel = 10;
+        [SerializeField] private int _blobsPerThreatLevel = 2;
+        [SerializeField] private float _respawnSpeedupPerThreat = 0.2f;
+        [SerializeField, HideInInspector] private int _contentVersion;
+
+        private const int CurrentContentVersion = 3;
+        [SerializeField] private SpawnEntryDefinition[] _spawnTable = Array.Empty<SpawnEntryDefinition>();
         [SerializeField] private DemonDefinition _blobDemon = null!;
         [SerializeField] private ArchetypeDefinition _blobArchetype = new ArchetypeDefinition();
+        [SerializeField] private ArchetypeChoiceDefinition[] _blobArchetypes = Array.Empty<ArchetypeChoiceDefinition>();
 
         [Header("Elder")]
         [SerializeField] private float _elderRouteRadius = 100f;
@@ -73,6 +83,9 @@ namespace DemonFighter.Data
 
         /// <summary>Stable content id.</summary>
         public string Id => _id;
+
+        /// <summary>True for an asset written before the pacing of D-078; the generator applies the spec numbers once.</summary>
+        internal bool NeedsPacingDefaults => _contentVersion < CurrentContentVersion;
 
         /// <summary>Builds the immutable spec the simulation uses; throws for invalid content.</summary>
         public BiomeSpec ToSpec()
@@ -113,6 +126,11 @@ namespace DemonFighter.Data
                 RespawnSeconds = _respawnSeconds,
                 RespawnMinDistance = _respawnMinDistance,
                 RespawnMaxDistance = _respawnMaxDistance,
+                ThreatPerMinute = _threatPerMinute,
+                ThreatMaxLevel = _threatMaxLevel,
+                BlobsPerThreatLevel = _blobsPerThreatLevel,
+                RespawnSpeedupPerThreat = _respawnSpeedupPerThreat,
+                SpawnTable = SpawnTableSpecs(),
                 ElderRouteRadius = _elderRouteRadius,
                 ElderRouteWaypoints = _elderRouteWaypoints,
                 ElderRouteJitter = _elderRouteJitter,
@@ -120,6 +138,7 @@ namespace DemonFighter.Data
                 ElderMinSpawnDistance = _elderMinSpawnDistance,
                 BlobDemon = RequireDemon(_blobDemon, "blob").ToSpec(),
                 BlobArchetype = _blobArchetype.ToSpec(),
+                BlobArchetypes = BlobArchetypeSpecs(),
                 ElderDemon = RequireDemon(_elderDemon, "elder").ToSpec(),
                 ElderArchetype = _elderArchetype.ToSpec(),
             };
@@ -163,6 +182,11 @@ namespace DemonFighter.Data
             _respawnSeconds = spec.RespawnSeconds;
             _respawnMinDistance = spec.RespawnMinDistance;
             _respawnMaxDistance = spec.RespawnMaxDistance;
+            _threatPerMinute = spec.ThreatPerMinute;
+            _threatMaxLevel = spec.ThreatMaxLevel;
+            _blobsPerThreatLevel = spec.BlobsPerThreatLevel;
+            _respawnSpeedupPerThreat = spec.RespawnSpeedupPerThreat;
+            _contentVersion = CurrentContentVersion;
             _elderRouteRadius = spec.ElderRouteRadius;
             _elderRouteWaypoints = spec.ElderRouteWaypoints;
             _elderRouteJitter = spec.ElderRouteJitter;
@@ -176,6 +200,44 @@ namespace DemonFighter.Data
         {
             _blobDemon = blob;
             _elderDemon = elder;
+        }
+
+        /// <summary>True once the asset lists blob personalities; an older asset gets the default three from the generator (D-071).</summary>
+        internal bool HasBlobArchetypes => _blobArchetypes.Length > 0;
+
+        internal void SetBlobArchetypes(ArchetypeChoiceDefinition[] choices)
+        {
+            _blobArchetypes = choices;
+        }
+
+        private ArchetypeChoice[] BlobArchetypeSpecs()
+        {
+            var choices = new ArchetypeChoice[_blobArchetypes.Length];
+            for (int i = 0; i < choices.Length; i++)
+            {
+                choices[i] = _blobArchetypes[i].ToSpec(_id);
+            }
+
+            return choices;
+        }
+
+        /// <summary>True once the asset carries a spawn table; an older asset gets the default one from the generator (D-070).</summary>
+        internal bool HasSpawnTable => _spawnTable.Length > 0;
+
+        internal void SetSpawnTable(SpawnEntryDefinition[] entries)
+        {
+            _spawnTable = entries;
+        }
+
+        private SpawnEntry[] SpawnTableSpecs()
+        {
+            var entries = new SpawnEntry[_spawnTable.Length];
+            for (int i = 0; i < entries.Length; i++)
+            {
+                entries[i] = _spawnTable[i].ToSpec(_id);
+            }
+
+            return entries;
         }
 
         private DemonDefinition RequireDemon(DemonDefinition definition, string role)

@@ -32,6 +32,23 @@ namespace DemonFighter.Simulation
             FoodIds = new IdSequence();
         }
 
+        /// <summary>Resumes a run from saved values (D-073); demons and food follow through RestoreDemon and RestoreFood.</summary>
+        internal RunState(int seed, SimulationConfig config, ContentCatalog catalog, ulong rngState, int lastDemonId, int lastFoodId, long tick)
+        {
+            if (tick < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(tick), tick, "The tick is never negative.");
+            }
+
+            Seed = seed;
+            Config = config ?? throw new ArgumentNullException(nameof(config));
+            Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+            Rng = new Rng(seed, rngState);
+            DemonIds = new IdSequence(lastDemonId);
+            FoodIds = new IdSequence(lastFoodId);
+            Tick = tick;
+        }
+
         /// <summary>The seed this run was generated from; same seed and same commands give the same run.</summary>
         public int Seed { get; }
 
@@ -55,6 +72,12 @@ namespace DemonFighter.Simulation
 
         /// <summary>Simulated seconds elapsed, derived from the tick count so it can never drift from it.</summary>
         public float Time => Tick * Config.TickSeconds;
+
+        /// <summary>Run-wide pressure rising with time (GAME_DESIGN, "The run"; D-016, D-069): levels per minute from the biome, capped; zero until the world is attached.</summary>
+        public float Threat => World == null ? 0f : MathF.Min(World.Biome.ThreatMaxLevel, Time / 60f * World.Biome.ThreatPerMinute);
+
+        /// <summary>The whole threat level that spawns and the HUD read.</summary>
+        public int ThreatLevel => (int)MathF.Floor(Threat + 0.0001f);
 
         /// <summary>The generated world, attached once at run start; null only while the run is being set up.</summary>
         public WorldLayout? World { get; private set; }
@@ -90,9 +113,28 @@ namespace DemonFighter.Simulation
         public Demon SpawnDemon(ControllerKind controller, DemonSpec spec, Vector3 position, float yaw)
         {
             var demon = new Demon(new DemonId(DemonIds.Next()), controller, spec, Catalog, position, yaw);
+            demon.ApplyStartingPackage();
             _demonsById.Add(demon.Id, demon);
             _demons.Add(demon);
             return demon;
+        }
+
+        /// <summary>Brings a saved demon back with its saved id, without the starting package of its kind (D-073).</summary>
+        internal Demon RestoreDemon(DemonId id, ControllerKind controller, DemonSpec spec, Vector3 position, float yaw)
+        {
+            var demon = new Demon(id, controller, spec, Catalog, position, yaw);
+            _demonsById.Add(demon.Id, demon);
+            _demons.Add(demon);
+            return demon;
+        }
+
+        /// <summary>Puts saved food back with its saved id and remaining decay time (D-073).</summary>
+        internal FoodItem RestoreFood(FoodId id, FoodKind kind, Vector3 position, float biomass, DemonId source, int sourceTier, long decayTicksLeft)
+        {
+            var food = new FoodItem(id, kind, position, biomass, source, sourceTier, decayTicksLeft);
+            _foodById.Add(food.Id, food);
+            _food.Add(food);
+            return food;
         }
 
         /// <summary>Looks a demon up by id; false for ids this run never issued.</summary>

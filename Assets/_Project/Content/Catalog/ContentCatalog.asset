@@ -33,7 +33,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 6f3bfcf7d81096a48b3fccd88c2d6aeb, type: 2}
   _demons:
   - {fileID: 11400000, guid: fb635abb7989bc04b96a3bb3acd0c14b, type: 2}
+  - {fileID: 11400000, guid: a463578e3bc47e149971ada4d926eb5c, type: 2}
   - {fileID: 11400000, guid: 169b138920090944ab82b3f164e79137, type: 2}
+  - {fileID: 11400000, guid: b633a434b1e5df04890507cac55d7ad0, type: 2}
+  - {fileID: 11400000, guid: 9ea4a16196916dd41997fd636b435351, type: 2}
   _evolutions:
   - {fileID: 11400000, guid: f1a638a39ff80c24bb56e9a6f9616c5c, type: 2}
   - {fileID: 11400000, guid: 57bd98ca3fabb8940a377875343ac132, type: 2}

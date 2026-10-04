@@ -1,5 +1,7 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
+using DemonFighter.Simulation.Content;
 
 namespace DemonFighter.Simulation.Ai
 {
@@ -22,7 +24,9 @@ namespace DemonFighter.Simulation.Ai
             float huntWeight = 0f,
             float eatWeight = 0f,
             float fleeHealthFraction = 0f,
-            float perceptionRadius = 25f)
+            float perceptionRadius = 25f,
+            float routePullPerThreat = 0f,
+            float routePullMax = 0f)
         {
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -74,6 +78,11 @@ namespace DemonFighter.Simulation.Ai
                 throw new ArgumentOutOfRangeException(nameof(perceptionRadius), perceptionRadius, "Perception radius must be positive.");
             }
 
+            if (routePullPerThreat < 0f || routePullMax < 0f || routePullMax > 1f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(routePullMax), routePullMax, "Route pull must be non-negative and the max at most 1.");
+            }
+
             Name = name;
             WanderWeight = wanderWeight;
             RestWeight = restWeight;
@@ -87,6 +96,8 @@ namespace DemonFighter.Simulation.Ai
             EatWeight = eatWeight;
             FleeHealthFraction = fleeHealthFraction;
             PerceptionRadius = perceptionRadius;
+            RoutePullPerThreat = routePullPerThreat;
+            RoutePullMax = routePullMax;
         }
 
         /// <summary>Content name for logs.</summary>
@@ -127,5 +138,20 @@ namespace DemonFighter.Simulation.Ai
 
         /// <summary>How far the demon perceives other demons and food, in meters.</summary>
         public float PerceptionRadius { get; }
+
+        /// <summary>Fraction of the way from a route waypoint toward the player per threat level (D-070); elders wander closer as the threat rises.</summary>
+        public float RoutePullPerThreat { get; }
+
+        /// <summary>The pull never exceeds this fraction, so a route keeps some of its shape.</summary>
+        public float RoutePullMax { get; }
+
+        /// <summary>Parts this personality buys in order when it has the Biomass (D-071); the AI mutation goal reads it.</summary>
+        public IReadOnlyList<string> PreferredPartIds { get; init; } = Array.Empty<string>();
+
+        /// <summary>The evolution line it takes: the offered option whose fit stat is this one.</summary>
+        public StatId PreferredEvolutionStat { get; init; } = StatIds.Strength;
+
+        /// <summary>The stat it puts its points into.</summary>
+        public StatId PreferredStat { get; init; } = StatIds.Strength;
     }
 }

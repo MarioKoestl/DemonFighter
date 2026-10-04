@@ -48,6 +48,21 @@ namespace DemonFighter.Simulation.Tests
         }
 
         [Test]
+        public void HighestTier_FollowsTheTierUp()
+        {
+            Demon demon = Spawn();
+            demon.HighestTier.Should().Be(demon.Spec.Tier);
+
+            demon.AttachPart(TestContent.Arm);
+            demon.AttachPart(TestContent.Arm);
+            demon.AttachPart(TestContent.Legs);
+            demon.AttachPart(TestContent.Jaws);
+
+            demon.HighestTier.Should().Be(demon.Spec.Tier + 1);
+            demon.HighestTier.Should().Be(demon.Tier);
+        }
+
+        [Test]
         public void SenseLevel_RisesWithEachPairOfEyes()
         {
             Demon demon = Spawn();

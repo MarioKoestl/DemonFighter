@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4cdc50a53ce1d3f48b365d8a65a23aef, type: 3}
+  m_Name: DM_Brute
+  m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.DemonDefinition
+  _id: demon.brute
+  _displayName: Brute
+  _tier: 0
+  _core: {fileID: 11400000, guid: ad87b9563db02f349ab623f663a8804a, type: 2}
+  _sizeMeters: 1.2
+  _moveSpeed: 4
+  _sprintMultiplier: 1.6
+  _startingStats: []
+  _startingParts:
+  - {fileID: 11400000, guid: e5e84f77c7102774c968a3b642951d26, type: 2}
+  - {fileID: 11400000, guid: 7fa1f5875db20534695e8d4d4649abc7, type: 2}
+  - {fileID: 11400000, guid: 5a9d7a7e1c6f1554c9384a00e6895b83, type: 2}
+  _startingBiomass: 60
+  _startingLevel: 5
+  _startingEvolution: {fileID: 11400000, guid: f1a638a39ff80c24bb56e9a6f9616c5c, type: 2}
