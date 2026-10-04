@@ -35,6 +35,7 @@ namespace DemonFighter.Input
         private const string StatsMenuAction = "StatsMenu";
         private const string ToggleCameraAction = "ToggleCamera";
         private const string AnalyzeAction = "Analyze";
+        private const string PauseAction = "Pause";
 
         private readonly InputActionMap _gameplay;
         private readonly InputAction _move;
@@ -45,6 +46,7 @@ namespace DemonFighter.Input
         private readonly InputAction _statsMenu;
         private readonly InputAction _toggleCamera;
         private readonly InputAction _analyze;
+        private readonly InputAction _pause;
         private readonly List<SlotBinding> _attacks = new List<SlotBinding>();
         private readonly List<SkillSlot> _requestedSlots = new List<SkillSlot>();
         private readonly IHeadingProvider _heading;
@@ -73,12 +75,14 @@ namespace DemonFighter.Input
             _statsMenu = _gameplay.FindAction(StatsMenuAction, throwIfNotFound: true);
             _toggleCamera = _gameplay.FindAction(ToggleCameraAction, throwIfNotFound: true);
             _analyze = _gameplay.FindAction(AnalyzeAction, throwIfNotFound: true);
+            _pause = _gameplay.FindAction(PauseAction, throwIfNotFound: true);
             _attacks.Add(new SlotBinding(_gameplay.FindAction(PrimaryAttackAction, throwIfNotFound: true), SkillSlot.Primary, OnAttack));
             _attacks.Add(new SlotBinding(_gameplay.FindAction(SecondaryAttackAction, throwIfNotFound: true), SkillSlot.Secondary, OnAttack));
             _attacks.Add(new SlotBinding(_gameplay.FindAction(LungeAction, throwIfNotFound: true), SkillSlot.Lunge, OnAttack));
             _attacks.Add(new SlotBinding(_gameplay.FindAction(TailSwingAction, throwIfNotFound: true), SkillSlot.TailSwing, OnAttack));
             _toggleCamera.performed += OnToggleCamera;
             _analyze.performed += OnAnalyze;
+            _pause.performed += OnPause;
             _mutationMenu.performed += OnMutationMenu;
             _statsMenu.performed += OnStatsMenu;
             _gameplay.Enable();
@@ -89,6 +93,9 @@ namespace DemonFighter.Input
 
         /// <summary>Raised when the Analyze key is pressed; the run controller locks or releases the target under the crosshair (D-066).</summary>
         public event Action? AnalyzeRequested;
+
+        /// <summary>Raised when Esc is pressed; raised from the input callback, so it fires while paused too (D-074).</summary>
+        public event Action? PauseRequested;
 
         /// <inheritdoc />
         public void UpdateFrame()
@@ -137,6 +144,7 @@ namespace DemonFighter.Input
         {
             _toggleCamera.performed -= OnToggleCamera;
             _analyze.performed -= OnAnalyze;
+            _pause.performed -= OnPause;
             _mutationMenu.performed -= OnMutationMenu;
             _statsMenu.performed -= OnStatsMenu;
             for (int i = 0; i < _attacks.Count; i++)
@@ -180,6 +188,11 @@ namespace DemonFighter.Input
         private void OnAnalyze(InputAction.CallbackContext context)
         {
             AnalyzeRequested?.Invoke();
+        }
+
+        private void OnPause(InputAction.CallbackContext context)
+        {
+            PauseRequested?.Invoke();
         }
 
         private void OnMutationMenu(InputAction.CallbackContext context)

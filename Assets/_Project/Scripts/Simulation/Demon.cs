@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Numerics;
 using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Content;
+using DemonFighter.Simulation.Evolution;
+using DemonFighter.Simulation.Persistence;
 using DemonFighter.Simulation.Skills;
 using DemonFighter.Simulation.Stats;
 
@@ -22,6 +24,7 @@ namespace DemonFighter.Simulation
         private readonly HashSet<string> _unlockedPartIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<StatId, int> _capBonuses = new Dictionary<StatId, int>();
         private float _sprintXpBuffer;
+        private readonly List<string> _evolutionIds = new List<string>();
 
         /// <summary>Below this stamina a sprint turns into a walk, so an empty bar never sprints for free.</summary>
         private const float MinSprintStamina = 1f;
@@ -99,6 +102,12 @@ namespace DemonFighter.Simulation
 
         /// <summary>Evolutions taken in this run; each raises the tier by one.</summary>
         public int Evolutions { get; private set; }
+
+        /// <summary>The highest tier reached in this run (D-075); the run summary reports it.</summary>
+        public int HighestTier { get; private set; }
+
+        /// <summary>Ids of the evolutions taken, in order.</summary>
+        public IReadOnlyList<string> EvolutionIds => _evolutionIds;
 
         /// <summary>Allocated base stat points and unspent points.</summary>
         public BaseStats Stats { get; }
@@ -602,6 +611,13 @@ namespace DemonFighter.Simulation
             RecomputeDerived(_tuning);
         }
 
+        /// <summary>Records a taken evolution by id, for the run summary (D-075), and counts it.</summary>
+        internal void RecordEvolution(string evolutionId)
+        {
+            _evolutionIds.Add(evolutionId ?? throw new ArgumentNullException(nameof(evolutionId)));
+            RecordEvolution();
+        }
+
         private void AddSkillsFrom(BodyPart part)
         {
             IReadOnlyList<string> granted = part.Spec.GrantedSkillIds;
@@ -617,6 +633,7 @@ namespace DemonFighter.Simulation
         private void RecomputeSize()
         {
             SizeMeters = SizeFor(Spec, Tier, _tuning);
+            HighestTier = Math.Max(HighestTier, Tier);
         }
 
         /// <summary>Spends stamina; false and unchanged when there is not enough.</summary>
@@ -640,6 +657,126 @@ namespace DemonFighter.Simulation
         internal void RegenerateStamina(float amount)
         {
             Stamina = MathF.Min(Derived.MaxStamina, Stamina + amount);
+        }
+
+        /// <summary>
+        /// Gives a freshly spawned demon what its kind is born with (D-070): parts, Biomass, levels with their stat
+        /// points and an evolution package, all free and without a transformation. A part without a free socket is skipped.
+        /// </summary>
+        internal void ApplyStartingPackage()
+        {
+            IReadOnlyList<string> parts = Spec.StartingPartIds;
+            for (int i = 0; i < parts.Count; i++)
+            {
+                BodyPartSpec part = _catalog.GetBodyPart(parts[i]);
+                if (Body.CanAttach(part, out _))
+                {
+                    AttachPart(part);
+                }
+            }
+
+            if (Spec.StartingBiomass > 0f)
+            {
+                GainBiomass(Spec.StartingBiomass);
+            }
+
+            while (Level < Spec.StartingLevel)
+            {
+                Level++;
+                Stats.GrantPoints(_tuning.StatPointsPerLevel);
+            }
+
+            if (!string.IsNullOrEmpty(Spec.StartingEvolutionId))
+            {
+                EvolutionPackage.Apply(this, _catalog.GetEvolution(Spec.StartingEvolutionId), _catalog);
+            }
+
+            RecomputeDerived(_tuning);
+        }
+
+        /// <summary>Sprint XP waiting to become a whole point; saved with the run.</summary>
+        internal float SprintXpBuffer => _sprintXpBuffer;
+
+        /// <summary>
+        /// Overwrites this fresh demon with saved state (D-073); the caller created it from the kind, position and yaw
+        /// of the snapshot. Stats and parts come first so the derived values rescale the body once, then the exact
+        /// saved numbers go back on, then the status timers. A skill use in progress and the movement intent are not
+        /// saved; the next commands set them.
+        /// </summary>
+        internal void Restore(DemonSnapshot saved)
+        {
+            if (saved == null)
+            {
+                throw new ArgumentNullException(nameof(saved));
+            }
+
+            for (int i = 0; i < saved.Stats.Count; i++)
+            {
+                var stat = new StatId(saved.Stats[i].StatId);
+                if (Stats.Has(stat))
+                {
+                    Stats.Set(stat, saved.Stats[i].Value);
+                }
+            }
+
+            Stats.GrantPoints(saved.UnspentPoints);
+            for (int i = 0; i < saved.CapBonuses.Count; i++)
+            {
+                RaiseStatCap(new StatId(saved.CapBonuses[i].StatId), saved.CapBonuses[i].Value);
+            }
+
+            for (int i = 0; i < saved.UnlockedPartIds.Count; i++)
+            {
+                UnlockPart(saved.UnlockedPartIds[i]);
+            }
+
+            Evolutions = saved.Evolutions;
+            _evolutionIds.Clear();
+            _evolutionIds.AddRange(saved.EvolutionIds);
+            Level = saved.Level;
+            Xp = saved.Xp;
+            for (int i = 1; i < saved.Parts.Count; i++)
+            {
+                Body.AddRestored(_catalog.GetBodyPart(saved.Parts[i].SpecId));
+            }
+
+            _skills.Clear();
+            for (int i = 0; i < saved.Skills.Count; i++)
+            {
+                SkillSnapshot skill = saved.Skills[i];
+                var instance = new SkillInstance(_catalog.GetSkill(skill.SpecId), skill.GrantedByEvolution);
+                instance.Restore(skill.Level, skill.Xp, skill.CooldownUntilTick);
+                _skills.Add(instance);
+            }
+
+            RecomputeDerived(_tuning);
+            IReadOnlyList<BodyPart> parts = Body.Parts;
+            for (int i = 0; i < saved.Parts.Count && i < parts.Count; i++)
+            {
+                PartSnapshot part = saved.Parts[i];
+                parts[i].Restore(part.UpgradeLevel, part.MaxHp, part.Hp, part.IsLost, part.BleedSecondsLeft, part.BleedDamagePerSecond, (DamageType)part.BleedType);
+            }
+
+            Biomass = saved.Biomass;
+            BiomassEaten = saved.BiomassEaten;
+            Stamina = saved.Stamina;
+            Kills = saved.Kills;
+            StaggeredUntilTick = saved.StaggeredUntilTick;
+            LastCombatTick = saved.LastCombatTick;
+            LastAttackedBy = new DemonId(saved.LastAttackedBy);
+            LastAttackedTick = saved.LastAttackedTick;
+            TransformingUntilTick = saved.TransformingUntilTick;
+            TransformationStartedTick = saved.TransformationStartedTick;
+            HeldUntilTick = saved.HeldUntilTick;
+            HeldBy = new DemonId(saved.HeldBy);
+            HeldOffset = new Vector2(saved.HeldOffsetX, saved.HeldOffsetY);
+            ExternalVelocity = new Vector2(saved.ExternalVelocityX, saved.ExternalVelocityY);
+            ExternalVelocityUntilTick = saved.ExternalVelocityUntilTick;
+            EatingFoodId = new FoodId(saved.EatingFoodId);
+            EatRequestTick = saved.EatRequestTick;
+            _sprintXpBuffer = saved.SprintXpBuffer;
+            RecomputeSize();
+            HighestTier = Math.Max(HighestTier, saved.HighestTier);
         }
 
         /// <summary>Adds eaten Biomass.</summary>

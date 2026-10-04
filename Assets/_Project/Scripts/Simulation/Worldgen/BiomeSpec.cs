@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using DemonFighter.Simulation.Ai;
 using DemonFighter.Simulation.Content;
 
@@ -79,23 +80,35 @@ namespace DemonFighter.Simulation.Worldgen
 
         public float BonePileRadiusMax { get; init; } = 3f;
 
-        /// <summary>Tier 0 demons spawned around the player at run start (D-029).</summary>
-        public int InitialBlobs { get; init; } = 10;
+        /// <summary>Tier 0 demons spawned around the player at run start (D-029; raised for a busier world, D-078).</summary>
+        public int InitialBlobs { get; init; } = 16;
 
         /// <summary>Radius of the circle the start spawns are scattered in.</summary>
-        public float SpawnClusterRadius { get; init; } = 15f;
+        public float SpawnClusterRadius { get; init; } = 30f;
 
         /// <summary>No feature inside this distance of the spawn center, so the first minute is open ground.</summary>
         public float SpawnClearRadius { get; init; } = 30f;
 
         /// <summary>Seconds between top-up spawns while fewer Tier 0 demons live than InitialBlobs; zero disables them (D-053).</summary>
-        public float RespawnSeconds { get; init; } = 12f;
+        public float RespawnSeconds { get; init; } = 6f;
 
         /// <summary>A top-up spawn lands at least this far from the player, in meters.</summary>
-        public float RespawnMinDistance { get; init; } = 35f;
+        public float RespawnMinDistance { get; init; } = 25f;
 
         /// <summary>A top-up spawn lands at most this far from the player, in meters.</summary>
-        public float RespawnMaxDistance { get; init; } = 70f;
+        public float RespawnMaxDistance { get; init; } = 55f;
+
+        /// <summary>Threat levels gained per simulated minute (D-069); the only clock of a run (D-016).</summary>
+        public float ThreatPerMinute { get; init; } = 0.5f;
+
+        /// <summary>The threat never rises past this level.</summary>
+        public int ThreatMaxLevel { get; init; } = 10;
+
+        /// <summary>More AI demons allowed alive per threat level on top of InitialBlobs (D-070).</summary>
+        public int BlobsPerThreatLevel { get; init; } = 2;
+
+        /// <summary>The respawn interval is divided by one plus this times the threat level (D-070).</summary>
+        public float RespawnSpeedupPerThreat { get; init; } = 0.2f;
 
         /// <summary>Radius of the elder loop around the map center.</summary>
         public float ElderRouteRadius { get; init; } = 100f;
@@ -115,6 +128,37 @@ namespace DemonFighter.Simulation.Worldgen
         /// <summary>The Tier 0 kind the player and the start spawns are born as.</summary>
         public DemonSpec BlobDemon { get; init; } = new DemonSpec { Id = "demon.blob", Name = "Blob" };
 
+        /// <summary>A blob born with an arm, the first stronger spawn (D-070).</summary>
+        public DemonSpec HunterDemon { get; init; } = new DemonSpec
+        {
+            Id = "demon.hunter",
+            Name = "Hunter",
+            StartingPartIds = new[] { "part.arm" },
+            StartingBiomass = 30f,
+            StartingLevel = 2,
+        };
+
+        /// <summary>A blob born with legs and eyes.</summary>
+        public DemonSpec StalkerDemon { get; init; } = new DemonSpec
+        {
+            Id = "demon.stalker",
+            Name = "Stalker",
+            StartingPartIds = new[] { "part.legs", "part.eyes" },
+            StartingBiomass = 40f,
+            StartingLevel = 3,
+        };
+
+        /// <summary>A blob born as a Brute: arm, jaws, thick hide and the first Brute evolution.</summary>
+        public DemonSpec BruteDemon { get; init; } = new DemonSpec
+        {
+            Id = "demon.brute",
+            Name = "Brute",
+            StartingPartIds = new[] { "part.arm", "part.jaws", "part.hide.thick" },
+            StartingBiomass = 60f,
+            StartingLevel = 5,
+            StartingEvolutionId = "evolution.brute.1",
+        };
+
         /// <summary>The high-tier kind that walks the elder loop.</summary>
         public DemonSpec ElderDemon { get; init; } = new DemonSpec
         {
@@ -133,10 +177,107 @@ namespace DemonFighter.Simulation.Worldgen
             restSecondsMin: 2f, restSecondsMax: 5f, decisionIntervalTicks: 10, arriveDistance: 1f,
             huntWeight: 0.8f, eatWeight: 2.5f, fleeHealthFraction: 0f, perceptionRadius: 18f);
 
+        /// <summary>The elder walks its loop, pulled toward the player by a tenth per threat level, at most seven tenths (D-070).</summary>
         public ArchetypeSpec ElderArchetype { get; init; } = new ArchetypeSpec(
             "Elder", wanderWeight: 0f, restWeight: 0.15f, patrolWeight: 1f, wanderRadius: 30f,
             restSecondsMin: 3f, restSecondsMax: 6f, decisionIntervalTicks: 10, arriveDistance: 4f,
-            huntWeight: 1.5f, eatWeight: 1f, fleeHealthFraction: 0f, perceptionRadius: 60f);
+            huntWeight: 1.5f, eatWeight: 1f, fleeHealthFraction: 0f, perceptionRadius: 60f,
+            routePullPerThreat: 0.1f, routePullMax: 0.7f);
+
+        /// <summary>Which kinds spawn from which threat level (D-070); empty means only the blob.</summary>
+        public IReadOnlyList<SpawnEntry> SpawnTable { get; init; } = Array.Empty<SpawnEntry>();
+
+        /// <summary>The Ash Cavern table: blobs always, hunters from threat 2, stalkers from 4, brutes from 6.</summary>
+        public static IReadOnlyList<SpawnEntry> DefaultSpawnTable(BiomeSpec biome)
+        {
+            return new[]
+            {
+                new SpawnEntry(biome.BlobDemon, 0, 1f),
+                new SpawnEntry(biome.HunterDemon, 2, 0.6f),
+                new SpawnEntry(biome.StalkerDemon, 4, 0.5f),
+                new SpawnEntry(biome.BruteDemon, 6, 0.4f),
+            };
+        }
+
+        /// <summary>The hunter among the blobs (D-071): most likely to attack, slowest to flee, builds toward the Brute line.</summary>
+        public ArchetypeSpec AggressiveArchetype { get; init; } = new ArchetypeSpec(
+            "Aggressive", wanderWeight: 0.6f, restWeight: 0.3f, patrolWeight: 0f, wanderRadius: 20f,
+            restSecondsMin: 2f, restSecondsMax: 4f, decisionIntervalTicks: 10, arriveDistance: 1f,
+            huntWeight: 2f, eatWeight: 1.5f, fleeHealthFraction: 0.15f, perceptionRadius: 20f)
+        {
+            PreferredPartIds = new[] { "part.jaws", "part.arm", "part.legs" },
+            PreferredEvolutionStat = StatIds.Strength,
+            PreferredStat = StatIds.Strength,
+        };
+
+        /// <summary>Eats and rests more, flees early, armors up toward the Bulwark line.</summary>
+        public ArchetypeSpec CautiousArchetype { get; init; } = new ArchetypeSpec(
+            "Cautious", wanderWeight: 0.8f, restWeight: 1f, patrolWeight: 0f, wanderRadius: 20f,
+            restSecondsMin: 2f, restSecondsMax: 5f, decisionIntervalTicks: 10, arriveDistance: 1f,
+            huntWeight: 0.6f, eatWeight: 2f, fleeHealthFraction: 0.4f, perceptionRadius: 22f)
+        {
+            PreferredPartIds = new[] { "part.hide.thick", "part.eyes", "part.legs" },
+            PreferredEvolutionStat = StatIds.Constitution,
+            PreferredStat = StatIds.Constitution,
+        };
+
+        /// <summary>Lives off corpses, hunts only sure things, runs at half health, grows fast and sharp toward the Stalker line.</summary>
+        public ArchetypeSpec ScavengerArchetype { get; init; } = new ArchetypeSpec(
+            "Scavenger", wanderWeight: 1f, restWeight: 0.6f, patrolWeight: 0f, wanderRadius: 24f,
+            restSecondsMin: 1f, restSecondsMax: 3f, decisionIntervalTicks: 10, arriveDistance: 1f,
+            huntWeight: 0.4f, eatWeight: 3f, fleeHealthFraction: 0.5f, perceptionRadius: 24f)
+        {
+            PreferredPartIds = new[] { "part.legs", "part.eyes", "part.jaws" },
+            PreferredEvolutionStat = StatIds.Agility,
+            PreferredStat = StatIds.Agility,
+        };
+
+        /// <summary>Personalities new blobs draw from by weight (D-071); empty means every blob gets BlobArchetype.</summary>
+        public IReadOnlyList<ArchetypeChoice> BlobArchetypes { get; init; } = Array.Empty<ArchetypeChoice>();
+
+        /// <summary>The Ash Cavern mix: half aggressive, three in ten cautious, two in ten scavengers.</summary>
+        public static IReadOnlyList<ArchetypeChoice> DefaultBlobArchetypes(BiomeSpec biome)
+        {
+            return new[]
+            {
+                new ArchetypeChoice(biome.AggressiveArchetype, 50f),
+                new ArchetypeChoice(biome.CautiousArchetype, 30f),
+                new ArchetypeChoice(biome.ScavengerArchetype, 20f),
+            };
+        }
+
+        /// <summary>Draws the personality of a new blob by weight from the run Rng; the plain blob archetype when none are listed.</summary>
+        public ArchetypeSpec PickBlobArchetype(Rng rng)
+        {
+            if (rng == null)
+            {
+                throw new ArgumentNullException(nameof(rng));
+            }
+
+            if (BlobArchetypes.Count == 0)
+            {
+                return BlobArchetype;
+            }
+
+            float total = 0f;
+            for (int i = 0; i < BlobArchetypes.Count; i++)
+            {
+                total += BlobArchetypes[i].Weight;
+            }
+
+            float roll = rng.NextFloat(0f, total);
+            for (int i = 0; i < BlobArchetypes.Count; i++)
+            {
+                if (roll < BlobArchetypes[i].Weight)
+                {
+                    return BlobArchetypes[i].Archetype;
+                }
+
+                roll -= BlobArchetypes[i].Weight;
+            }
+
+            return BlobArchetypes[BlobArchetypes.Count - 1].Archetype;
+        }
 
         /// <summary>Throws with the first content error found; called by the generator and the asset's OnValidate.</summary>
         public void Validate()
@@ -162,6 +303,10 @@ namespace DemonFighter.Simulation.Worldgen
             Require(SpawnClusterRadius > 0f && SpawnClearRadius >= SpawnClusterRadius, "Spawn clear radius must cover the cluster.");
             Require(RespawnSeconds >= 0f, "RespawnSeconds is never negative.");
             Require(RespawnMinDistance > 0f && RespawnMaxDistance >= RespawnMinDistance, "Respawn distances must be positive and ordered.");
+            Require(ThreatPerMinute >= 0f && ThreatMaxLevel >= 0, "Threat pace and cap are never negative.");
+            Require(BlobsPerThreatLevel >= 0 && RespawnSpeedupPerThreat >= 0f, "Threat scaling of spawns is never negative.");
+            Require(SpawnTable != null, "SpawnTable must not be null.");
+            Require(BlobArchetypes != null, "BlobArchetypes must not be null.");
             Require(ElderRouteRadius > 0f && ElderRouteRadius + ElderRouteJitter < SizeMeters * 0.5f - WallInset - FeatureMargin, "Elder route must fit inside the feature area.");
             Require(ElderRouteWaypoints >= 3, "An elder route needs at least three waypoints.");
             Require(ElderRouteJitter >= 0f && ElderRouteClearance >= 0f && ElderMinSpawnDistance >= 0f, "Elder route distances are never negative.");
@@ -169,6 +314,10 @@ namespace DemonFighter.Simulation.Worldgen
             Require(BlobArchetype != null && ElderArchetype != null, "Both archetypes are required.");
             BlobDemon.Validate();
             ElderDemon.Validate();
+            for (int i = 0; i < SpawnTable.Count; i++)
+            {
+                SpawnTable[i].Demon.Validate();
+            }
         }
 
         private void Require([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool condition, string message)

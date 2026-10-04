@@ -28,6 +28,21 @@ namespace DemonFighter.Simulation.Ai
         /// The best prey in range with its score, or null. Prey more than one tier above is avoided; prey two or more
         /// tiers below is ignored unless it attacked us recently, which is how elders ignore blobs until bitten.
         /// </summary>
+        /// <summary>The living player demon, or null; the route pull of patrolling archetypes aims at it (D-070).</summary>
+        public static Demon? FindPlayer(RunState state)
+        {
+            IReadOnlyList<Demon> demons = state.Demons;
+            for (int i = 0; i < demons.Count; i++)
+            {
+                if (demons[i].Controller == ControllerKind.Player && demons[i].IsAlive)
+                {
+                    return demons[i];
+                }
+            }
+
+            return null;
+        }
+
         public static Demon? FindPrey(RunState state, Demon self, ArchetypeSpec archetype, out float score)
         {
             CombatTuning tuning = state.Catalog.Tuning;

@@ -7,6 +7,7 @@ using DemonFighter.Editor.Setup;
 using DemonFighter.Presentation;
 using DemonFighter.Presentation.Cameras;
 using DemonFighter.Presentation.Demons;
+using DemonFighter.Simulation.Ai;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Worldgen;
 using UnityEditor;
@@ -42,8 +43,7 @@ namespace DemonFighter.Editor.Generate
         private const string SkillsFolder = ContentFolder + "/Skills";
         private const string DemonsFolder = ContentFolder + "/Demons";
         private const string EvolutionsFolder = ContentFolder + "/Evolutions";
-        private const string BlobDemonPath = DemonsFolder + "/DM_Blob.asset";
-        private const string ElderDemonPath = DemonsFolder + "/DM_Elder.asset";
+        private const string ArchetypesFolder = ContentFolder + "/Archetypes";
         private const string CombatTuningPath = ContentCatalogRebuilder.CatalogFolder + "/CombatTuning.asset";
         private const string PrefabsFolder = "Assets/_Project/Prefabs";
         private const string DemonBodyProperty = "_body";
@@ -155,6 +155,7 @@ namespace DemonFighter.Editor.Generate
                 parts[spec.Id] = part;
             }
 
+            var evolutions = new Dictionary<string, EvolutionDefinition>();
             foreach (EvolutionSpec spec in PlaceholderContent.Evolutions)
             {
                 EvolutionDefinition evolution = EditorAssets.LoadOrCreate<EvolutionDefinition>(EvolutionsFolder + "/EV_" + FileName(spec.Name) + spec.Stage + ".asset", e =>
@@ -165,25 +166,79 @@ namespace DemonFighter.Editor.Generate
                     evolution.Configure(spec, Resolve(parts, spec.FreeMutationPartIds), Resolve(parts, spec.UnlockedPartIds), Resolve(skills, spec.ExtraSkillIds));
                     EditorUtility.SetDirty(evolution);
                 }
+
+                evolutions[spec.Id] = evolution;
             }
 
             EditorAssets.LoadOrCreate<CombatTuningDefinition>(CombatTuningPath, tuning => tuning.Configure(new CombatTuning()));
             BodyPartDefinition core = parts[PlaceholderContent.CoreId];
-            DemonDefinition blob = EditorAssets.LoadOrCreate<DemonDefinition>(BlobDemonPath, demon => demon.Configure(BiomeSpec.AshCavern.BlobDemon, core));
-            DemonDefinition elder = EditorAssets.LoadOrCreate<DemonDefinition>(ElderDemonPath, demon => demon.Configure(BiomeSpec.AshCavern.ElderDemon, core));
+            BiomeSpec ashCavern = BiomeSpec.AshCavern;
+            DemonDefinition blob = Demon(ashCavern.BlobDemon, core, parts, evolutions);
+            DemonDefinition elder = Demon(ashCavern.ElderDemon, core, parts, evolutions);
+            IReadOnlyList<SpawnEntry> table = BiomeSpec.DefaultSpawnTable(ashCavern);
+            var spawnTable = new SpawnEntryDefinition[table.Count];
+            for (int i = 0; i < spawnTable.Length; i++)
+            {
+                spawnTable[i] = new SpawnEntryDefinition();
+                spawnTable[i].Configure(Demon(table[i].Demon, core, parts, evolutions), table[i]);
+            }
+
+            EditorAssets.EnsureFolder(ArchetypesFolder);
+            IReadOnlyList<ArchetypeChoice> personalities = BiomeSpec.DefaultBlobArchetypes(ashCavern);
+            var blobArchetypes = new ArchetypeChoiceDefinition[personalities.Count];
+            for (int i = 0; i < blobArchetypes.Length; i++)
+            {
+                ArchetypeSpec archetype = personalities[i].Archetype;
+                ArchetypeAsset asset = EditorAssets.LoadOrCreate<ArchetypeAsset>(ArchetypesFolder + "/AR_" + FileName(archetype.Name) + ".asset", a => a.Configure(archetype, Resolve(parts, archetype.PreferredPartIds)));
+                blobArchetypes[i] = new ArchetypeChoiceDefinition();
+                blobArchetypes[i].Configure(asset, personalities[i]);
+            }
+
             EditorAssets.LoadOrCreate<BiomeDefinition>(AshCavernPath, biome =>
             {
-                biome.ApplyDefaults(BiomeSpec.AshCavern);
+                biome.ApplyDefaults(ashCavern);
                 biome.SetDemons(blob, elder);
+                biome.SetSpawnTable(spawnTable);
+                biome.SetBlobArchetypes(blobArchetypes);
             });
 
-            // An older biome asset predates the demon references; give it the two demons without touching its numbers.
+            // An older biome asset predates the demon references and the spawn table (D-070); it gets both once. The
+            // numbers it carries equal the spec defaults, so applying them again changes nothing a player would notice.
             var existingBiome = AssetDatabase.LoadAssetAtPath<BiomeDefinition>(AshCavernPath);
             if (existingBiome != null)
             {
                 existingBiome.SetDemons(blob, elder);
+                if (!existingBiome.HasSpawnTable)
+                {
+                    existingBiome.SetSpawnTable(spawnTable);
+                }
+
+                // The pacing numbers changed after the first playtest (D-078); older assets get the spec numbers once.
+                if (existingBiome.NeedsPacingDefaults)
+                {
+                    existingBiome.ApplyDefaults(ashCavern);
+                }
+
+                if (!existingBiome.HasBlobArchetypes)
+                {
+                    existingBiome.SetBlobArchetypes(blobArchetypes);
+                }
+
                 EditorUtility.SetDirty(existingBiome);
             }
+        }
+
+        // One asset per demon kind, named after the kind; the starting package resolves to part and evolution assets.
+        private static DemonDefinition Demon(DemonSpec spec, BodyPartDefinition core, Dictionary<string, BodyPartDefinition> parts, Dictionary<string, EvolutionDefinition> evolutions)
+        {
+            BodyPartDefinition[] startingParts = Resolve(parts, spec.StartingPartIds);
+            EvolutionDefinition? startingEvolution = null;
+            if (spec.StartingEvolutionId.Length > 0 && !evolutions.TryGetValue(spec.StartingEvolutionId, out startingEvolution))
+            {
+                throw new IOException("Demon " + spec.Id + " starts with unknown evolution " + spec.StartingEvolutionId + ".");
+            }
+
+            return EditorAssets.LoadOrCreate<DemonDefinition>(DemonsFolder + "/DM_" + FileName(spec.Name) + ".asset", demon => demon.Configure(spec, core, startingParts, startingEvolution));
         }
 
         private static T[] Resolve<T>(Dictionary<string, T> byId, IReadOnlyList<string> ids)

@@ -79,6 +79,10 @@ The HUD and menus are built in code from `VisualElement`, `Label` and `Button` o
 
 Actions (`Move`, `Look`, `Attack`) are defined in an asset and bound to devices. Code reads actions, not keys. This is what makes adding a gamepad a data change later. Only `PlayerInputAdapter` reads them.
 
+## Saving and settings
+
+`Application.persistentDataPath` is the per-user folder for save files; on Windows it is under `AppData\LocalLow\<Company>\<Product>`. `PlayerPrefs` is a small key-value store (the registry on Windows) for flags and settings such as the first-run hints and the offers toggle. `Application.quitting` fires when the player quits and also when Play Mode stops in the editor, which is why a run saves itself then (D-074). A DLL from a package, such as Newtonsoft.Json, is referenced from an assembly definition through `overrideReferences` plus `precompiledReferences`, not through the references list.
+
 ## Play Mode and the Test Runner
 
 - Pressing Play runs the game inside the editor. Changes made to scene objects while playing are discarded on stop (a classic trap).

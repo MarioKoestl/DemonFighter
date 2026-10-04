@@ -5,6 +5,7 @@ using DemonFighter.Simulation;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Mutation;
+using DemonFighter.Simulation.Progression;
 using DemonFighter.Simulation.Worldgen;
 using UnityEngine.InputSystem;
 
@@ -25,6 +26,10 @@ namespace DemonFighter.App
             ContentCatalog catalog,
             ContentCatalogDefinition catalogDefinition,
             IMutationOfferPolicy offerPolicy,
+            RunSaveService saves,
+            IMetaProgression meta,
+            IMutationOfferPolicy randomOffers,
+            GameSettings settings,
             InputActionAsset actions)
         {
             SimulationConfig = simulationConfig ?? throw new ArgumentNullException(nameof(simulationConfig));
@@ -34,6 +39,10 @@ namespace DemonFighter.App
             Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
             CatalogDefinition = catalogDefinition != null ? catalogDefinition : throw new ArgumentNullException(nameof(catalogDefinition));
             OfferPolicy = offerPolicy ?? throw new ArgumentNullException(nameof(offerPolicy));
+            Saves = saves ?? throw new ArgumentNullException(nameof(saves));
+            Meta = meta ?? throw new ArgumentNullException(nameof(meta));
+            RandomOffers = randomOffers ?? throw new ArgumentNullException(nameof(randomOffers));
+            Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             Actions = actions != null ? actions : throw new ArgumentNullException(nameof(actions));
         }
 
@@ -57,6 +66,18 @@ namespace DemonFighter.App
 
         /// <summary>Which mutations the menu lists: the shop in v1 (GAME_DESIGN, "Mutation").</summary>
         public IMutationOfferPolicy OfferPolicy { get; }
+
+        /// <summary>The one save slot (D-074).</summary>
+        public RunSaveService Saves { get; }
+
+        /// <summary>Receives every finished run; nothing persists in v1 (D-075).</summary>
+        public IMetaProgression Meta { get; }
+
+        /// <summary>The random hand of Option B, used when the setting asks for it (D-076).</summary>
+        public IMutationOfferPolicy RandomOffers { get; }
+
+        /// <summary>The few settings the player can flip.</summary>
+        public GameSettings Settings { get; }
 
         /// <summary>The input actions asset the player input adapter reads.</summary>
         public InputActionAsset Actions { get; }

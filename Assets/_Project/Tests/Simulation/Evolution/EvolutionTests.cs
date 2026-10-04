@@ -187,6 +187,7 @@ namespace DemonFighter.Simulation.Tests.Evolution
             run.Tick(1);
 
             run.Rejections.Should().BeEmpty();
+            run.Player.EvolutionIds.Should().ContainSingle().Which.Should().Be(TestContent.Brute1.Id);
             run.Player.Stats.Get(StatIds.Strength).Should().Be(strengthBefore + 10);
             run.Player.StatCap(StatIds.Strength).Should().Be(capBefore + 5 + 10);
             run.Player.Derived.DamageMultiplier.Should().BeGreaterThan(damageBefore);

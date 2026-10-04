@@ -4,7 +4,7 @@ Milestones are ordered. Each has acceptance criteria that Mario can check in Pla
 
 ## Current milestone
 
-**M3: Mutation.** M2 is merged and verified. All Claude Code items of M3 are done on branch `feat/m3-mutation` (2026-10-04): sockets with capacities on the core and ten body parts as assets with upgrade levels, costs and requirements (Jaws, Arm, Legs, Thick Hide, Plates, Elastic Tissue, Eyes, Spines, Tail); Claw, Grab, Lunge, passive Sprint and Tail Swing as data plus behaviours, bound through skill slots (left mouse, right mouse, Space, Shift, Q); skill levels that scale damage, cost, cooldown, speed and reach, one perk per skill at level 10, levels frozen while the granting part is lost; the mutation menu (Tab, C) with the tabs Mutate, Evolve, Stats and Skills, the shop offer policy and a stubbed random policy; the calm rule and the 2 second transformation; two evolution thresholds with three lines (Brute, Stalker, Bulwark) and their packages; part primitives on the body, size and camera scaling with the tier. First playtest round: readable tabs, a live 3D preview of the own body in the menu (D-063), offers grouped into new parts, upgrades and regrows and selected together for one Apply (D-064), the combat rule suspended (D-060), quicker leveling (D-062), grabbed demons dragged along (D-061); second round: Grab on equal size and an aim marker (D-065), the Analyze key with sense levels (D-066), evolution packages with bound stat gains (D-067); 372 EditMode and 3 PlayMode tests. Open: the Play Mode acceptance checks from Legs onward are Mario's; AI mutation and evolution come with M4. Next: M4 ecosystem.
+**M4: A living ecosystem.** M3 is merged. All Claude Code items of M4 are done on branch `feat/m4-ecosystem` (2026-10-04): a threat level that rises half a level per minute, with a meter in the HUD (D-069); a spawn table with stronger kinds born with parts, Biomass, levels and an evolution, a population cap and a respawn interval that follow the threat, and elders drawn toward the player (D-070); three blob personalities as assets, drawn by weight, with fleeing back on (D-071); AI demons that spend stat points, evolve and buy, regrow or upgrade parts in calm moments (D-072); a plain save snapshot with capture and restore (D-073) and one JSON slot behind Esc, Save and Quit, save on quit and Continue in the menu (D-074); the full death summary and the no-op meta-progression hook (D-075); first-run hints and a settings box with the random offers toggle (D-076); a headless autoplay harness with a simulation-side hit resolver, and a stress test at about 0.06 ms per tick with 50 demons and 200 food items (D-077); 407 EditMode and 4 PlayMode tests. First playtest: the world was too quiet, so the spawning was doubled (D-078). Open: the run tuning target needs more playtests (the harness gives first numbers), the Option B decision, and the two acceptance checks are Mario's. Next: M5 look and feel.
 
 (Claude Code: update this section when a milestone completes. Do not rewrite other sections without asking.)
 
@@ -106,15 +106,15 @@ Acceptance:
 
 Goal: a complete 15 to 20 minute run where the world evolves without the player.
 
-- [ ] AI demons mutate and evolve using archetype preferences; three archetypes (aggressive, cautious, scavenger)
-- [ ] Threat level over time: spawn tables, elder proximity, stronger spawns
-- [ ] Elders fight back when attacked and ignore low tiers otherwise
-- [ ] Run tuning: a competent player survives 15 to 20 minutes, a careless one dies in 5
-- [ ] Save on quit and resume (one slot, deleted on resume and on death); Continue button in the main menu
-- [ ] Death screen with full summary; `IMetaProgression` hook with a no-op implementation
-- [ ] First-run hints (first corpse, first Biomass, first level up, first evolution)
-- [ ] Playtest Option B (random offers) behind a setting; decide, record in `DECISIONS.md`
-- [ ] Stress test: 50 demons, 200 food, simulation tick under 2 ms (test with timing assertion)
+- [x] AI demons mutate and evolve using archetype preferences; three archetypes (aggressive, cautious, scavenger)
+- [x] Threat level over time: spawn tables, elder proximity, stronger spawns
+- [x] Elders fight back when attacked and ignore low tiers otherwise
+- [ ] Run tuning: a competent player survives 15 to 20 minutes, a careless one dies in 5 (the autoplay harness of D-077 is in place; the first playtests set the numbers)
+- [x] Save on quit and resume (one slot, deleted on resume and on death); Continue button in the main menu
+- [x] Death screen with full summary; `IMetaProgression` hook with a no-op implementation
+- [x] First-run hints (first corpse, first Biomass, first level up, first evolution)
+- [x] Playtest Option B (random offers) behind a setting; decide, record in `DECISIONS.md` (the setting is in place; the decision follows the playtest)
+- [x] Stress test: 50 demons, 200 food, simulation tick under 2 ms (test with timing assertion)
 
 Acceptance:
 

@@ -3,15 +3,18 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using DemonFighter.Simulation.Ai;
+using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Worldgen;
 
 namespace DemonFighter.Simulation.Spawning
 {
     /// <summary>
-    /// Keeps the arena populated (D-053): while fewer Tier 0 demons live than the biome asks for, one more is born
-    /// every <see cref="BiomeSpec.RespawnSeconds"/>, out of sight of the player and clear of features. The threat
-    /// level that scales spawns over time is M4; this is the floor under it.
+    /// Keeps the arena populated and lets the threat shape it (D-053, D-070): while fewer AI demons live than the cap,
+    /// which grows with the threat level, one more is born every interval, which shrinks with it, out of sight of the
+    /// player and clear of features. Its kind comes from the spawn table of the biome: among the entries whose
+    /// threshold the threat has reached, one is drawn by weight, so stronger kinds join as the run goes on. Elders
+    /// never count toward the cap.
     /// </summary>
     internal sealed class SpawnSystem
     {
@@ -22,10 +25,31 @@ namespace DemonFighter.Simulation.Spawning
         private readonly AiSystem _ai;
         private long _nextSpawnTick = -1;
 
+        /// <summary>Tick of the next spawn attempt; -1 before the first; saved with the run (D-073).</summary>
+        public long NextSpawnTick => _nextSpawnTick;
+
         public SpawnSystem(SimulationEvents events, AiSystem ai)
         {
             _events = events ?? throw new ArgumentNullException(nameof(events));
             _ai = ai ?? throw new ArgumentNullException(nameof(ai));
+        }
+
+        /// <summary>Continues the spawn timer of a saved run.</summary>
+        internal void RestoreNextSpawnTick(long tick)
+        {
+            _nextSpawnTick = tick;
+        }
+
+        /// <summary>How many AI demons below the elder the biome wants alive at this threat level.</summary>
+        public static int PopulationCap(BiomeSpec biome, int threatLevel)
+        {
+            return biome.InitialBlobs + threatLevel * biome.BlobsPerThreatLevel;
+        }
+
+        /// <summary>Seconds between spawns at this threat level; the interval shrinks as the threat rises.</summary>
+        public static float RespawnSeconds(BiomeSpec biome, int threatLevel)
+        {
+            return biome.RespawnSeconds / (1f + biome.RespawnSpeedupPerThreat * threatLevel);
         }
 
         /// <summary>Spawns at most one demon per interval; nothing before the world is attached or when disabled.</summary>
@@ -37,7 +61,8 @@ namespace DemonFighter.Simulation.Spawning
                 return;
             }
 
-            int interval = Math.Max(1, state.Config.TicksFor(world.Biome.RespawnSeconds));
+            int threat = state.ThreatLevel;
+            int interval = Math.Max(1, state.Config.TicksFor(RespawnSeconds(world.Biome, threat)));
             if (_nextSpawnTick < 0)
             {
                 _nextSpawnTick = state.Tick + interval;
@@ -49,7 +74,7 @@ namespace DemonFighter.Simulation.Spawning
                 return;
             }
 
-            if (CountLivingBlobs(state, world.Biome) >= world.Biome.InitialBlobs)
+            if (CountLivingPopulation(state, world.Biome) >= PopulationCap(world.Biome, threat))
             {
                 _nextSpawnTick = state.Tick + interval;
                 return;
@@ -61,21 +86,61 @@ namespace DemonFighter.Simulation.Spawning
                 return;
             }
 
+            DemonSpec kind = PickKind(state, world.Biome, threat);
             float yaw = state.Rng.NextFloat(0f, MathF.PI * 2f);
-            Demon blob = state.SpawnDemon(ControllerKind.Ai, world.Biome.BlobDemon, position, yaw);
-            _ai.AddBrain(blob, world.Biome.BlobArchetype, world.Bounds, null);
-            _events.Publish(new DemonSpawned(blob.Id));
+            Demon demon = state.SpawnDemon(ControllerKind.Ai, kind, position, yaw);
+            _ai.AddBrain(demon, world.Biome.PickBlobArchetype(state.Rng), world.Bounds, null);
+            _events.Publish(new DemonSpawned(demon.Id));
             _nextSpawnTick = state.Tick + interval;
         }
 
-        private static int CountLivingBlobs(RunState state, BiomeSpec biome)
+        // Weighted draw among the table entries the threat has unlocked; an empty table spawns the blob of the biome.
+        private static DemonSpec PickKind(RunState state, BiomeSpec biome, int threat)
+        {
+            IReadOnlyList<SpawnEntry> table = biome.SpawnTable;
+            float total = 0f;
+            for (int i = 0; i < table.Count; i++)
+            {
+                if (table[i].MinThreat <= threat)
+                {
+                    total += table[i].Weight;
+                }
+            }
+
+            if (total <= 0f)
+            {
+                return biome.BlobDemon;
+            }
+
+            float roll = state.Rng.NextFloat(0f, total);
+            DemonSpec last = biome.BlobDemon;
+            for (int i = 0; i < table.Count; i++)
+            {
+                if (table[i].MinThreat > threat)
+                {
+                    continue;
+                }
+
+                last = table[i].Demon;
+                if (roll < table[i].Weight)
+                {
+                    return last;
+                }
+
+                roll -= table[i].Weight;
+            }
+
+            return last;
+        }
+
+        private static int CountLivingPopulation(RunState state, BiomeSpec biome)
         {
             int count = 0;
             IReadOnlyList<Demon> demons = state.Demons;
             for (int i = 0; i < demons.Count; i++)
             {
                 Demon demon = demons[i];
-                if (demon.Controller == ControllerKind.Ai && demon.IsAlive && string.Equals(demon.Spec.Id, biome.BlobDemon.Id, StringComparison.Ordinal))
+                if (demon.Controller == ControllerKind.Ai && demon.IsAlive && !string.Equals(demon.Spec.Id, biome.ElderDemon.Id, StringComparison.Ordinal))
                 {
                     count++;
                 }

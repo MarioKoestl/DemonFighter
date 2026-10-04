@@ -5,6 +5,7 @@ using DemonFighter.Data;
 using DemonFighter.Simulation;
 using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Mutation;
+using DemonFighter.Simulation.Progression;
 using DemonFighter.Simulation.Worldgen;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -25,6 +26,9 @@ namespace DemonFighter.App
         private RunController? _runController;
         private SceneFlow? _sceneFlow;
 
+        /// <summary>The run controller of this application, for Play Mode tests; null when bootstrapping failed.</summary>
+        internal RunController? RunController => _runController;
+
         private void Awake()
         {
             DontDestroyOnLoad(gameObject);
@@ -44,9 +48,13 @@ namespace DemonFighter.App
                     _catalog.Build(),
                     _catalog,
                     new ShopOfferPolicy(),
+                    new RunSaveService(),
+                    new NoMetaProgression(),
+                    new RandomOfferPolicy(),
+                    new GameSettings(),
                     _actions);
                 _runController = new RunController(services);
-                _sceneFlow = new SceneFlow(_runController);
+                _sceneFlow = new SceneFlow(_runController, services.Settings);
                 Log.Info(LogCategory.App, "Bootstrap complete with biome " + services.Biome.Id + " and " + services.Catalog.Demons.Count + " demon kinds.");
             }
             catch (Exception exception)

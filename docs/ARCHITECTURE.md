@@ -31,7 +31,7 @@ Assets/_Project/
     PlayMode/        DemonFighter.PlayMode.Tests    PlayMode, needs scenes, slow
     Plugins/         test library DLLs: AwesomeAssertions, NSubstitute, Castle.Core (D-039)
   Analyzers/         Roslyn analyzer DLLs: Microsoft.Unity.Analyzers (D-039)
-  Content/           ScriptableObject assets: BodyParts/, Skills/, Evolutions/, Demons/, Biomes/, Catalog/
+  Content/           ScriptableObject assets: BodyParts/, Skills/, Evolutions/, Demons/, Archetypes/, Biomes/, Catalog/
   Prefabs/           generated or hand-made prefabs
   Scenes/            Bootstrap.unity, MainMenu.unity, Run.unity
   Art/               Models/, Textures/, Materials/, Animations/, VFX/ (see ASSET_PIPELINE.md)
@@ -90,7 +90,8 @@ Specs are immutable `record` classes (C# 9) created from ScriptableObjects at lo
 BodyPartSpec (socket, HP, defense, granted skills, bonuses per upgrade level, cost and requirements),
 SkillSpec (slot, timings, level scaling, one SkillPerkSpec),
 EvolutionSpec (stage, bound stat gains, free stat points, cap bonuses, free parts, extra skills, unlocked parts, fit stat),
-DemonSpec, ArchetypeSpec, BiomeSpec, StatSpec, CombatTuning
+DemonSpec (kind, size, core, starting stats and the starting package of parts, Biomass, level and evolution),
+ArchetypeSpec, BiomeSpec (world shape, spawn table, threat pace), SpawnEntry, StatSpec, CombatTuning
 ContentCatalog (lookup by id for all of the above)
 ```
 
@@ -147,7 +148,7 @@ The simulation advances in fixed steps (`SimulationTick`, 20 Hz for v1, configur
 7. Transformation: a transformation whose time is up ends (`MutationCompleted`).
 8. Eating: Biomass flows for every demon that held Eat this tick.
 9. Run AI decisions for AI demons (every N ticks per brain; held actions continue between decisions; dead, transforming and held demons are skipped). Commands land in the next tick.
-10. Spawning: top the Tier 0 population up to the biome count, one demon per interval, out of sight of the player (D-053); the threat level that scales it comes in M4.
+10. Threat and spawning: the threat level, derived from the tick, is announced when it crosses a whole level (D-069); then the Tier 0 population is topped up to the biome count, one demon per interval, out of sight of the player (D-053).
 11. Decay food.
 12. Flush events.
 
@@ -159,7 +160,7 @@ This is the deliberate exception to "rules in the simulation". Unity's `Characte
 
 - `MoveCommand` is consumed by the Presentation layer (the demon's view) which moves the Unity object. After the physics step, the view writes the resulting position and facing back into the simulation entity (`Demon.Position`). The simulation trusts this.
 - Skill hit detection happens in Unity during the active ticks a `SkillActivated` event announces: `CombatPresenter` sweeps a sphere along the crosshair ray for the player, then falls back to a volume in front of the body (which is all AI uses), against `BodyPartView` trigger colliders on the `Demon` layer. The touch becomes a `ReportHitCommand`; the simulation accepts it only inside the window, once per use, within reach and arc, then applies the damage and emits events (D-046). Reach is the skill reach per meter of body size times `Demon.ReachMultiplier` (Eyes, D-058) in both places.
-- Perception for AI is a distance scan of the run state inside the simulation (`Perception`, D-050), so AI tests need no Unity and every demon sees the same world.
+- Perception for AI is a distance scan of the run state inside the simulation (`Perception`, D-050), so AI tests need no Unity and every demon sees the same world. For runs without a frame (the autoplay harness, tests) `SimulationTicker.EnableHeadlessHits` lets a `HeadlessHitResolver` report hits itself (D-077).
 - A grabbed demon is dragged by its holder: `HoldSystem` gives it a push toward the grab spot every tick, and the view moves it like any pushed body (D-061).
 
 Why: writing our own 3D physics is out of scope, and Unity's physics also runs headless, so a future server could run the same code.
@@ -168,10 +169,10 @@ Why: writing our own 3D physics is out of scope, and Unity's physics also runs h
 
 `DemonFighter.Simulation.Ai`:
 
-- `UtilityBrain` picks a goal (`Hunt`, `Eat`, `Flee`, `Wander`, `Rest`, `Patrol`; `Mutate` and `Evolve` join in M4) by weighted chance from the `ArchetypeSpec` weights, scored by what `Perception` finds within the perception radius: prey at most one tier above, never two or more tiers below unless it attacked the demon, wounded or eating prey preferred, food by the reward factor (`CombatTuning.RewardFactor`). Low health near a fight overrides everything with `Flee`.
-- The chosen goal produces commands: move (with a facing toward the prey when standing), a strike or a dash chosen from the skills the body grants when in reach, eat every tick while at food. A demon that was hit turns on its attacker (D-052).
+- `UtilityBrain` picks a goal (`Hunt`, `Eat`, `Flee`, `Wander`, `Rest`, `Patrol`, `Mutate`, `Evolve`) by weighted chance from the weights of its `ArchetypeSpec`, which new blobs draw from the biome by weight (Aggressive, Cautious, Scavenger, D-071), scored by what `Perception` finds within the perception radius: prey at most one tier above, never two or more tiers below unless it attacked the demon, wounded or eating prey preferred, food by the reward factor (`CombatTuning.RewardFactor`). Low health near a fight overrides everything with `Flee`.
+- The chosen goal produces commands: move (with a facing toward the prey when standing), a strike or a dash chosen from the skills the body grants when in reach, eat every tick while at food. A demon that was hit turns on its attacker (D-052). In calm moments it spends stat points, evolves and buys, regrows or upgrades parts by the preferences of its archetype, through the same commands as the player (D-072).
 - AI decisions run every N ticks per demon (staggered), not every tick, to keep cost flat with 50+ demons; between decisions `Hold` only keeps a meal going.
-- Elders use the same brain with a wider perception; the reward rule makes them ignore blobs until one bites them.
+- Elders use the same brain with a wider perception; the reward rule makes them ignore blobs until one bites them. Their route targets are pulled toward the player as the threat rises (D-070).
 
 ### World generation
 
@@ -207,20 +208,21 @@ Presentation never changes simulation state directly. It sends commands or hit r
 
 ## App
 
-- `Bootstrap.unity` is the first scene. It creates `GameServices` (content catalog, settings, event bus, run factory), marks it persistent, then loads `MainMenu`.
+- `Bootstrap.unity` is the first scene. It creates `GameServices` (content catalog, event bus, offer policies, save slot, meta hook, settings), marks it persistent, then loads `MainMenu`. `GameSettings` keeps the few playtest settings in PlayerPrefs (D-076).
 - `RunController` creates a `RunState` from a seed (or loads one from the save slot), builds the world, spawns views for every entity, starts the `SimulationRunner`, and tears everything down on run end.
-- `RunSaveService`: on quit during a run, serializes the whole `RunState` (Newtonsoft JSON) to one slot under `Application.persistentDataPath`. The world is not saved; it is regenerated from the seed. Resuming deletes the slot, death deletes the slot. Every type inside `RunState` must therefore be serializable without Unity references.
-- Scene flow: Bootstrap -> MainMenu -> Run -> (death) -> RunSummary (overlay) -> MainMenu or new Run.
+- `RunSaveService`: on quit during a run, writes the `RunSnapshot` that `RunPersistence.Capture` produces (plain data, D-073) as Newtonsoft JSON to one slot under `Application.persistentDataPath`, and `RunPersistence.Restore` rebuilds the run from it. The world is not saved; it is regenerated from the seed. Resuming deletes the slot, death deletes the slot.
+- On the death of the player `RunController` builds a `RunSummary`, hands it to `IMetaProgression` (a no-op in v1, D-075) and to the death screen.
+- Scene flow: Bootstrap -> MainMenu -> Run -> (death) -> RunSummary (overlay) -> MainMenu or new Run; MainMenu -> Continue -> Run resumed from the slot; Run -> Esc -> Save and Quit -> MainMenu (D-074).
 
 ## Input
 
 - One Input Actions asset (`Settings/DemonFighter.inputactions`) with action maps `Gameplay` and `Menu`.
-- `PlayerInputAdapter` reads actions and produces commands for the demon of the player: move (with the sprint flag, facing the camera while attacking), one skill use per attack key pressed, resolved through the skill slot the key stands for (`SkillSlots.Find`: left mouse Primary, right mouse Secondary, Space Lunge, Q Tail Swing), eat while the key is held on the food Presentation found under the crosshair (`IPlayerAim`). It raises `MenuToggled(MenuTab)` for Tab and C and `AnalyzeRequested` for F. Nothing else in the project reads input. No `Input.GetKey` anywhere.
+- `PlayerInputAdapter` reads actions and produces commands for the demon of the player: move (with the sprint flag, facing the camera while attacking), one skill use per attack key pressed, resolved through the skill slot the key stands for (`SkillSlots.Find`: left mouse Primary, right mouse Secondary, Space Lunge, Q Tail Swing), eat while the key is held on the food Presentation found under the crosshair (`IPlayerAim`). It raises `MenuToggled(MenuTab)` for Tab and C, `AnalyzeRequested` for F and `PauseRequested` for Esc. Nothing else in the project reads input. No `Input.GetKey` anywhere.
 - Adding gamepad later means adding bindings to the asset, no code changes.
 
 ## UI
 
-- `HudScreen` (UI Toolkit, built in code) shows the run and hosts the `MutationMenu`, the `StatsPanel` inside it and the `RunSummaryPanel`. The menu reads `RunState`, the offer policy and the rules every frame while open and only raises requests (`MutationsRequested` with every selected mutation, `EvolutionRequested`, `StatPointRequested`); `RunController` turns them into commands, pauses the runner while the menu is open and resumes it on confirm. The Mutate tab is a planner like Stats (D-064): it composes a preview `Body` (own parts plus selected offers) and hands it to an `IBodyPreview`, which the App layer implements over the `BodyPreviewRig`, so UI never references Presentation. The HUD names the aimed part under the crosshair and shows the analysis panel of a locked target through a `TargetFocus` callback composed the same way, revealing by the sense level of the player (D-066). The UI never changes simulation state directly.
+- `HudScreen` (UI Toolkit, built in code) shows the run and hosts the `MutationMenu`, the `StatsPanel` inside it and the `RunSummaryPanel`. The menu reads `RunState`, the offer policy and the rules every frame while open and only raises requests (`MutationsRequested` with every selected mutation, `EvolutionRequested`, `StatPointRequested`); `RunController` turns them into commands, pauses the runner while the menu is open and resumes it on confirm. The Mutate tab is a planner like Stats (D-064): it composes a preview `Body` (own parts plus selected offers) and hands it to an `IBodyPreview`, which the App layer implements over the `BodyPreviewRig`, so UI never references Presentation. The HUD names the aimed part under the crosshair and shows the analysis panel of a locked target through a `TargetFocus` callback composed the same way, revealing by the sense level of the player (D-066). First-run hints appear once per installation, remembered in PlayerPrefs through `HintMemory` (D-076). The UI never changes simulation state directly.
 
 ## Multiplayer readiness
 
@@ -236,6 +238,7 @@ Not building multiplayer. Both co-op and PvP should stay possible later, which m
 
 - `DemonFighter.Simulation.Tests` (EditMode): the bulk of tests. Create a `RunState` with a fixed seed, feed commands, assert on state and events. Must run in under a few seconds total.
 - `DemonFighter.PlayMode.Tests`: a few integration tests that load `Run.unity` with a fixed seed and check that views match state. Slow; keep them few.
+- `StressTests` keeps the 50 demon, 200 food tick under 2 ms; `AutoplayHarness` (Editor, menu or batch mode) plays seeded headless runs for tuning (D-077).
 - Test builders: `DemonBuilder`, `RunStateBuilder` in the test assembly so tests read like design statements.
 
 ## Performance notes (v1 scale)

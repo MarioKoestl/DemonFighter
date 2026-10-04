@@ -1,13 +1,14 @@
 #nullable enable
 using System;
 using DemonFighter.Simulation.Ai;
+using DemonFighter.Simulation.Content;
 using UnityEngine;
 
 namespace DemonFighter.Data
 {
     /// <summary>
     /// Inspector-editable AI personality, converted to an <see cref="ArchetypeSpec"/> at load. Nested inside the
-    /// biome asset for M1; becomes its own asset type in M4.
+    /// biome asset for the elder and wrapped by <see cref="ArchetypeAsset"/> for the blob personalities (D-071).
     /// </summary>
     [Serializable]
     public sealed class ArchetypeDefinition
@@ -25,14 +26,44 @@ namespace DemonFighter.Data
         [SerializeField] private float _eatWeight = 2.5f;
         [SerializeField] private float _fleeHealthFraction;
         [SerializeField] private float _perceptionRadius = 18f;
+        [SerializeField] private float _routePullPerThreat;
+        [SerializeField] private float _routePullMax;
+        [SerializeField] private BodyPartDefinition[] _preferredParts = Array.Empty<BodyPartDefinition>();
+        [SerializeField] private string _preferredEvolutionStatId = "stat.strength";
+        [SerializeField] private string _preferredStatId = "stat.strength";
+
+        /// <summary>Content name.</summary>
+        public string Name => _name;
 
         /// <summary>Builds the immutable spec; throws for invalid numbers, which OnValidate reports.</summary>
         public ArchetypeSpec ToSpec()
         {
+            var preferred = new string[_preferredParts.Length];
+            for (int i = 0; i < preferred.Length; i++)
+            {
+                if (_preferredParts[i] == null)
+                {
+                    throw new ContentException("Archetype " + _name + " has an empty preferred part slot.");
+                }
+
+                preferred[i] = _preferredParts[i].Id;
+            }
+
             return new ArchetypeSpec(
                 _name, _wanderWeight, _restWeight, _patrolWeight, _wanderRadius,
                 _restSecondsMin, _restSecondsMax, _decisionIntervalTicks, _arriveDistance,
-                _huntWeight, _eatWeight, _fleeHealthFraction, _perceptionRadius);
+                _huntWeight, _eatWeight, _fleeHealthFraction, _perceptionRadius, _routePullPerThreat, _routePullMax)
+            {
+                PreferredPartIds = preferred,
+                PreferredEvolutionStat = new StatId(_preferredEvolutionStatId),
+                PreferredStat = new StatId(_preferredStatId),
+            };
+        }
+
+        /// <summary>Points the preferences at part assets; the generator resolves them from the spec ids.</summary>
+        internal void SetPreferredParts(BodyPartDefinition[] parts)
+        {
+            _preferredParts = parts;
         }
 
         internal void ApplyDefaults(ArchetypeSpec spec)
@@ -50,6 +81,10 @@ namespace DemonFighter.Data
             _eatWeight = spec.EatWeight;
             _fleeHealthFraction = spec.FleeHealthFraction;
             _perceptionRadius = spec.PerceptionRadius;
+            _routePullPerThreat = spec.RoutePullPerThreat;
+            _routePullMax = spec.RoutePullMax;
+            _preferredEvolutionStatId = spec.PreferredEvolutionStat.Value;
+            _preferredStatId = spec.PreferredStat.Value;
         }
     }
 }

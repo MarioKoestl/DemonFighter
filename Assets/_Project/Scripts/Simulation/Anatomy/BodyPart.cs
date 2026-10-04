@@ -173,6 +173,23 @@ namespace DemonFighter.Simulation.Anatomy
             BleedDamagePerSecond = 0f;
         }
 
+        /// <summary>Overwrites the part with saved values (D-073); the caller created it from the same spec.</summary>
+        internal void Restore(int upgradeLevel, float maxHp, float hp, bool isLost, float bleedSecondsLeft, float bleedDamagePerSecond, DamageType bleedType)
+        {
+            if (upgradeLevel < 0 || maxHp <= 0f || hp < 0f || bleedSecondsLeft < 0f || bleedDamagePerSecond < 0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxHp), "Saved part values are out of range.");
+            }
+
+            UpgradeLevel = upgradeLevel;
+            MaxHp = maxHp;
+            Hp = isLost ? 0f : MathF.Min(hp, maxHp);
+            IsLost = isLost;
+            BleedSecondsLeft = bleedSecondsLeft;
+            BleedDamagePerSecond = bleedDamagePerSecond;
+            BleedType = bleedType;
+        }
+
         /// <summary>Changes the maximum after a Constitution change, keeping the same fraction of health.</summary>
         internal void Rescale(float newMaxHp)
         {

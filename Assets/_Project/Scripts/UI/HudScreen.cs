@@ -9,6 +9,7 @@ using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Evolution;
 using DemonFighter.Simulation.Mutation;
+using DemonFighter.Simulation.Progression;
 using DemonFighter.Simulation.Skills;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -18,7 +19,7 @@ namespace DemonFighter.UI
     /// <summary>
     /// The in-run HUD (GAME_DESIGN, "UI"): health with a line per part, stamina, Biomass, level with XP, tier, the
     /// skills the body grants with their keys and cooldowns, a bleeding warning, a transforming or held notice, the
-    /// stat points and evolutions waiting, plus a crosshair that names the aimed part, the analysis panel of a locked
+    /// stat points and evolutions waiting, a thin threat meter at the top (D-069), plus a crosshair that names the aimed part, the analysis panel of a locked
     /// target (what the senses reveal, D-066), the eat prompt and the seed. Hosts the mutation menu (Tab, C) and the death
     /// screen. Refreshes once per simulation tick, every frame while the menu is open, and only rewrites a label when
     /// its value changed. Styling in code is a placeholder until the M5 UI work moves it into USS.
@@ -33,6 +34,7 @@ namespace DemonFighter.UI
         private const int StatusNone = 0;
         private const int StatusTransforming = 1;
         private const int StatusHeld = 2;
+        private const float HintSeconds = 6f;
 
         private static readonly Color PanelBackground = new Color(0f, 0f, 0f, 0.55f);
         private static readonly Color MutedText = new Color(0.75f, 0.7f, 0.65f);
@@ -44,6 +46,7 @@ namespace DemonFighter.UI
         private readonly List<PartCache> _partCache = new List<PartCache>();
         private readonly List<Label> _skillLabels = new List<Label>();
         private readonly List<string> _skillTexts = new List<string>();
+        private readonly HashSet<string> _hintsShown = new HashSet<string>(StringComparer.Ordinal);
 
         private UIDocument _document = null!;
         private VisualElement _overlay = null!;
@@ -64,7 +67,11 @@ namespace DemonFighter.UI
         private VisualElement _target = null!;
         private Label _targetTitle = null!;
         private Label _targetBody = null!;
+        private VisualElement _threatBox = null!;
+        private Label _threat = null!;
+        private VisualElement _threatFill = null!;
         private RunSummaryPanel? _summary;
+        private PausePanel? _pause;
         private StatsPanel? _stats;
         private MutationMenu? _menu;
         private RunState? _state;
@@ -83,6 +90,9 @@ namespace DemonFighter.UI
         private int _xp;
         private int _xpNext;
         private int _tierValue;
+        private int _threatTenths;
+        private Label _hint = null!;
+        private float _hintSecondsLeft;
         private int _bleedingShown;
         private int _statusState;
         private int _pointsValue;
@@ -101,6 +111,15 @@ namespace DemonFighter.UI
         /// <summary>Raised when the player clicks Back to Menu on the death screen.</summary>
         public event Action? BackToMenuRequested;
 
+        /// <summary>Raised when the player clicks Resume on the pause panel.</summary>
+        public event Action? ResumeRequested;
+
+        /// <summary>Raised when the player clicks Save and Quit on the pause panel.</summary>
+        public event Action? SaveAndQuitRequested;
+
+        /// <summary>True while the pause panel is open.</summary>
+        public bool IsPauseOpen => _pause != null && _pause.IsVisible;
+
         /// <summary>True while the mutation menu is open.</summary>
         public bool IsMenuOpen => _menu != null && _menu.IsOpen;
 
@@ -118,6 +137,7 @@ namespace DemonFighter.UI
 
             ResetCaches();
             _summary?.SetVisible(false);
+            _pause?.SetVisible(false);
             _seed.text = "Seed " + state.Seed;
 
             if (_menu != null)
@@ -138,6 +158,7 @@ namespace DemonFighter.UI
             _menu.MutationsRequested += OnMutationsRequested;
             _menu.EvolutionRequested += OnEvolutionRequested;
             _overlay.Add(_menu.Root);
+            _pause?.Root.BringToFront();
             if (_summary != null)
             {
                 _summary.Root.BringToFront();
@@ -172,11 +193,30 @@ namespace DemonFighter.UI
             _menu?.Close();
         }
 
-        /// <summary>Shows the death screen for the run; the menu closes if it was open.</summary>
-        public void ShowRunSummary(RunState state, Demon player)
+        /// <summary>Opens or closes the pause panel; returns true when it is open afterwards (D-074).</summary>
+        public bool TogglePause()
+        {
+            if (_pause == null)
+            {
+                return false;
+            }
+
+            _pause.SetVisible(!_pause.IsVisible);
+            return _pause.IsVisible;
+        }
+
+        /// <summary>Closes the pause panel if it is open.</summary>
+        public void ClosePause()
+        {
+            _pause?.SetVisible(false);
+        }
+
+        /// <summary>Shows the death screen for the run; the menu and the pause panel close if they were open.</summary>
+        public void ShowRunSummary(RunState state, Demon player, RunSummary summary)
         {
             _menu?.Close();
-            _summary?.Show(state, player);
+            _pause?.SetVisible(false);
+            _summary?.Show(state, player, summary);
         }
 
         private void Awake()
@@ -185,6 +225,9 @@ namespace DemonFighter.UI
             _document = GetComponent<UIDocument>();
             _summary = new RunSummaryPanel();
             _summary.BackToMenuRequested += OnBackToMenu;
+            _pause = new PausePanel();
+            _pause.ResumeRequested += OnResume;
+            _pause.SaveAndQuitRequested += OnSaveAndQuit;
         }
 
         private void OnEnable()
@@ -197,6 +240,11 @@ namespace DemonFighter.UI
             if (_menu != null)
             {
                 _overlay.Add(_menu.Root);
+            }
+
+            if (_pause != null)
+            {
+                _overlay.Add(_pause.Root);
             }
 
             if (_summary != null)
@@ -218,6 +266,7 @@ namespace DemonFighter.UI
             }
 
             RefreshFocus();
+            UpdateHint(Time.deltaTime);
             if (_state.Tick == _lastTick)
             {
                 return;
@@ -257,6 +306,11 @@ namespace DemonFighter.UI
                 _biomass.text = "Biomass " + (_biomassTenths / 10f).ToString("0.0", CultureInfo.InvariantCulture);
             }
 
+            if (_biomassTenths > 0)
+            {
+                ShowHint(HintMemory.FirstBiomass, "Biomass. Press Tab to spend it on new body parts.");
+            }
+
             int xpNext = Mathf.RoundToInt(tuning.LevelXpForNext(_player.Level));
             if (Changed(ref _levelValue, _player.Level) | Changed(ref _xp, Mathf.RoundToInt(_player.Xp)) | Changed(ref _xpNext, xpNext))
             {
@@ -266,6 +320,13 @@ namespace DemonFighter.UI
             if (Changed(ref _tierValue, _player.Tier))
             {
                 _tier.text = "Tier " + _tierValue + "   " + _player.SizeMeters.ToString("0.0", CultureInfo.InvariantCulture) + " m";
+            }
+
+            if (Changed(ref _threatTenths, Mathf.RoundToInt(_state.Threat * 10f)))
+            {
+                float max = _state.World != null ? Mathf.Max(1f, _state.World.Biome.ThreatMaxLevel) : 1f;
+                _threat.text = "Threat " + (_threatTenths / 10f).ToString("0.0", CultureInfo.InvariantCulture);
+                _threatFill.style.width = Length.Percent(Mathf.Clamp01(_state.Threat / max) * 100f);
             }
 
             RefreshSkills();
@@ -288,9 +349,19 @@ namespace DemonFighter.UI
                 _points.style.display = _pointsValue > 0 ? DisplayStyle.Flex : DisplayStyle.None;
             }
 
+            if (_pointsValue > 0)
+            {
+                ShowHint(HintMemory.FirstPoints, "Stat points. Press C to spend them.");
+            }
+
             if (Changed(ref _evolutionShown, EvolutionRules.PendingStage(_player, tuning) > 0 ? 1 : 0))
             {
                 _evolution.style.display = _evolutionShown == 1 ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            if (_evolutionShown == 1)
+            {
+                ShowHint(HintMemory.FirstEvolution, "An evolution is ready. Press Tab and open Evolve.");
             }
 
             int promptState = _player.IsEating ? PromptEating : _aimedFood != null && _aimedFood().IsValid ? PromptEat : PromptNone;
@@ -298,6 +369,11 @@ namespace DemonFighter.UI
             {
                 _prompt.text = promptState == PromptEating ? "Eating" : "Hold E to eat";
                 _prompt.style.display = promptState == PromptNone ? DisplayStyle.None : DisplayStyle.Flex;
+            }
+
+            if (promptState == PromptEat)
+            {
+                ShowHint(HintMemory.FirstCorpse, "A corpse. Hold E to eat it and gain Biomass.");
             }
         }
 
@@ -420,7 +496,10 @@ namespace DemonFighter.UI
         {
             _lastTick = -1;
             _hp = _maxHp = _staminaValue = _maxStamina = _biomassTenths = _levelValue = _xp = _xpNext = _tierValue = -1;
-            _bleedingShown = _statusState = _pointsValue = _evolutionShown = _promptState = -1;
+            _bleedingShown = _statusState = _pointsValue = _evolutionShown = _promptState = _threatTenths = -1;
+            _hintsShown.Clear();
+            _hintSecondsLeft = 0f;
+            _hint.style.display = DisplayStyle.None;
             _focusText = string.Empty;
             _targetText = string.Empty;
             for (int i = 0; i < _partCache.Count; i++)
@@ -548,9 +627,47 @@ namespace DemonFighter.UI
             return text.ToString().TrimEnd();
         }
 
+        // First-run hints (D-076): once per installation, six seconds, a later one replaces an earlier one.
+        private void ShowHint(string id, string text)
+        {
+            if (!_hintsShown.Add(id) || HintMemory.WasShown(id))
+            {
+                return;
+            }
+
+            HintMemory.MarkShown(id);
+            _hint.text = text;
+            _hint.style.display = DisplayStyle.Flex;
+            _hintSecondsLeft = HintSeconds;
+        }
+
+        private void UpdateHint(float deltaTime)
+        {
+            if (_hintSecondsLeft <= 0f)
+            {
+                return;
+            }
+
+            _hintSecondsLeft -= deltaTime;
+            if (_hintSecondsLeft <= 0f)
+            {
+                _hint.style.display = DisplayStyle.None;
+            }
+        }
+
         private void OnBackToMenu()
         {
             BackToMenuRequested?.Invoke();
+        }
+
+        private void OnResume()
+        {
+            ResumeRequested?.Invoke();
+        }
+
+        private void OnSaveAndQuit()
+        {
+            SaveAndQuitRequested?.Invoke();
         }
 
         private void OnSpendRequested(StatId stat)
@@ -629,6 +746,29 @@ namespace DemonFighter.UI
             _prompt.style.unityTextAlign = TextAnchor.MiddleCenter;
             _prompt.style.display = DisplayStyle.None;
 
+            _threatBox = new VisualElement { name = "threat", pickingMode = PickingMode.Ignore };
+            _threatBox.style.position = Position.Absolute;
+            _threatBox.style.top = 12;
+            _threatBox.style.left = Length.Percent(50f);
+            _threatBox.style.translate = new Translate(Length.Percent(-50f), 0f);
+            _threatBox.style.width = 240;
+            _threatBox.style.alignItems = Align.Center;
+            _threat = new Label { name = "threat-label", pickingMode = PickingMode.Ignore };
+            _threat.style.fontSize = 14;
+            _threat.style.color = MutedText;
+            _threat.style.marginBottom = 2;
+            var track = new VisualElement { name = "threat-track", pickingMode = PickingMode.Ignore };
+            track.style.width = 240;
+            track.style.height = 4;
+            track.style.backgroundColor = PanelBackground;
+            _threatFill = new VisualElement { name = "threat-fill", pickingMode = PickingMode.Ignore };
+            _threatFill.style.height = 4;
+            _threatFill.style.width = Length.Percent(0f);
+            _threatFill.style.backgroundColor = WarningText;
+            track.Add(_threatFill);
+            _threatBox.Add(_threat);
+            _threatBox.Add(track);
+
             _seed = new Label { name = "seed", pickingMode = PickingMode.Ignore };
             _seed.style.position = Position.Absolute;
             _seed.style.right = 16;
@@ -674,6 +814,25 @@ namespace DemonFighter.UI
             _target.Add(_targetBody);
 
             overlay.Add(_seed);
+            _hint = new Label { name = "first-run-hint", pickingMode = PickingMode.Ignore };
+            _hint.style.position = Position.Absolute;
+            _hint.style.top = 48;
+            _hint.style.left = Length.Percent(50f);
+            _hint.style.translate = new Translate(Length.Percent(-50f), 0f);
+            _hint.style.fontSize = 20;
+            _hint.style.color = HighlightText;
+            _hint.style.backgroundColor = PanelBackground;
+            _hint.style.paddingLeft = 16;
+            _hint.style.paddingRight = 16;
+            _hint.style.paddingTop = 8;
+            _hint.style.paddingBottom = 8;
+            _hint.style.maxWidth = 620;
+            _hint.style.whiteSpace = WhiteSpace.Normal;
+            _hint.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _hint.style.display = DisplayStyle.None;
+
+            overlay.Add(_threatBox);
+            overlay.Add(_hint);
             overlay.Add(_focus);
             overlay.Add(_target);
             return overlay;

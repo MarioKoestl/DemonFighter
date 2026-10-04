@@ -213,7 +213,7 @@ Whatever the stage: every wound must be visible on the body.
 - Personality is data: an **archetype** asset sets goal weights (aggressive, cautious, scavenger) and preferred mutation and evolution paths, so AI builds differ without new code.
 - AI demons avoid targets more than one tier above them, prefer wounded or eating targets, and flee when Health is low and a path away exists.
 - Elders use the same AI with a very high tier; reward scaling makes them ignore the small.
-- v1 target: about 10 demons alive at once for testing. Higher counts are a performance target for later milestones.
+- v1 target: 16 demons alive at the start, growing with the threat to about 30 (D-078). Fifty is the stress target the simulation already meets.
 
 ## World generation
 

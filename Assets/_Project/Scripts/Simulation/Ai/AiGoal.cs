@@ -3,7 +3,7 @@ namespace DemonFighter.Simulation.Ai
 {
     /// <summary>
     /// What an AI demon is currently pursuing. Resting, wandering and walking a route came with M1, hunting, eating
-    /// and fleeing with M2; mutating and evolving join with their milestones (ARCHITECTURE, "AI").
+    /// and fleeing with M2, mutating and evolving with M4 (ARCHITECTURE, "AI"; D-072).
     /// </summary>
     public enum AiGoal
     {
@@ -21,5 +21,11 @@ namespace DemonFighter.Simulation.Ai
 
         /// <summary>Sprinting away from a fight while health is low.</summary>
         Flee,
+
+        /// <summary>Standing still while a bought, upgraded or regrown part reshapes the body.</summary>
+        Mutate,
+
+        /// <summary>Standing still while an evolution reshapes the body.</summary>
+        Evolve,
     }
 }

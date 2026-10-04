@@ -2,18 +2,22 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using DemonFighter.Simulation;
 using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Content;
+using DemonFighter.Simulation.Progression;
+using DemonFighter.Simulation.Skills;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace DemonFighter.UI
 {
     /// <summary>
-    /// The death screen (GAME_DESIGN, "The run": end of run): time survived, kills, Biomass eaten, highest tier and
-    /// the final body, with one button back to the menu. It only raises the request; the App layer ends the run.
-    /// Built in code like the other screens until M5 moves styling into USS.
+    /// The death screen (GAME_DESIGN, "The run": end of run; D-075): time survived, what killed you, kills, Biomass
+    /// eaten, highest and final tier with the level, the evolutions taken, the skills with their levels and the final
+    /// body, with one button back to the menu. It only raises the request; the App layer ends the run. Built in code
+    /// like the other screens until M5 moves styling into USS.
     /// </summary>
     public sealed class RunSummaryPanel
     {
@@ -22,9 +26,12 @@ namespace DemonFighter.UI
         private static readonly Color MutedText = new Color(0.75f, 0.7f, 0.65f);
 
         private readonly Label _time;
+        private readonly Label _cause;
         private readonly Label _kills;
         private readonly Label _biomass;
         private readonly Label _tier;
+        private readonly Label _evolutions;
+        private readonly Label _skills;
         private readonly VisualElement _body;
 
         public RunSummaryPanel()
@@ -43,22 +50,28 @@ namespace DemonFighter.UI
             title.style.fontSize = 64;
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
             title.style.color = TitleColor;
-            title.style.marginBottom = 32;
+            title.style.marginBottom = 24;
             Root.Add(title);
 
             _time = SummaryLabel("time");
+            _cause = SummaryLabel("cause");
             _kills = SummaryLabel("kills");
             _biomass = SummaryLabel("biomass");
             _tier = SummaryLabel("tier");
+            _evolutions = SummaryLabel("evolutions");
+            _skills = SummaryLabel("skills");
+            _skills.style.whiteSpace = WhiteSpace.Normal;
+            _skills.style.maxWidth = 760;
+            _skills.style.unityTextAlign = TextAnchor.MiddleCenter;
 
             var bodyTitle = new Label("Final body") { name = "body-title" };
             bodyTitle.style.fontSize = 22;
             bodyTitle.style.color = MutedText;
-            bodyTitle.style.marginTop = 16;
+            bodyTitle.style.marginTop = 12;
             Root.Add(bodyTitle);
             _body = new VisualElement { name = "body" };
             _body.style.alignItems = Align.Center;
-            _body.style.marginBottom = 32;
+            _body.style.marginBottom = 24;
             Root.Add(_body);
 
             var back = new Button { name = "back-to-menu", text = "Back to Menu" };
@@ -85,8 +98,8 @@ namespace DemonFighter.UI
             Root.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
-        /// <summary>Fills the summary from the run and the dead demon of the player and shows it.</summary>
-        public void Show(RunState state, Demon player)
+        /// <summary>Fills the summary from the run, the dead demon of the player and the summary record, and shows it.</summary>
+        public void Show(RunState state, Demon player, RunSummary summary)
         {
             if (state == null)
             {
@@ -98,26 +111,78 @@ namespace DemonFighter.UI
                 throw new ArgumentNullException(nameof(player));
             }
 
-            _time.text = "Survived " + FormatTime(state.Time);
-            _kills.text = player.Kills == 1 ? "1 kill" : player.Kills + " kills";
-            _biomass.text = "Biomass eaten " + player.BiomassEaten.ToString("0.0", CultureInfo.InvariantCulture);
-            _tier.text = "Highest tier " + player.Tier + ", level " + player.Level;
+            if (summary == null)
+            {
+                throw new ArgumentNullException(nameof(summary));
+            }
+
+            _time.text = "Survived " + FormatTime(summary.SecondsSurvived) + "   seed " + summary.Seed;
+            _cause.text = summary.KillerName.Length > 0 ? "Killed by a " + summary.KillerName : "Bled out";
+            _kills.text = summary.Kills == 1 ? "1 kill" : summary.Kills + " kills";
+            _biomass.text = "Biomass eaten " + summary.BiomassEaten.ToString("0.0", CultureInfo.InvariantCulture);
+            _tier.text = "Highest tier " + summary.HighestTier + (summary.FinalTier != summary.HighestTier ? " (final " + summary.FinalTier + ")" : string.Empty) + ", level " + summary.Level;
+            _evolutions.text = "Evolutions: " + EvolutionNames(state, summary.EvolutionIds);
+            _skills.text = "Skills: " + SkillLevels(player);
 
             _body.Clear();
             IReadOnlyList<BodyPart> parts = player.Body.Parts;
             for (int i = 0; i < parts.Count; i++)
             {
                 BodyPart part = parts[i];
-                string state2 = part.Condition == PartCondition.Lost
+                string condition = part.Condition == PartCondition.Lost
                     ? part.Spec.Fate == PartFate.Severed ? "severed" : "destroyed"
                     : part.Condition == PartCondition.Wounded ? "wounded" : "intact";
-                var line = new Label(part.Spec.Name + ": " + state2) { name = "part-" + i };
+                string upgrade = part.UpgradeLevel > 0 ? " +" + part.UpgradeLevel : string.Empty;
+                var line = new Label(part.Spec.Name + upgrade + ": " + condition) { name = "part-" + i };
                 line.style.fontSize = 18;
                 line.style.color = Color.white;
                 _body.Add(line);
             }
 
             SetVisible(true);
+        }
+
+        private static string EvolutionNames(RunState state, IReadOnlyList<string> ids)
+        {
+            if (ids.Count == 0)
+            {
+                return "none";
+            }
+
+            var text = new StringBuilder();
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (i > 0)
+                {
+                    text.Append(", ");
+                }
+
+                text.Append(state.Catalog.TryGetEvolution(ids[i], out EvolutionSpec? spec) ? spec.Name + " " + spec.Stage : ids[i]);
+            }
+
+            return text.ToString();
+        }
+
+        private static string SkillLevels(Demon player)
+        {
+            IReadOnlyList<SkillInstance> skills = player.Skills;
+            if (skills.Count == 0)
+            {
+                return "none";
+            }
+
+            var text = new StringBuilder();
+            for (int i = 0; i < skills.Count; i++)
+            {
+                if (i > 0)
+                {
+                    text.Append(", ");
+                }
+
+                text.Append(skills[i].Spec.Name).Append(" Lv ").Append(skills[i].Level);
+            }
+
+            return text.ToString();
         }
 
         private Label SummaryLabel(string name)

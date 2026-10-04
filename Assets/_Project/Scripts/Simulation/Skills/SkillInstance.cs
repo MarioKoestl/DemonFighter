@@ -93,6 +93,14 @@ namespace DemonFighter.Simulation.Skills
             return GrantedByEvolution || body.Grants(Spec.Id);
         }
 
+        /// <summary>Overwrites level, XP and cooldown with saved values (D-073).</summary>
+        internal void Restore(int level, float xp, long cooldownUntilTick)
+        {
+            Level = Math.Max(1, level);
+            Xp = Math.Max(0f, xp);
+            CooldownUntilTick = cooldownUntilTick;
+        }
+
         internal void StartCooldown(long untilTick)
         {
             CooldownUntilTick = untilTick;
