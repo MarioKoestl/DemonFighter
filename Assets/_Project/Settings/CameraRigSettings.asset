@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30e8141b68bb8d946926463e18287646, type: 3}
+  m_Name: CameraRigSettings
+  m_EditorClassIdentifier: DemonFighter.Presentation::DemonFighter.Presentation.Cameras.CameraRigSettings
+  _lookSensitivityDegreesPerPixel: 0.12
+  _invertY: 0
+  _pitchMinDegrees: -20
+  _pitchMaxDegrees: 60
+  _defaultPitchDegrees: 15
+  _orbitRadiusBase: 2
+  _orbitRadiusPerMeter: 2.5
+  _lookHeightPerMeter: 0.6
+  _blendSeconds: 0.35

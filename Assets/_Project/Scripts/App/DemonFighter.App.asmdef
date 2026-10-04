@@ -7,7 +7,8 @@
     "DemonFighter.Presentation",
     "DemonFighter.Input",
     "DemonFighter.UI",
-    "DemonFighter.Common"
+    "DemonFighter.Common",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

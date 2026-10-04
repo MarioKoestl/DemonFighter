@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba681f2daa855ca44b68a7b3f8017336, type: 3}
+  m_Name: PlaceholderPalette
+  m_EditorClassIdentifier: DemonFighter.Presentation::DemonFighter.Presentation.PlaceholderPalette
+  _ground: {fileID: 2100000, guid: e179e387c1db08d42bc33e954a0bf677, type: 2}
+  _wall: {fileID: 2100000, guid: e11eca44fca47ba44b1f2e6e942dc9a7, type: 2}
+  _rock: {fileID: 2100000, guid: fe25c07ecd4af1248a73d77d70c12b27, type: 2}
+  _fissure: {fileID: 2100000, guid: 5d27833e73e742a48bda2f6ba3079d73, type: 2}
+  _lava: {fileID: 2100000, guid: 716f80541dc7ffe4896be9e9bd57b441, type: 2}
+  _water: {fileID: 2100000, guid: 2a5f3119cbbf5064b9ad4b359215ca84, type: 2}
+  _bone: {fileID: 2100000, guid: 7c2a380a4cf28394086d8ffa299d2d0d, type: 2}
+  _player: {fileID: 2100000, guid: 0efe742a7ffec81418d0027c28ce4c93, type: 2}
+  _demonTiers:
+  - {fileID: 2100000, guid: be8d8745a979a844b91bbd39ef35679c, type: 2}
+  - {fileID: 2100000, guid: a9be0a971924aa34f94c57648db4373e, type: 2}
+  - {fileID: 2100000, guid: 6111efb17c7f7a14295badf2bb1c896d, type: 2}
+  - {fileID: 2100000, guid: 143f692afbb1a6d4b84042132e327933, type: 2}
+  _elder: {fileID: 2100000, guid: 9a905ac6387949643962ca839b1b867e, type: 2}

@@ -1,18 +1,23 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using DemonFighter.Common;
 using DemonFighter.Simulation;
+using DemonFighter.Simulation.Commands;
 using UnityEngine;
 
 namespace DemonFighter.App
 {
     /// <summary>
     /// Drives the simulation at its fixed rate from FixedUpdate with an accumulator, so the tick rate is independent
-    /// of the frame rate and of the physics rate (ARCHITECTURE, "Tick"). This is the boundary where simulation
-    /// exceptions are caught: the run stops and the error is logged with the Sim category.
+    /// of the frame rate and of the physics rate (ARCHITECTURE, "Tick"). Before every tick it collects the commands of
+    /// the registered sources. This is the boundary where simulation exceptions are caught: the run stops and the
+    /// error is logged with the Sim category.
     /// </summary>
     internal sealed class SimulationRunner : MonoBehaviour
     {
+        private readonly List<ICommandSource> _commandSources = new List<ICommandSource>();
+        private readonly List<IFrameUpdatable> _frameUpdatables = new List<IFrameUpdatable>();
         private SimulationTicker? _ticker;
         private float _accumulator;
 
@@ -30,6 +35,31 @@ namespace DemonFighter.App
             IsFaulted = false;
         }
 
+        /// <summary>Asks this source for commands before every tick, in registration order.</summary>
+        public void AddCommandSource(ICommandSource source)
+        {
+            _commandSources.Add(source ?? throw new ArgumentNullException(nameof(source)));
+        }
+
+        /// <summary>Gives this object one call per rendered frame.</summary>
+        public void AddFrameUpdatable(IFrameUpdatable updatable)
+        {
+            _frameUpdatables.Add(updatable ?? throw new ArgumentNullException(nameof(updatable)));
+        }
+
+        private void Update()
+        {
+            if (IsFaulted)
+            {
+                return;
+            }
+
+            for (int i = 0; i < _frameUpdatables.Count; i++)
+            {
+                _frameUpdatables[i].UpdateFrame();
+            }
+        }
+
         private void FixedUpdate()
         {
             if (_ticker == null || IsFaulted)
@@ -43,6 +73,11 @@ namespace DemonFighter.App
             {
                 while (_accumulator >= tickSeconds)
                 {
+                    for (int i = 0; i < _commandSources.Count; i++)
+                    {
+                        _commandSources[i].SubmitCommands(_ticker.Commands);
+                    }
+
                     _ticker.Tick();
                     _accumulator -= tickSeconds;
                 }

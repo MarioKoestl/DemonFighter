@@ -167,6 +167,26 @@ Import settings are enforced by `PluginImportRules` (an `AssetPostprocessor` in 
 
 The `Log` helper from CODING_GUIDELINES must be reachable from Presentation, Input, UI and App, and no assembly in the original reference graph is referenced by all four. `DemonFighter.Common` holds Unity-side infrastructure without game rules (logging now, small shared adapters later) and is referenced by those four assemblies and by Editor. Simulation does not reference it, so the pure C# rule (D-006) is untouched. ARCHITECTURE.md lists it. Rules out: infrastructure types in Data, and a static logger inside the simulation.
 
+### D-041: Terrain is a generated chunked mesh, not Unity Terrain (resolves O-003)
+
+The cavern floor comes from `CavernWorldGenerator` as a heightfield and becomes 30-cell mesh chunks with mesh colliders in `WorldBuilder`. Fully code-driven and deterministic, no terrain data or texture assets while the art is primitives, per-chunk culling for free, and a future server runs the same code headless. Unity Terrain would add LOD and painting we do not need yet and texture layers we do not have. Rules out: nothing for M5; a terrain-based builder could replace the mesh builder behind the same layout data.
+
+### D-042: Simulation vectors are System.Numerics
+
+`System.Numerics.Vector2` and `Vector3` from the .NET Standard 2.1 profile Unity ships, converted at the boundary by `SimulationVectors` in Presentation. Axes match Unity (X east, Y up, Z north) and the yaw is radians clockwise from north, so conversions are plain copies. Rules out: own vector structs and `UnityEngine.Vector3` inside the simulation.
+
+### D-043: Content and placeholder assets are generated, starting with the biome
+
+`BiomeDefinition` is the first ScriptableObject content type (id `biome.ash.cavern`), converted to an immutable `BiomeSpec` at bootstrap and validated in `OnValidate`. `Demon Fighter > Generate > Placeholder Assets` creates the URP materials, the `PlaceholderPalette`, the world, demon view and camera settings assets, the biome asset and the `P_Demon` prefab, and updates them in place on re-run; `Generate > Scenes` wires them into the scenes, so no reference is set by hand. Rules out: materials created in code at runtime (shader stripping in player builds) and hand-made assets for the primitive stage.
+
+### D-044: Bodies are moved by their views; the simulation integrates only demons without a body
+
+A `MoveCommand` sets the demon's intent. `DemonView` moves the `CharacterController` from that intent every frame and writes the resulting pose back; the simulation integrates positions only for demons without a body (tests, a headless server). Facing follows the movement direction in third person and the camera in first person. One mover per demon, no double movement, and the collision result is what the AI sees. Rules out: a simulation prediction that Unity then overrides every frame.
+
+### D-045: Elders patrol; mouse look is routed through the input adapter
+
+The utility brain has a `Patrol` goal for route following next to `Wander` and `Rest`; the elder archetype weights it highest, the blob archetype never picks it. `PlayerInputAdapter` reads the mouse and forwards deltas and the view toggle to `CameraRig` through `ICameraControl`, and WASD is camera-relative through `IHeadingProvider`; Cinemachine's own input component stays unused, so one class reads input. Rules out: Cinemachine reading actions directly.
+
 ## Open
 
 Each open item has a proposed default. Work proceeds with the default until Mario decides.
@@ -181,7 +201,7 @@ Default: none in v1. Candidates: reach an exit, kill an elder, survive N minutes
 
 ### O-003: Terrain technology: Unity Terrain vs generated mesh
 
-Default: Claude Code picks in M1 based on what the world generator needs and records the choice here.
+Default: Claude Code picks in M1 based on what the world generator needs and records the choice here. Resolved in M1: generated chunked mesh, see D-041.
 
 ### O-004: Steam library: Steamworks.NET vs Facepunch.Steamworks
 

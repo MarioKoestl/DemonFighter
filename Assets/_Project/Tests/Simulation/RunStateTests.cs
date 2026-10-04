@@ -1,7 +1,9 @@
 #nullable enable
+using System;
 using AwesomeAssertions;
 using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Tests.Builders;
+using DemonFighter.Simulation.Worldgen;
 using NUnit.Framework;
 
 namespace DemonFighter.Simulation.Tests
@@ -70,6 +72,64 @@ namespace DemonFighter.Simulation.Tests
 
             first.Should().NotBe(second);
             second.Value.Should().BeGreaterThan(first.Value);
+        }
+
+        [Test]
+        public void SpawnDemon_Twice_RegistersBothWithDistinctIds()
+        {
+            RunState state = new RunStateBuilder().Build();
+
+            Demon player = new DemonBuilder().AsPlayer().At(1f, 1f).SpawnInto(state);
+            Demon other = new DemonBuilder().At(3f, 3f).SpawnInto(state);
+
+            state.Demons.Should().Equal(player, other);
+            player.Id.Should().NotBe(other.Id);
+            player.Controller.Should().Be(ControllerKind.Player);
+            state.TryGetDemon(other.Id, out Demon? found).Should().BeTrue();
+            found.Should().BeSameAs(other);
+        }
+
+        [Test]
+        public void TryGetDemon_UnknownId_IsFalse()
+        {
+            RunState state = new RunStateBuilder().Build();
+
+            bool found = state.TryGetDemon(new DemonId(42), out _);
+
+            found.Should().BeFalse();
+        }
+
+        [Test]
+        public void AttachWorld_GeneratedFromTheRunSeed_IsKept()
+        {
+            RunState state = new RunStateBuilder().WithSeed(5).Build();
+            WorldLayout world = new CavernWorldGenerator().Generate(5, BiomeSpec.AshCavern);
+
+            state.AttachWorld(world);
+
+            state.World.Should().BeSameAs(world);
+        }
+
+        [Test]
+        public void AttachWorld_FromAnotherSeed_Throws()
+        {
+            RunState state = new RunStateBuilder().WithSeed(5).Build();
+            WorldLayout world = new CavernWorldGenerator().Generate(6, BiomeSpec.AshCavern);
+
+            Action act = () => state.AttachWorld(world);
+
+            act.Should().Throw<ArgumentException>();
+        }
+
+        [Test]
+        public void AttachWorld_Twice_Throws()
+        {
+            RunState state = new RunStateBuilder().WithSeed(5).Build();
+            state.AttachWorld(new CavernWorldGenerator().Generate(5, BiomeSpec.AshCavern));
+
+            Action act = () => state.AttachWorld(new CavernWorldGenerator().Generate(5, BiomeSpec.AshCavern));
+
+            act.Should().Throw<InvalidOperationException>();
         }
     }
 }

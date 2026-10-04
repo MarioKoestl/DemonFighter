@@ -9,7 +9,8 @@
     "DemonFighter.UI",
     "DemonFighter.App",
     "DemonFighter.Common",
-    "Unity.InputSystem"
+    "Unity.InputSystem",
+    "Unity.Cinemachine"
   ],
   "includePlatforms": [
     "Editor"

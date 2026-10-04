@@ -10,5 +10,7 @@ namespace DemonFighter.Common
         public const string Sim = "Sim";
         public const string Ui = "UI";
         public const string Editor = "Editor";
+        public const string Content = "Content";
+        public const string World = "World";
     }
 }
