@@ -32,5 +32,16 @@ namespace DemonFighter.Simulation
 
         /// <summary>Length of one fixed step in simulated seconds.</summary>
         public float TickSeconds { get; }
+
+        /// <summary>Whole ticks that cover the given duration; durations round up so nothing ends early.</summary>
+        public int TicksFor(float seconds)
+        {
+            if (seconds < 0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(seconds), seconds, "Durations are never negative.");
+            }
+
+            return (int)MathF.Ceiling(seconds * TicksPerSecond);
+        }
     }
 }

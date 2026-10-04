@@ -120,6 +120,25 @@ namespace DemonFighter.Simulation.Tests.Movement
         }
 
         [Test]
+        public void Tick_MoveCommandForADeadDemon_IsRejected()
+        {
+            RunState state = new RunStateBuilder().Build();
+            var events = new SimulationEvents();
+            var rejections = new List<CommandRejected>();
+            events.Subscribe<CommandRejected>(rejections.Add);
+            Demon demon = new DemonBuilder().SpawnInto(state);
+            var ticker = new SimulationTicker(state, events);
+            demon.Body.Core.ApplyDamage(1000f);
+            ticker.Commands.Submit(new MoveCommand(demon.Id, new Vector2(0f, 1f), sprint: false));
+
+            ticker.Tick();
+
+            rejections.Should().ContainSingle();
+            rejections[0].Reason.Should().Be(MoveCommandHandler.ActorDead);
+            demon.Position.Z.Should().BeApproximately(0f, Tolerance);
+        }
+
+        [Test]
         public void Tick_MoveCommandForUnknownActor_IsRejectedWithAnEvent()
         {
             RunState state = new RunStateBuilder().Build();

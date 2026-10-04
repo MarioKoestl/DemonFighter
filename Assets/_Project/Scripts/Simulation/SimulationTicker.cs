@@ -1,9 +1,13 @@
 #nullable enable
 using System;
 using DemonFighter.Simulation.Ai;
+using DemonFighter.Simulation.Combat;
 using DemonFighter.Simulation.Commands;
 using DemonFighter.Simulation.Events;
+using DemonFighter.Simulation.Food;
 using DemonFighter.Simulation.Movement;
+using DemonFighter.Simulation.Skills;
+using DemonFighter.Simulation.Spawning;
 
 namespace DemonFighter.Simulation
 {
@@ -14,14 +18,22 @@ namespace DemonFighter.Simulation
     /// </summary>
     public sealed class SimulationTicker
     {
-        /// <summary>Binds a run to the event bus its observers listen on and installs the command handlers.</summary>
+        /// <summary>Binds a run to the event bus its observers listen on and installs the systems and handlers.</summary>
         public SimulationTicker(RunState state, SimulationEvents events)
         {
             State = state ?? throw new ArgumentNullException(nameof(state));
             Events = events ?? throw new ArgumentNullException(nameof(events));
+            Damage = new DamageSystem(state, events);
+            Behaviours = new SkillBehaviourRegistry();
+            Behaviours.Validate(state.Catalog);
             Commands = new CommandQueue();
             Commands.RegisterHandler(new MoveCommandHandler());
+            Commands.RegisterHandler(new UseSkillCommandHandler(events));
+            Commands.RegisterHandler(new ReportHitCommandHandler(Damage, Behaviours, events));
+            Commands.RegisterHandler(new EatCommandHandler());
+            Commands.RegisterHandler(new SpendStatPointCommandHandler(events));
             Ai = new AiSystem();
+            Spawning = new SpawnSystem(events, Ai);
         }
 
         /// <summary>The run being advanced.</summary>
@@ -36,13 +48,38 @@ namespace DemonFighter.Simulation
         /// <summary>The brains of the AI demons; register one per AI demon after spawning it.</summary>
         public AiSystem Ai { get; }
 
+        /// <summary>The damage rules of this run; skills and status effects route all harm through it.</summary>
+        internal DamageSystem Damage { get; }
+
+        /// <summary>Tops the Tier 0 population up over time (D-053).</summary>
+        internal SpawnSystem Spawning { get; }
+
+        /// <summary>The skill behaviours found by attribute, validated against the content at start.</summary>
+        internal SkillBehaviourRegistry Behaviours { get; }
+
         /// <summary>Applies one fixed step. The caller invokes it TicksPerSecond times per simulated second.</summary>
         public void Tick()
         {
+            float seconds = State.Config.TickSeconds;
             Commands.ApplyAll(State, Events);
-            MovementSystem.Advance(State, State.Config.TickSeconds);
+            MovementSystem.Advance(State, seconds);
+            StatusSystem.Advance(State, Damage, seconds);
+            SkillSystem.Advance(State);
+            EatingSystem.Advance(State, Events, seconds);
             Ai.Think(State, Commands);
+            Spawning.Advance(State);
+            FoodDecaySystem.Advance(State, Events);
             State.AdvanceTick();
+            Events.Flush();
+        }
+
+        /// <summary>
+        /// Applies the queued commands without advancing time, for menu commands while the run is paused (the Stats
+        /// tab spends points through the same command path as everything else).
+        /// </summary>
+        public void ApplyPendingCommands()
+        {
+            Commands.ApplyAll(State, Events);
             Events.Flush();
         }
     }

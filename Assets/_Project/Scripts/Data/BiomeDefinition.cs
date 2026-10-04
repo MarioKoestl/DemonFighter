@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using DemonFighter.Common;
+using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Worldgen;
 using UnityEngine;
 
@@ -55,7 +56,10 @@ namespace DemonFighter.Data
         [SerializeField] private int _initialBlobs = 10;
         [SerializeField] private float _spawnClusterRadius = 15f;
         [SerializeField] private float _spawnClearRadius = 30f;
-        [SerializeField] private DemonTemplateDefinition _blobTemplate = new DemonTemplateDefinition();
+        [SerializeField] private float _respawnSeconds = 12f;
+        [SerializeField] private float _respawnMinDistance = 35f;
+        [SerializeField] private float _respawnMaxDistance = 70f;
+        [SerializeField] private DemonDefinition _blobDemon = null!;
         [SerializeField] private ArchetypeDefinition _blobArchetype = new ArchetypeDefinition();
 
         [Header("Elder")]
@@ -64,7 +68,7 @@ namespace DemonFighter.Data
         [SerializeField] private float _elderRouteJitter = 12f;
         [SerializeField] private float _elderRouteClearance = 12f;
         [SerializeField] private float _elderMinSpawnDistance = 40f;
-        [SerializeField] private DemonTemplateDefinition _elderTemplate = new DemonTemplateDefinition();
+        [SerializeField] private DemonDefinition _elderDemon = null!;
         [SerializeField] private ArchetypeDefinition _elderArchetype = new ArchetypeDefinition();
 
         /// <summary>Stable content id.</summary>
@@ -106,14 +110,17 @@ namespace DemonFighter.Data
                 InitialBlobs = _initialBlobs,
                 SpawnClusterRadius = _spawnClusterRadius,
                 SpawnClearRadius = _spawnClearRadius,
+                RespawnSeconds = _respawnSeconds,
+                RespawnMinDistance = _respawnMinDistance,
+                RespawnMaxDistance = _respawnMaxDistance,
                 ElderRouteRadius = _elderRouteRadius,
                 ElderRouteWaypoints = _elderRouteWaypoints,
                 ElderRouteJitter = _elderRouteJitter,
                 ElderRouteClearance = _elderRouteClearance,
                 ElderMinSpawnDistance = _elderMinSpawnDistance,
-                BlobTemplate = _blobTemplate.ToSpec(),
+                BlobDemon = RequireDemon(_blobDemon, "blob").ToSpec(),
                 BlobArchetype = _blobArchetype.ToSpec(),
-                ElderTemplate = _elderTemplate.ToSpec(),
+                ElderDemon = RequireDemon(_elderDemon, "elder").ToSpec(),
                 ElderArchetype = _elderArchetype.ToSpec(),
             };
             spec.Validate();
@@ -153,15 +160,32 @@ namespace DemonFighter.Data
             _initialBlobs = spec.InitialBlobs;
             _spawnClusterRadius = spec.SpawnClusterRadius;
             _spawnClearRadius = spec.SpawnClearRadius;
+            _respawnSeconds = spec.RespawnSeconds;
+            _respawnMinDistance = spec.RespawnMinDistance;
+            _respawnMaxDistance = spec.RespawnMaxDistance;
             _elderRouteRadius = spec.ElderRouteRadius;
             _elderRouteWaypoints = spec.ElderRouteWaypoints;
             _elderRouteJitter = spec.ElderRouteJitter;
             _elderRouteClearance = spec.ElderRouteClearance;
             _elderMinSpawnDistance = spec.ElderMinSpawnDistance;
-            _blobTemplate.ApplyDefaults(spec.BlobTemplate);
             _blobArchetype.ApplyDefaults(spec.BlobArchetype);
-            _elderTemplate.ApplyDefaults(spec.ElderTemplate);
             _elderArchetype.ApplyDefaults(spec.ElderArchetype);
+        }
+
+        internal void SetDemons(DemonDefinition blob, DemonDefinition elder)
+        {
+            _blobDemon = blob;
+            _elderDemon = elder;
+        }
+
+        private DemonDefinition RequireDemon(DemonDefinition definition, string role)
+        {
+            if (definition == null)
+            {
+                throw new ContentException("Biome " + _id + " has no " + role + " demon.");
+            }
+
+            return definition;
         }
 
         private void OnValidate()

@@ -4,7 +4,7 @@ Milestones are ordered. Each has acceptance criteria that Mario can check in Pla
 
 ## Current milestone
 
-**M1: Walking skeleton.** M0 is merged and verified. All Claude Code items of M1 are done on branch `feat/m1-walking-skeleton` (2026-10-04): seeded cavern world with terrain mesh, walls, rocks, fissures, pools and bone piles; player capsule with WASD, mouse look and sprint; Cinemachine third and first person with V; ten wandering blobs and a patrolling elder through the same command path; HUD with seed; 113 EditMode and 2 PlayMode tests. Open: the five Play Mode acceptance checks are Mario's. Next: M2 combat, death and eating.
+**M2: Combat, death and eating.** M1 is merged and verified. All Claude Code items of M2 are done on branch `feat/m2-combat-death-eating` (2026-10-04): body model with core and parts, base and derived stats; Pierce, Cut and Blunt against the three hide types, bleeding, stagger, regeneration, severed and destroyed parts, death and corpses; Bite as data plus an attribute-found behaviour with windup, active window and recovery, hit detection in Unity judged by the simulation, skill XP and levels; held-key eating with reward scaling and food decay; kill XP, level-ups, stat points and the Stats panel (C); AI goals Hunt, Eat and Flee with the one-tier rule; placeholder gore (wounded parts, corpses, fallen parts, blood); death freeze with run summary and Back to Menu; 277 EditMode and 2 PlayMode tests. Open: the four Play Mode acceptance checks are Mario's. Next: M3 mutation.
 
 (Claude Code: update this section when a milestone completes. Do not rewrite other sections without asking.)
 
@@ -66,15 +66,15 @@ Acceptance:
 
 Goal: bite something, see it bleed, kill it, eat it.
 
-- [ ] Body model: core plus parts with HP and condition; base stats Strength, Constitution, Agility; derived stats computed from base stats and body (tests)
-- [ ] Damage model: Pierce, Cut, Blunt against Thick Hide, Plates, Elastic Tissue; bleeding; stagger; passive regeneration; part wounded, severed, destroyed; core death (tests)
-- [ ] Bite skill: hitbox during active frames, aim-based part targeting (the part under the crosshair within the arc), `HitReport` into the simulation, damage applied, events out; stamina cost; Bite gains skill XP per hit (the first skill with a level)
-- [ ] Placeholder gore stage 1: wounded parts change color and shrink, severed parts detach as physics objects, blood decal on the ground and on the body
-- [ ] Death: demon view becomes a corpse `FoodItem`; severed parts are food; food decays
-- [ ] Eat: hold E on food, Biomass flows over time, interruptible, shown in HUD
-- [ ] XP for kills with reward scaling by tier difference (tests); Level up grants stat points; Stats tab (C) to spend them
-- [ ] AI goals `Hunt`, `Flee`, `Eat` added to the brain, with the one-tier-above avoidance rule (tests)
-- [ ] Player death: freeze, run summary overlay, back to menu
+- [x] Body model: core plus parts with HP and condition; base stats Strength, Constitution, Agility; derived stats computed from base stats and body (tests)
+- [x] Damage model: Pierce, Cut, Blunt against Thick Hide, Plates, Elastic Tissue; bleeding; stagger; passive regeneration; part wounded, severed, destroyed; core death (tests)
+- [x] Bite skill: hitbox during active frames, aim-based part targeting (the part under the crosshair within the arc), `HitReport` into the simulation, damage applied, events out; stamina cost; Bite gains skill XP per hit (the first skill with a level)
+- [x] Placeholder gore stage 1: wounded parts change color and shrink, severed parts detach as physics objects, blood decal on the ground and on the body
+- [x] Death: demon view becomes a corpse `FoodItem`; severed parts are food; food decays
+- [x] Eat: hold E on food, Biomass flows over time, interruptible, shown in HUD
+- [x] XP for kills with reward scaling by tier difference (tests); Level up grants stat points; Stats tab (C) to spend them
+- [x] AI goals `Hunt`, `Flee`, `Eat` added to the brain, with the one-tier-above avoidance rule (tests)
+- [x] Player death: freeze, run summary overlay, back to menu
 
 Acceptance:
 

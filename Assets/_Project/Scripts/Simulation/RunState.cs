@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using DemonFighter.Simulation.Content;
+using DemonFighter.Simulation.Food;
 using DemonFighter.Simulation.Worldgen;
 
 namespace DemonFighter.Simulation
@@ -10,24 +12,21 @@ namespace DemonFighter.Simulation
     /// <summary>
     /// Everything that exists in one run. Owned by the simulation and changed only through ticks and commands, so it
     /// can be saved whole and rebuilt from the seed plus the command stream (ARCHITECTURE, "The simulation").
-    /// Holds the seed, the clock, the random source, the id sequences and the demons; food joins in M2.
+    /// Holds the seed, the clock, the random source, the id sequences, the content and the demons.
     /// </summary>
     public sealed class RunState
     {
         private readonly Dictionary<DemonId, Demon> _demonsById = new Dictionary<DemonId, Demon>();
         private readonly List<Demon> _demons = new List<Demon>();
+        private readonly Dictionary<FoodId, FoodItem> _foodById = new Dictionary<FoodId, FoodItem>();
+        private readonly List<FoodItem> _food = new List<FoodItem>();
 
-        /// <summary>Starts a run from a seed with the default tick rate.</summary>
-        public RunState(int seed)
-            : this(seed, SimulationConfig.Default)
-        {
-        }
-
-        /// <summary>Starts a run from a seed with an explicit tick rate.</summary>
-        public RunState(int seed, SimulationConfig config)
+        /// <summary>Starts a run from a seed with the content every spec is looked up in.</summary>
+        public RunState(int seed, SimulationConfig config, ContentCatalog catalog)
         {
             Seed = seed;
             Config = config ?? throw new ArgumentNullException(nameof(config));
+            Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
             Rng = new Rng(seed);
             DemonIds = new IdSequence();
             FoodIds = new IdSequence();
@@ -38,6 +37,9 @@ namespace DemonFighter.Simulation
 
         /// <summary>Tick timing of this run.</summary>
         public SimulationConfig Config { get; }
+
+        /// <summary>The immutable content this run plays with.</summary>
+        public ContentCatalog Catalog { get; }
 
         /// <summary>The only random source of this run.</summary>
         public Rng Rng { get; }
@@ -82,12 +84,12 @@ namespace DemonFighter.Simulation
         }
 
         /// <summary>
-        /// Brings a demon into the run with an id this run issued. It starts standing still at the given feet
-        /// position; the layout decides where that is.
+        /// Brings a demon of the given kind into the run with an id this run issued. It starts standing still at the
+        /// given feet position with a fresh body; the layout decides where that is.
         /// </summary>
-        public Demon SpawnDemon(ControllerKind controller, DemonTemplate template, Vector3 position, float yaw)
+        public Demon SpawnDemon(ControllerKind controller, DemonSpec spec, Vector3 position, float yaw)
         {
-            var demon = new Demon(new DemonId(DemonIds.Next()), controller, template, position, yaw);
+            var demon = new Demon(new DemonId(DemonIds.Next()), controller, spec, Catalog, position, yaw);
             _demonsById.Add(demon.Id, demon);
             _demons.Add(demon);
             return demon;
@@ -97,6 +99,37 @@ namespace DemonFighter.Simulation
         public bool TryGetDemon(DemonId id, [MaybeNullWhen(false)] out Demon demon)
         {
             return _demonsById.TryGetValue(id, out demon);
+        }
+
+        /// <summary>Every food item lying in the world, oldest first; iterate by index.</summary>
+        public IReadOnlyList<FoodItem> Food => _food;
+
+        /// <summary>Looks a food item up by id; false once it was eaten or decayed.</summary>
+        public bool TryGetFood(FoodId id, [MaybeNullWhen(false)] out FoodItem food)
+        {
+            return _foodById.TryGetValue(id, out food);
+        }
+
+        /// <summary>Puts food into the world with a fresh id and the biome's decay time.</summary>
+        internal FoodItem SpawnFood(FoodKind kind, Vector3 position, float biomass, DemonId source, int sourceTier)
+        {
+            long decayTicks = Config.TicksFor(Catalog.Tuning.FoodDecaySeconds);
+            var food = new FoodItem(new FoodId(FoodIds.Next()), kind, position, biomass, source, sourceTier, decayTicks);
+            _foodById.Add(food.Id, food);
+            _food.Add(food);
+            return food;
+        }
+
+        /// <summary>Takes food out of the world after it was eaten up or rotted away.</summary>
+        internal bool RemoveFood(FoodId id)
+        {
+            if (!_foodById.Remove(id, out FoodItem food))
+            {
+                return false;
+            }
+
+            _food.Remove(food);
+            return true;
         }
 
         /// <summary>Moves the clock forward by one step; only the ticker calls this, nothing else moves time.</summary>

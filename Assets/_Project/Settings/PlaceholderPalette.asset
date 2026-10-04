@@ -26,3 +26,6 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 6111efb17c7f7a14295badf2bb1c896d, type: 2}
   - {fileID: 2100000, guid: 143f692afbb1a6d4b84042132e327933, type: 2}
   _elder: {fileID: 2100000, guid: 9a905ac6387949643962ca839b1b867e, type: 2}
+  _corpse: {fileID: 2100000, guid: 4f348156b857f8f489cc88897224757a, type: 2}
+  _blood: {fileID: 2100000, guid: 6853b9d0c15ff954fb5ec2fce2a9a6d0, type: 2}
+  _maw: {fileID: 2100000, guid: 0e9d36576813d4a4b9df5a6b34366b66, type: 2}

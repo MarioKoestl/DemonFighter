@@ -11,8 +11,9 @@ namespace DemonFighter.App
     /// <summary>
     /// Drives the simulation at its fixed rate from FixedUpdate with an accumulator, so the tick rate is independent
     /// of the frame rate and of the physics rate (ARCHITECTURE, "Tick"). Before every tick it collects the commands of
-    /// the registered sources. This is the boundary where simulation exceptions are caught: the run stops and the
-    /// error is logged with the Sim category.
+    /// the registered sources. While paused (a menu is open, the player died) no time passes, but commands dropped
+    /// into the queue directly, such as spending a stat point, still apply. This is the boundary where simulation
+    /// exceptions are caught: the run stops and the error is logged with the Sim category.
     /// </summary>
     internal sealed class SimulationRunner : MonoBehaviour
     {
@@ -24,6 +25,9 @@ namespace DemonFighter.App
         /// <summary>True after an exception stopped the run; no further ticks happen.</summary>
         public bool IsFaulted { get; private set; }
 
+        /// <summary>While true, time stands still: no ticks, no input, no frame updates; menu commands still apply.</summary>
+        public bool Paused { get; set; }
+
         /// <summary>Ticks applied so far, for diagnostics.</summary>
         public long TickCount => _ticker == null ? 0 : _ticker.State.Tick;
 
@@ -33,6 +37,7 @@ namespace DemonFighter.App
             _ticker = ticker ?? throw new ArgumentNullException(nameof(ticker));
             _accumulator = 0f;
             IsFaulted = false;
+            Paused = false;
         }
 
         /// <summary>Asks this source for commands before every tick, in registration order.</summary>
@@ -49,8 +54,14 @@ namespace DemonFighter.App
 
         private void Update()
         {
-            if (IsFaulted)
+            if (_ticker == null || IsFaulted)
             {
+                return;
+            }
+
+            if (Paused)
+            {
+                ApplyMenuCommands();
                 return;
             }
 
@@ -67,11 +78,17 @@ namespace DemonFighter.App
                 return;
             }
 
+            if (Paused)
+            {
+                _accumulator = 0f;
+                return;
+            }
+
             _accumulator += Time.fixedDeltaTime;
             float tickSeconds = _ticker.State.Config.TickSeconds;
             try
             {
-                while (_accumulator >= tickSeconds)
+                while (!Paused && _accumulator >= tickSeconds)
                 {
                     for (int i = 0; i < _commandSources.Count; i++)
                     {
@@ -84,9 +101,26 @@ namespace DemonFighter.App
             }
             catch (Exception exception)
             {
-                IsFaulted = true;
-                Log.Error(LogCategory.Sim, "Simulation tick failed; the run is stopped.", exception, this);
+                Fault(exception);
             }
+        }
+
+        private void ApplyMenuCommands()
+        {
+            try
+            {
+                _ticker!.ApplyPendingCommands();
+            }
+            catch (Exception exception)
+            {
+                Fault(exception);
+            }
+        }
+
+        private void Fault(Exception exception)
+        {
+            IsFaulted = true;
+            Log.Error(LogCategory.Sim, "Simulation tick failed; the run is stopped.", exception, this);
         }
     }
 }

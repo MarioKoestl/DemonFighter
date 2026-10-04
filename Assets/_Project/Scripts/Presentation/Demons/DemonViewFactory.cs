@@ -27,7 +27,7 @@ namespace DemonFighter.Presentation.Demons
         public DemonView Spawn(Demon demon, Transform parent)
         {
             DemonView view = Object.Instantiate(_prefab, parent);
-            view.name = demon.Template.Name + " " + demon.Id.Value;
+            view.name = demon.Spec.Name + " " + demon.Id.Value;
             view.Bind(demon, _settings, _palette.ForDemon(demon));
             return view;
         }

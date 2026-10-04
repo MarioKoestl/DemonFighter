@@ -2,9 +2,11 @@
 using System.IO;
 using DemonFighter.Common;
 using DemonFighter.Data;
+using DemonFighter.Editor.Setup;
 using DemonFighter.Presentation;
 using DemonFighter.Presentation.Cameras;
 using DemonFighter.Presentation.Demons;
+using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Worldgen;
 using UnityEditor;
 using UnityEngine;
@@ -14,35 +16,84 @@ namespace DemonFighter.Editor.Generate
 {
     /// <summary>
     /// Creates the primitive-stage assets from code so they can be regenerated after a change (ASSET_PIPELINE): the
-    /// URP materials, the palette that maps roles to them, the world build settings and the ash cavern biome asset.
-    /// Existing assets are updated in place, so references and GUIDs survive a re-run.
+    /// URP materials, the palette that maps roles to them, the settings assets, the first content assets (core,
+    /// Bite, two demon kinds, combat tuning, the ash cavern biome) and the demon prefab, then rebuilds the content
+    /// catalog. Materials are rewritten every run; every other asset is created once and keeps its Inspector values.
     /// Public because the -executeMethod command line switch of Unity has to find it.
     /// </summary>
     public static class PlaceholderAssetGenerator
     {
+        internal const string PalettePath = SettingsFolder + "/PlaceholderPalette.asset";
+        internal const string WorldBuildSettingsPath = SettingsFolder + "/WorldBuildSettings.asset";
+        internal const string DemonViewSettingsPath = SettingsFolder + "/DemonViewSettings.asset";
+        internal const string CameraRigSettingsPath = SettingsFolder + "/CameraRigSettings.asset";
+        internal const string AshCavernPath = BiomesFolder + "/BI_AshCavern.asset";
+        internal const string DemonPrefabPath = PrefabsFolder + "/P_Demon.prefab";
+        internal const string MenuPath = "Demon Fighter/Generate/Placeholder Assets";
+
         private const string LitShader = "Universal Render Pipeline/Lit";
         private const string MaterialsFolder = "Assets/_Project/Art/Materials/Placeholder";
         private const string SettingsFolder = "Assets/_Project/Settings";
-        private const string BiomesFolder = "Assets/_Project/Content/Biomes";
-        internal const string PalettePath = SettingsFolder + "/PlaceholderPalette.asset";
-        internal const string WorldBuildSettingsPath = SettingsFolder + "/WorldBuildSettings.asset";
-        internal const string AshCavernPath = BiomesFolder + "/BI_AshCavern.asset";
-        internal const string DemonViewSettingsPath = SettingsFolder + "/DemonViewSettings.asset";
-        internal const string CameraRigSettingsPath = SettingsFolder + "/CameraRigSettings.asset";
+        private const string ContentFolder = "Assets/_Project/Content";
+        private const string BiomesFolder = ContentFolder + "/Biomes";
+        private const string BodyPartsFolder = ContentFolder + "/BodyParts";
+        private const string SkillsFolder = ContentFolder + "/Skills";
+        private const string DemonsFolder = ContentFolder + "/Demons";
+        private const string CorePartPath = BodyPartsFolder + "/BP_Core.asset";
+        private const string BiteSkillPath = SkillsFolder + "/SK_Bite.asset";
+        private const string BlobDemonPath = DemonsFolder + "/DM_Blob.asset";
+        private const string ElderDemonPath = DemonsFolder + "/DM_Elder.asset";
+        private const string CombatTuningPath = ContentCatalogRebuilder.CatalogFolder + "/CombatTuning.asset";
         private const string PrefabsFolder = "Assets/_Project/Prefabs";
-        internal const string DemonPrefabPath = PrefabsFolder + "/P_Demon.prefab";
         private const string DemonBodyProperty = "_body";
         private const string EmissionKeyword = "_EMISSION";
         private const string EmissionColorProperty = "_EmissionColor";
         private const string SmoothnessProperty = "_Smoothness";
 
-        [MenuItem("Demon Fighter/Generate/Placeholder Assets")]
+        // The snout sits on the front of the capsule mesh (2 units tall, radius 0.5), in mesh units.
+        private static readonly Vector3 SnoutLocalPosition = new Vector3(0f, 0.3f, 0.45f);
+        private static readonly Vector3 SnoutLocalScale = new Vector3(0.45f, 0.3f, 0.35f);
+
+        // The first content: the blob is born as this core, which grants Bite (GAME_DESIGN, "The run").
+        private static readonly SkillSpec BiteSpec = new SkillSpec { Id = "skill.bite", Name = "Bite" };
+
+        private static readonly BodyPartSpec CoreSpec = new BodyPartSpec
+        {
+            Id = "part.core",
+            Name = "Core",
+            Socket = SocketKind.Core,
+            MaxHp = 100f,
+            Fate = PartFate.Destroyed,
+            GrantedSkillIds = new[] { BiteSpec.Id },
+            BiomassValue = 20f,
+        };
+
+        [MenuItem(MenuPath)]
         public static void Generate()
         {
-            EnsureFolder(MaterialsFolder);
-            EnsureFolder(SettingsFolder);
-            EnsureFolder(BiomesFolder);
+            ProjectLayers.EnsureLayers();
+            EditorAssets.EnsureFolder(MaterialsFolder);
+            EditorAssets.EnsureFolder(SettingsFolder);
+            EditorAssets.EnsureFolder(BiomesFolder);
+            EditorAssets.EnsureFolder(BodyPartsFolder);
+            EditorAssets.EnsureFolder(SkillsFolder);
+            EditorAssets.EnsureFolder(DemonsFolder);
+            EditorAssets.EnsureFolder(ContentCatalogRebuilder.CatalogFolder);
 
+            PlaceholderPalette palette = GenerateMaterials();
+            EditorAssets.LoadOrCreate<WorldBuildSettings>(WorldBuildSettingsPath);
+            EditorAssets.LoadOrCreate<DemonViewSettings>(DemonViewSettingsPath);
+            EditorAssets.LoadOrCreate<CameraRigSettings>(CameraRigSettingsPath);
+            GenerateContent();
+            GenerateDemonPrefab(palette);
+
+            AssetDatabase.SaveAssets();
+            ContentCatalogRebuilder.Rebuild();
+            Log.Info(LogCategory.Editor, "Generated placeholder materials, palette, settings, content assets and " + DemonPrefabPath + ".");
+        }
+
+        private static PlaceholderPalette GenerateMaterials()
+        {
             // Colors from ASSET_PIPELINE "Placeholder standard": player teal, AI by tier, elders near black.
             Material ground = Lit("M_Ground", new Color(0.16f, 0.12f, 0.11f), 0.15f);
             Material wall = Lit("M_Wall", new Color(0.09f, 0.07f, 0.07f), 0.1f);
@@ -60,61 +111,36 @@ namespace DemonFighter.Editor.Generate
                 Lit("M_DemonTier3", new Color(0.4f, 0.06f, 0.06f), 0.4f),
             };
             Material elder = Lit("M_DemonElder", new Color(0.06f, 0.05f, 0.05f), 0.5f);
+            Material corpse = Lit("M_Corpse", new Color(0.13f, 0.09f, 0.08f), 0.2f);
+            Material blood = Lit("M_Blood", new Color(0.28f, 0.01f, 0.01f), 0.65f);
+            Material maw = Lit("M_DemonMaw", new Color(0.35f, 0.03f, 0.03f), 0.3f);
 
-            PlaceholderPalette palette = LoadOrCreate<PlaceholderPalette>(PalettePath);
-            palette.SetMaterials(ground, wall, rock, fissure, lava, water, bone, player, tiers, elder);
+            PlaceholderPalette palette = EditorAssets.LoadOrCreate<PlaceholderPalette>(PalettePath);
+            palette.SetMaterials(ground, wall, rock, fissure, lava, water, bone, player, tiers, elder, corpse, blood, maw);
             EditorUtility.SetDirty(palette);
-
-            WorldBuildSettings settings = LoadOrCreate<WorldBuildSettings>(WorldBuildSettingsPath);
-            EditorUtility.SetDirty(settings);
-
-            BiomeDefinition biome = LoadOrCreate<BiomeDefinition>(AshCavernPath);
-            biome.ApplyDefaults(BiomeSpec.AshCavern);
-            EditorUtility.SetDirty(biome);
-
-            DemonViewSettings viewSettings = LoadOrCreate<DemonViewSettings>(DemonViewSettingsPath);
-            EditorUtility.SetDirty(viewSettings);
-
-            CameraRigSettings cameraSettings = LoadOrCreate<CameraRigSettings>(CameraRigSettingsPath);
-            EditorUtility.SetDirty(cameraSettings);
-
-            GenerateDemonPrefab();
-
-            AssetDatabase.SaveAssets();
-            Log.Info(LogCategory.Editor, "Generated placeholder materials, palette, settings, " + AshCavernPath + " and " + DemonPrefabPath + ".");
+            return palette;
         }
 
-        // Root with the controller and the view, one capsule child as the body; materials come at bind time.
-        private static void GenerateDemonPrefab()
+        // Each asset is initialized from the spec defaults once; afterwards the asset is the truth.
+        private static void GenerateContent()
         {
-            EnsureFolder(PrefabsFolder);
-            var root = new GameObject("Demon");
-            try
+            SkillDefinition bite = EditorAssets.LoadOrCreate<SkillDefinition>(BiteSkillPath, skill => skill.Configure(BiteSpec));
+            BodyPartDefinition core = EditorAssets.LoadOrCreate<BodyPartDefinition>(CorePartPath, part => part.Configure(CoreSpec, new[] { bite }));
+            EditorAssets.LoadOrCreate<CombatTuningDefinition>(CombatTuningPath, tuning => tuning.Configure(new CombatTuning()));
+            DemonDefinition blob = EditorAssets.LoadOrCreate<DemonDefinition>(BlobDemonPath, demon => demon.Configure(BiomeSpec.AshCavern.BlobDemon, core));
+            DemonDefinition elder = EditorAssets.LoadOrCreate<DemonDefinition>(ElderDemonPath, demon => demon.Configure(BiomeSpec.AshCavern.ElderDemon, core));
+            EditorAssets.LoadOrCreate<BiomeDefinition>(AshCavernPath, biome =>
             {
-                root.AddComponent<CharacterController>();
-                GameObject body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                body.name = "Body";
-                body.transform.SetParent(root.transform, false);
-                Object.DestroyImmediate(body.GetComponent<Collider>());
+                biome.ApplyDefaults(BiomeSpec.AshCavern);
+                biome.SetDemons(blob, elder);
+            });
 
-                DemonView view = root.AddComponent<DemonView>();
-                using (var serialized = new SerializedObject(view))
-                {
-                    SerializedProperty? bodyProperty = serialized.FindProperty(DemonBodyProperty);
-                    if (bodyProperty == null)
-                    {
-                        throw new IOException("DemonView has no serialized field " + DemonBodyProperty + ".");
-                    }
-
-                    bodyProperty.objectReferenceValue = body.transform;
-                    serialized.ApplyModifiedPropertiesWithoutUndo();
-                }
-
-                PrefabUtility.SaveAsPrefabAsset(root, DemonPrefabPath);
-            }
-            finally
+            // An older biome asset predates the demon references; give it the two demons without touching its numbers.
+            var existingBiome = AssetDatabase.LoadAssetAtPath<BiomeDefinition>(AshCavernPath);
+            if (existingBiome != null)
             {
-                Object.DestroyImmediate(root);
+                existingBiome.SetDemons(blob, elder);
+                EditorUtility.SetDirty(existingBiome);
             }
         }
 
@@ -159,30 +185,39 @@ namespace DemonFighter.Editor.Generate
             return material;
         }
 
-        private static T LoadOrCreate<T>(string path)
-            where T : ScriptableObject
+        // Root with the controller and the view, one capsule child as the body and core part with a trigger collider
+        // on the Demon layer for hit detection; materials come at bind time.
+        private static void GenerateDemonPrefab(PlaceholderPalette palette)
         {
-            var existing = AssetDatabase.LoadAssetAtPath<T>(path);
-            if (existing != null)
+            EditorAssets.EnsureFolder(PrefabsFolder);
+            var root = new GameObject("Demon");
+            try
             {
-                return existing;
+                root.AddComponent<CharacterController>();
+                GameObject body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                body.name = "Body";
+                body.transform.SetParent(root.transform, false);
+                body.GetComponent<Collider>().isTrigger = true;
+                body.layer = Layers.Demon;
+                body.AddComponent<BodyPartView>();
+
+                // A snout marks the front, so a blob reads as facing somewhere even before real models arrive.
+                GameObject snout = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                snout.name = "Snout";
+                snout.transform.SetParent(body.transform, false);
+                snout.transform.localPosition = SnoutLocalPosition;
+                snout.transform.localScale = SnoutLocalScale;
+                Object.DestroyImmediate(snout.GetComponent<Collider>());
+                snout.GetComponent<Renderer>().sharedMaterial = palette.Maw;
+
+                DemonView view = root.AddComponent<DemonView>();
+                EditorAssets.SetReference(view, DemonBodyProperty, body.transform);
+                PrefabUtility.SaveAsPrefabAsset(root, DemonPrefabPath);
             }
-
-            var created = ScriptableObject.CreateInstance<T>();
-            AssetDatabase.CreateAsset(created, path);
-            return created;
-        }
-
-        private static void EnsureFolder(string path)
-        {
-            if (AssetDatabase.IsValidFolder(path))
+            finally
             {
-                return;
+                Object.DestroyImmediate(root);
             }
-
-            string parent = Path.GetDirectoryName(path)!.Replace('\\', '/');
-            EnsureFolder(parent);
-            AssetDatabase.CreateFolder(parent, Path.GetFileName(path));
         }
     }
 }

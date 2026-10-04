@@ -9,11 +9,12 @@ namespace DemonFighter.Simulation.Commands
     /// </summary>
     public readonly struct MoveCommand : ICommand
     {
-        public MoveCommand(DemonId actor, Vector2 direction, bool sprint)
+        public MoveCommand(DemonId actor, Vector2 direction, bool sprint, Vector2 facing = default)
         {
             Actor = actor;
             Direction = direction;
             Sprint = sprint;
+            Facing = facing;
         }
 
         /// <inheritdoc />
@@ -24,5 +25,8 @@ namespace DemonFighter.Simulation.Commands
 
         /// <summary>True while sprinting.</summary>
         public bool Sprint { get; }
+
+        /// <summary>Optional direction to face, for attacking while standing; zero faces the movement direction.</summary>
+        public Vector2 Facing { get; }
     }
 }

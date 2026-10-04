@@ -1,0 +1,423 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+using DemonFighter.Common;
+using DemonFighter.Presentation.Demons;
+using DemonFighter.Presentation.Food;
+using DemonFighter.Simulation;
+using DemonFighter.Simulation.Commands;
+using DemonFighter.Simulation.Content;
+using DemonFighter.Simulation.Events;
+using DemonFighter.Simulation.Food;
+using UnityEngine;
+using Object = UnityEngine.Object;
+using Random = UnityEngine.Random;
+
+namespace DemonFighter.Presentation.Combat
+{
+    /// <summary>
+    /// The Unity side of combat for one run. Detects the hits of active skills (the part under the crosshair for the
+    /// player, otherwise whatever stands in front within reach, which is all AI uses) and reports them for the
+    /// simulation to judge (ARCHITECTURE, "Movement, collision and hits"), and turns combat events into blood,
+    /// corpses and fallen parts (GAME_DESIGN, "Visible damage and gore", stage 1). The run controller creates it,
+    /// hands it the views and disposes it with the run.
+    /// </summary>
+    public sealed class CombatPresenter : ICommandSource, IFrameUpdatable, IDisposable
+    {
+        private const float AimRayExtraMeters = 1.5f;
+        private const float AimedFoodExtraMeters = 3f;
+        private const float CrosshairSweepRadiusPerMeter = 0.1f;
+        private const float FrontVolumeCenterPerReach = 0.5f;
+        private const float FrontVolumeRadiusPerReach = 0.6f;
+        private const float SeveredPartSizePerMeter = 0.25f;
+        private const float SeveredPartImpulse = 2.5f;
+        private const float SplashOffsetPerMeter = 0.3f;
+        private const int BleedDripEveryTicks = 10;
+        private const int DeathSplashes = 3;
+
+        private static readonly Vector3 ViewportCenter = new Vector3(0.5f, 0.5f, 0f);
+
+        private readonly RunState _state;
+        private readonly PlaceholderPalette _palette;
+        private readonly DemonId _player;
+        private readonly Transform _root;
+        private readonly BloodDecalPool _blood;
+        private readonly Dictionary<DemonId, DemonView> _views = new Dictionary<DemonId, DemonView>();
+        private readonly Dictionary<FoodId, FoodView> _foodViews = new Dictionary<FoodId, FoodView>();
+        private readonly Dictionary<DemonId, PendingUse> _pendingUses = new Dictionary<DemonId, PendingUse>();
+        private readonly Dictionary<DemonId, Vector3> _lastHitPoints = new Dictionary<DemonId, Vector3>();
+        private readonly List<DemonId> _finishedUses = new List<DemonId>();
+        private readonly List<ReportHitCommand> _hitReports = new List<ReportHitCommand>();
+        private readonly List<IDisposable> _subscriptions = new List<IDisposable>();
+        private readonly RaycastHit[] _hits = new RaycastHit[16];
+        private readonly Collider[] _colliders = new Collider[32];
+        private Camera? _camera;
+
+        public CombatPresenter(RunState state, SimulationEvents events, PlaceholderPalette palette, DemonId player, Transform root)
+        {
+            _state = state ?? throw new ArgumentNullException(nameof(state));
+            if (events == null)
+            {
+                throw new ArgumentNullException(nameof(events));
+            }
+
+            _palette = palette != null ? palette : throw new ArgumentNullException(nameof(palette));
+            _player = player;
+            _root = root != null ? root : throw new ArgumentNullException(nameof(root));
+            _blood = new BloodDecalPool(palette.Blood, root);
+            _subscriptions.Add(events.Subscribe<SkillActivated>(OnSkillActivated));
+            _subscriptions.Add(events.Subscribe<DamageApplied>(OnDamageApplied));
+            _subscriptions.Add(events.Subscribe<PartSevered>(OnPartSevered));
+            _subscriptions.Add(events.Subscribe<PartDestroyed>(OnPartDestroyed));
+            _subscriptions.Add(events.Subscribe<DemonDied>(OnDemonDied));
+            _subscriptions.Add(events.Subscribe<FoodRemoved>(OnFoodRemoved));
+        }
+
+        /// <summary>The food under the crosshair of the player and within eat reach, or None; HUD prompt and Eat key use it.</summary>
+        public FoodId AimedFood { get; private set; }
+
+        /// <summary>Makes a spawned body known, so events for its demon reach it.</summary>
+        public void Register(DemonView view)
+        {
+            if (view == null)
+            {
+                throw new ArgumentNullException(nameof(view));
+            }
+
+            if (view.Demon == null)
+            {
+                throw new ArgumentException("Bind the view before registering it.", nameof(view));
+            }
+
+            _views[view.Demon.Id] = view;
+        }
+
+        /// <inheritdoc />
+        public void UpdateFrame()
+        {
+            if (_camera == null)
+            {
+                _camera = Camera.main;
+            }
+
+            ScanActiveSkills(_state.Tick);
+            AimedFood = FindAimedFood();
+        }
+
+        /// <inheritdoc />
+        public void SubmitCommands(CommandQueue commands)
+        {
+            for (int i = 0; i < _hitReports.Count; i++)
+            {
+                commands.Submit(_hitReports[i]);
+            }
+
+            _hitReports.Clear();
+        }
+
+        /// <inheritdoc />
+        public void Dispose()
+        {
+            for (int i = 0; i < _subscriptions.Count; i++)
+            {
+                _subscriptions[i].Dispose();
+            }
+
+            _subscriptions.Clear();
+            _blood.Destroy();
+        }
+
+        // One report per use, in the active window; the simulation checks reach and arc again and may still refuse.
+        private void ScanActiveSkills(long tick)
+        {
+            foreach (KeyValuePair<DemonId, PendingUse> entry in _pendingUses)
+            {
+                PendingUse use = entry.Value;
+                if (use.Reported || tick > use.ActiveUntilTick)
+                {
+                    _finishedUses.Add(entry.Key);
+                    continue;
+                }
+
+                if (tick < use.ActiveFromTick)
+                {
+                    continue;
+                }
+
+                if (!_views.TryGetValue(entry.Key, out DemonView? attacker) || attacker.Demon == null || !attacker.Demon.IsAlive)
+                {
+                    _finishedUses.Add(entry.Key);
+                    continue;
+                }
+
+                if (TryFindHit(attacker, use.Skill, out BodyPartView? part, out Vector3 point) && part.Owner != null && part.Owner.Demon != null)
+                {
+                    use.Reported = true;
+                    _lastHitPoints[part.Owner.Demon.Id] = point;
+                    _hitReports.Add(new ReportHitCommand(entry.Key, part.Owner.Demon.Id, part.PartIndex));
+                }
+            }
+
+            for (int i = 0; i < _finishedUses.Count; i++)
+            {
+                _pendingUses.Remove(_finishedUses[i]);
+            }
+
+            _finishedUses.Clear();
+        }
+
+        // The player gets the part under the crosshair first, so aiming picks the part (D-027); when the crosshair
+        // rests on nothing, the bite still lands on whatever stands in front within reach, like it does for AI.
+        private bool TryFindHit(DemonView attacker, SkillSpec skill, out BodyPartView part, out Vector3 point)
+        {
+            Demon demon = attacker.Demon!;
+            float size = demon.SizeMeters;
+            float reach = skill.ReachPerMeter * size + AimRayExtraMeters;
+            if (demon.Id == _player && _camera != null)
+            {
+                Ray crosshair = _camera.ViewportPointToRay(ViewportCenter);
+                float fromCamera = reach + Vector3.Distance(_camera.transform.position, attacker.transform.position);
+                if (Sweep(attacker, crosshair, size * CrosshairSweepRadiusPerMeter, fromCamera, out part, out point))
+                {
+                    return true;
+                }
+            }
+
+            return OverlapFront(attacker, reach, out part, out point);
+        }
+
+        private bool Sweep(DemonView attacker, Ray ray, float radius, float distance, out BodyPartView part, out Vector3 point)
+        {
+            int count = Physics.SphereCastNonAlloc(ray, radius, _hits, distance, Layers.DemonMask, QueryTriggerInteraction.Collide);
+            BodyPartView? nearest = null;
+            float nearestDistance = float.MaxValue;
+            Vector3 nearestPoint = Vector3.zero;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit hit = _hits[i];
+                var candidate = hit.collider.GetComponent<BodyPartView>();
+                if (!IsValidTarget(candidate, attacker) || hit.distance >= nearestDistance)
+                {
+                    continue;
+                }
+
+                nearest = candidate;
+                nearestDistance = hit.distance;
+                nearestPoint = hit.distance > 0f ? hit.point : candidate!.transform.position;
+            }
+
+            part = nearest!;
+            point = nearestPoint;
+            return nearest != null;
+        }
+
+        // Everything in front within reach: a sphere ahead of the body center, so a 15 m elder still reaches a blob at
+        // its feet and a blob bites what stands beside its snout. The simulation checks the real reach and arc.
+        private bool OverlapFront(DemonView attacker, float reach, out BodyPartView part, out Vector3 point)
+        {
+            Vector3 forward = attacker.transform.forward;
+            Vector3 origin = attacker.transform.position + Vector3.up * (attacker.Demon!.SizeMeters * 0.5f);
+            Vector3 center = origin + forward * (reach * FrontVolumeCenterPerReach);
+            int count = Physics.OverlapSphereNonAlloc(center, reach * FrontVolumeRadiusPerReach, _colliders, Layers.DemonMask, QueryTriggerInteraction.Collide);
+            BodyPartView? nearest = null;
+            float nearestDistance = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                var candidate = _colliders[i].GetComponent<BodyPartView>();
+                if (!IsValidTarget(candidate, attacker))
+                {
+                    continue;
+                }
+
+                Vector3 toPart = candidate!.transform.position - origin;
+                float distance = toPart.magnitude;
+                if (Vector3.Dot(forward, toPart) <= 0f || distance >= nearestDistance)
+                {
+                    continue;
+                }
+
+                nearest = candidate;
+                nearestDistance = distance;
+            }
+
+            part = nearest!;
+            point = nearest != null ? nearest.GetComponent<Collider>().ClosestPoint(origin) : Vector3.zero;
+            return nearest != null;
+        }
+
+        private static bool IsValidTarget(BodyPartView? candidate, DemonView attacker)
+        {
+            return candidate != null
+                && candidate.Owner != null
+                && candidate.Owner != attacker
+                && !candidate.Owner.IsCorpse
+                && candidate.Owner.Demon != null
+                && candidate.Owner.Demon.IsAlive;
+        }
+
+        private FoodId FindAimedFood()
+        {
+            if (_camera == null || !_views.TryGetValue(_player, out DemonView? playerView) || playerView.Demon == null)
+            {
+                return FoodId.None;
+            }
+
+            float reach = _state.Catalog.Tuning.EatReachPerMeter * playerView.Demon.SizeMeters;
+            float maxDistance = reach + AimedFoodExtraMeters + Vector3.Distance(_camera.transform.position, playerView.transform.position);
+            Ray ray = _camera.ViewportPointToRay(ViewportCenter);
+            if (!Physics.Raycast(ray, out RaycastHit hit, maxDistance, Layers.FoodMask, QueryTriggerInteraction.Collide))
+            {
+                return FoodId.None;
+            }
+
+            var food = hit.collider.GetComponentInParent<FoodView>();
+            if (food == null || food.Food == null)
+            {
+                return FoodId.None;
+            }
+
+            // Within eat reach on the ground plane, the same check the simulation makes.
+            Vector3 toFood = food.transform.position - playerView.transform.position;
+            toFood.y = 0f;
+            return toFood.magnitude <= reach ? food.Food.Id : FoodId.None;
+        }
+
+        private void OnSkillActivated(SkillActivated evt)
+        {
+            if (!_views.TryGetValue(evt.Actor, out DemonView? view))
+            {
+                return;
+            }
+
+            view.PlayAttackPulse();
+            _pendingUses[evt.Actor] = new PendingUse(_state.Catalog.GetSkill(evt.SkillId), evt.ActiveFromTick, evt.ActiveUntilTick);
+        }
+
+        private void OnDamageApplied(DamageApplied evt)
+        {
+            if (!_views.TryGetValue(evt.Target, out DemonView? view) || view.Demon == null)
+            {
+                return;
+            }
+
+            float size = view.Demon.SizeMeters;
+            if (evt.Attacker.IsValid)
+            {
+                // Blood sticks to the part that was hit, so it lies down with the body when the demon dies.
+                BodyPartView? part = view.FindPart(evt.PartIndex);
+                Transform body = part != null ? part.transform : view.transform;
+                Vector3 point = _lastHitPoints.TryGetValue(evt.Target, out Vector3 hitPoint) ? hitPoint : body.position;
+                _lastHitPoints.Remove(evt.Target);
+                _blood.SplashBody(body, point, size);
+                _blood.SplashGround(view.transform.position + RandomOffset(size), size);
+            }
+            else if (_state.Tick % BleedDripEveryTicks == 0)
+            {
+                // Bleeding drips onto the ground now and then, so a wounded demon leaves a trail.
+                _blood.SplashGround(view.transform.position + RandomOffset(size), size * 0.5f);
+            }
+        }
+
+        private void OnPartSevered(PartSevered evt)
+        {
+            if (!_views.TryGetValue(evt.Demon, out DemonView? view) || view.Demon == null || !_state.TryGetFood(evt.Food, out FoodItem? food))
+            {
+                return;
+            }
+
+            float size = view.Demon.SizeMeters;
+            BodyPartView? part = view.FindPart(evt.PartIndex);
+            Vector3 position = part != null ? part.transform.position : view.transform.position + Vector3.up * (size * 0.5f);
+            GameObject piece = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            piece.name = "Severed part " + food.Id.Value;
+            piece.layer = Layers.Food;
+            piece.transform.SetParent(_root, false);
+            piece.transform.position = position;
+            piece.transform.localScale = Vector3.one * (size * SeveredPartSizePerMeter);
+            piece.GetComponent<Renderer>().sharedMaterial = _palette.Corpse;
+            Rigidbody body = piece.AddComponent<Rigidbody>();
+            body.AddForce((Random.insideUnitSphere + Vector3.up).normalized * SeveredPartImpulse, ForceMode.VelocityChange);
+            FoodView foodView = piece.AddComponent<FoodView>();
+            foodView.Bind(food, body);
+            _foodViews[food.Id] = foodView;
+            _blood.SplashBody(view.transform, position, size);
+            _blood.SplashGround(position, size);
+        }
+
+        private void OnPartDestroyed(PartDestroyed evt)
+        {
+            if (!_views.TryGetValue(evt.Demon, out DemonView? view) || view.Demon == null)
+            {
+                return;
+            }
+
+            BodyPartView? part = view.FindPart(evt.PartIndex);
+            Vector3 position = part != null ? part.transform.position : view.transform.position;
+            _blood.SplashBody(view.transform, position, view.Demon.SizeMeters);
+        }
+
+        private void OnDemonDied(DemonDied evt)
+        {
+            if (!_views.TryGetValue(evt.Demon, out DemonView? view) || view.Demon == null)
+            {
+                return;
+            }
+
+            _pendingUses.Remove(evt.Demon);
+            view.BecomeCorpse(_palette.Corpse);
+            if (_state.TryGetFood(evt.Corpse, out FoodItem? corpse))
+            {
+                FoodView foodView = view.gameObject.AddComponent<FoodView>();
+                foodView.Bind(corpse, null);
+                _foodViews[corpse.Id] = foodView;
+            }
+
+            float size = view.Demon.SizeMeters;
+            for (int i = 0; i < DeathSplashes; i++)
+            {
+                _blood.SplashGround(view.transform.position + RandomOffset(size), size * 1.5f);
+            }
+        }
+
+        private void OnFoodRemoved(FoodRemoved evt)
+        {
+            if (!_foodViews.TryGetValue(evt.Food, out FoodView? view))
+            {
+                return;
+            }
+
+            _foodViews.Remove(evt.Food);
+            var corpse = view.GetComponent<DemonView>();
+            if (corpse != null && corpse.Demon != null)
+            {
+                _views.Remove(corpse.Demon.Id);
+            }
+
+            Object.Destroy(view.gameObject);
+        }
+
+        private static Vector3 RandomOffset(float sizeMeters)
+        {
+            float range = sizeMeters * SplashOffsetPerMeter;
+            return new Vector3(Random.Range(-range, range), 0f, Random.Range(-range, range));
+        }
+
+        private sealed class PendingUse
+        {
+            public PendingUse(SkillSpec skill, long activeFromTick, long activeUntilTick)
+            {
+                Skill = skill;
+                ActiveFromTick = activeFromTick;
+                ActiveUntilTick = activeUntilTick;
+            }
+
+            public SkillSpec Skill { get; }
+
+            public long ActiveFromTick { get; }
+
+            public long ActiveUntilTick { get; }
+
+            public bool Reported { get; set; }
+        }
+    }
+}

@@ -187,6 +187,37 @@ A `MoveCommand` sets the demon's intent. `DemonView` moves the `CharacterControl
 
 The utility brain has a `Patrol` goal for route following next to `Wander` and `Rest`; the elder archetype weights it highest, the blob archetype never picks it. `PlayerInputAdapter` reads the mouse and forwards deltas and the view toggle to `CameraRig` through `ICameraControl`, and WASD is camera-relative through `IHeadingProvider`; Cinemachine's own input component stays unused, so one class reads input. Rules out: Cinemachine reading actions directly.
 
+### D-046: Hits are detected in Unity and judged by the simulation
+
+A `UseSkillCommand` starts a skill; the simulation opens its active window (windup, active ticks and recovery are data on `SkillSpec`, shortened by Agility) and announces it with `SkillActivated`. Presentation detects the touch during the active ticks: the player with a sphere sweep along the crosshair ray from the camera, AI with a forward sweep from the eyes, both against body part trigger colliders on the `Demon` layer. The touch goes in as a `ReportHitCommand`, which the simulation accepts only inside the window (one tick of grace), once per use, for a living part within reach and arc; the facing of the move intent counts as the aim. The skill behaviour then applies the hit. Rules out: damage computed in Unity, and hits the view can force on the rules.
+
+### D-047: Skills are data plus attribute-found behaviours, validated at run start
+
+`SkillSpec` holds the damage type, the numbers and the timings; `BehaviourId` names a class tagged `[SkillBehaviour]` that implements `ISkillBehaviour`. `SkillBehaviourRegistry` scans the Simulation assembly once and `SimulationTicker` validates every catalog skill against it when a run starts, so an unknown behaviour fails before the first tick. Bite, Claw and Tail Swing share `MeleeStrikeBehaviour` (`melee-strike`). Per demon, a `SkillInstance` carries level, XP and cooldown and is usable only while the part that grants it is attached. Rules out: a switch over skill ids, and behaviour lookups at hit time.
+
+### D-048: Eating is a held command; reward scaling is one formula on the tuning
+
+`EatCommand` is sent every tick the key is held (AI brains re-send it between decisions). The eating stage moves `EatBiomassPerSecond` out of the food and into the eater, scaled by `CombatTuning.RewardFactor(receiverTier, sourceTier)`: full at equal tier or one below, plus 50 percent per tier the source stands above, 10 percent two or more tiers below. The same factor scales kill XP. A tick without the command, a started skill or a hit from another demon ends the meal; bleeding does not. Food rots away after `FoodDecaySeconds` in the decay stage. Rules out: an eat toggle the player could leave on, and separate scaling rules for XP and Biomass.
+
+### D-049: Kill XP, a skill XP share and stat points through commands
+
+A kill grants `KillXpBase x (victim tier + 1) x reward factor` to the killer; half of every skill XP gain (`CharacterXpPerSkillXp`, tuning) also becomes character XP, as GAME_DESIGN asks. `XpSystem.Grant` is the only place XP is handed out and publishes `XpGained` and `LevelUp`. Stat points are spent with `SpendStatPointCommand`, so the Stats tab and a future AI mutation brain use the same path; `SimulationTicker.ApplyPendingCommands` applies queued commands without advancing time while the run is paused. Rules out: UI code writing stats directly.
+
+### D-050: AI perception is distance-based in the simulation; Hunt, Eat and Flee join the brain
+
+Perception is a pure scan of the run state within the `PerceptionRadius` of the archetype, so AI stays deterministic and testable without Unity; the `IPerceptionProvider` idea from the architecture draft is dropped. Prey more than one tier above is never hunted; prey two or more tiers below only when it attacked the demon recently (`Demon.LastAttackedBy`), which is how elders ignore blobs until bitten. Wounded and eating prey score higher. Idle goals are interrupted the moment prey or food comes into view. A demon below `FleeHealthFraction` with a fight nearby sprints away from the nearest fighter; the M2 content sets that threshold to 0 for both archetypes because fights are hard to test when prey runs (Mario), a later milestone turns it on. Standing attackers face their prey through `MovementIntent.Facing`, which the view turns toward. Rules out: Unity overlap queries feeding the brains, and omniscient AI.
+
+### D-051: Gore stage 1, corpses as food views, menus pause the runner
+
+Each body part is a `BodyPartView` with a trigger collider on the `Demon` layer; wounded parts darken and shrink, lost parts vanish. The view of a dead demon becomes the corpse: it lies flat on the `Food` layer with the corpse material and carries the `FoodView`; severed parts are rigidbody spheres that write their resting position back into the simulation. `BloodDecalPool` reuses a fixed number of ground quads and body blobs. The two layers are created by the placeholder asset generator through the TagManager asset. The Stats panel and the death screen pause `SimulationRunner`, which then only applies queued menu commands. Rules out: a separate corpse prefab, and per-hit allocations for blood.
+### D-052: Attacked demons retaliate, whatever the attacker is worth (Mario)
+
+A hit makes the attacker the prey of its victim on the next decision, overriding wandering, resting, patrolling and eating, but not fleeing; the reward discount for prey far below does not apply to a provoked demon, so an elder bitten by a blob turns on it as GAME_DESIGN asks. Archetypes with a hunt weight of zero never retaliate. The demon remembers who hit it and when (`LastAttackedBy`, `LastAttackedTick`); the memory expires with the combat window. Rules out: a bitten blob that shrugs and rests, and an elder that ignores the player chewing on its leg.
+
+### D-053: The Tier 0 population is topped up during a run (Mario)
+
+A spawn stage spawns one Tier 0 demon per `RespawnSeconds` (biome data, 12 s) while fewer live than `InitialBlobs`, between `RespawnMinDistance` and `RespawnMaxDistance` from the player, inside the bounds and clear of features, with a brain and a `DemonSpawned` event the App layer answers with a body. Pulled forward from M4 because the arena emptied within minutes; the threat level that scales spawns over time stays an M4 item. Rules out: a run that ends because nothing is left to fight.
+
 ## Open
 
 Each open item has a proposed default. Work proceeds with the default until Mario decides.

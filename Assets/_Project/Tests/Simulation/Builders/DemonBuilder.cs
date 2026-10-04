@@ -1,18 +1,21 @@
 #nullable enable
 using System.Numerics;
+using DemonFighter.Simulation.Content;
+using DemonFighter.Simulation.Tests.Content;
 
 namespace DemonFighter.Simulation.Tests.Builders
 {
     /// <summary>
-    /// Spawns a demon into a run for tests, with a Tier 0 blob as the default body so tests only state what matters.
+    /// Spawns a demon into a run for tests, with the Tier 0 blob as the default kind so tests only state what matters.
     /// </summary>
     internal sealed class DemonBuilder
     {
-        public static readonly DemonTemplate Blob = new DemonTemplate("Blob", 0, 1.2f, 4f, 1.6f);
-        public static readonly DemonTemplate Elder = new DemonTemplate("Elder", 6, 15f, 3f, 1f);
+        public static DemonSpec Blob => TestContent.Blob;
+
+        public static DemonSpec Elder => TestContent.Elder;
 
         private ControllerKind _controller = ControllerKind.Ai;
-        private DemonTemplate _template = Blob;
+        private DemonSpec _spec = TestContent.Blob;
         private Vector3 _position = Vector3.Zero;
         private float _yaw;
 
@@ -22,9 +25,9 @@ namespace DemonFighter.Simulation.Tests.Builders
             return this;
         }
 
-        public DemonBuilder WithTemplate(DemonTemplate template)
+        public DemonBuilder WithSpec(DemonSpec spec)
         {
-            _template = template;
+            _spec = spec;
             return this;
         }
 
@@ -42,7 +45,7 @@ namespace DemonFighter.Simulation.Tests.Builders
 
         public Demon SpawnInto(RunState state)
         {
-            return state.SpawnDemon(_controller, _template, _position, _yaw);
+            return state.SpawnDemon(_controller, _spec, _position, _yaw);
         }
     }
 }
