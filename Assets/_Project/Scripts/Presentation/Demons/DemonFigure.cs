@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using DemonFighter.Data;
 using DemonFighter.Simulation.Anatomy;
+using DemonFighter.Simulation.Content;
 using UnityEngine;
 
 namespace DemonFighter.Presentation.Demons
@@ -12,7 +13,8 @@ namespace DemonFighter.Presentation.Demons
     /// and the menu preview. Under the figure root sit the Body (the core: the prefab capsule, or the core mesh once
     /// a model is bound), the Placeholders (scaled like the capsule, where primitives of unbound parts hang as they
     /// did before M5) and the Rig (scaled by the body size, where parts with meshes hang on the socket anchors of
-    /// the core). The root carries the procedural motion of the whole body (D-082) and tilts for the corpse pose.
+    /// the core). The root carries the procedural motion of the whole body (D-082), stands the core on the parts it
+    /// walks on (D-094) and tilts for the corpse pose.
     /// No game rules live here.
     /// </summary>
     public sealed class DemonFigure
@@ -25,12 +27,14 @@ namespace DemonFighter.Presentation.Demons
 
         private const float MinimumHeight = 0.0001f;
         private const int CapsuleAlongY = 1;
+        private const float StanceSettleSeconds = 0.3f;
         private static readonly Vector3 FallbackAnchor = new Vector3(0f, 0.5f, 0f);
         private static readonly Quaternion LyingRotation = Quaternion.Euler(-90f, 0f, 0f);
 
         private readonly Transform _root;
         private readonly CapsuleCollider? _coreCapsule;
         private readonly Renderer[] _decorations;
+        private readonly List<BodyPartView> _standing = new List<BodyPartView>();
         private PartMeshSet? _coreMeshes;
         private Bounds _coreBounds;
         private IReadOnlyList<SocketAnchorDefinition> _anchors = Array.Empty<SocketAnchorDefinition>();
@@ -76,6 +80,12 @@ namespace DemonFighter.Presentation.Demons
 
         /// <summary>Body-unit space (scaled by the body size) for parts with meshes, hung on the socket anchors.</summary>
         public Transform Rig { get; }
+
+        /// <summary>
+        /// How high the core stands on the parts in the Locomotion socket, in meters: as far as they reach below it,
+        /// so their lowest point rests on the ground. Zero while it crawls or once they are lost (D-094).
+        /// </summary>
+        public float Stance { get; private set; }
 
         /// <summary>True when the core wears a bound mesh instead of the capsule.</summary>
         public bool HasCoreMesh => _coreMeshes.HasValue;
@@ -152,7 +162,7 @@ namespace DemonFighter.Presentation.Demons
         /// <summary>Poses the whole figure for this frame: the bob, the tilt and the squash and stretch of the body motion.</summary>
         public void Animate(Vector3 localPosition, Quaternion rotation, Vector3 scale)
         {
-            Root.localPosition = localPosition;
+            Root.localPosition = localPosition + (Vector3.up * Stance);
             Root.localRotation = rotation;
             Root.localScale = scale;
         }
@@ -209,6 +219,7 @@ namespace DemonFighter.Presentation.Demons
                 BodyPartView view = visuals.CreateMeshPart(part, meshes.Value, Rig, position, rotation, ownerMaterial, out Material material, out ownerColored);
                 view.Initialize(owner, part.Index, material, ownerColored && meshes.Value.HasOwnMaterial ? OwnerTint(ownerMaterial) : (Color?)null);
                 view.SetMotion(motion, copyIndex, meshes.Value.Clip != null);
+                StandOnIfLocomotion(part, view);
                 return view;
             }
 
@@ -217,9 +228,36 @@ namespace DemonFighter.Presentation.Demons
             {
                 primitive.Initialize(owner, part.Index, primitiveMaterial, null);
                 primitive.SetMotion(motion, copyIndex, false);
+                StandOnIfLocomotion(part, primitive);
             }
 
             return primitive;
+        }
+
+        /// <summary>Moves the stance toward what the standing parts give now, over the settle time, so the body rises on new legs and drops when it loses them.</summary>
+        public void UpdateStance(float deltaTime)
+        {
+            float target = MeasureStance();
+            float rate = Mathf.Max(target, Stance) / StanceSettleSeconds;
+            Stance = Mathf.MoveTowards(Stance, target, rate * Mathf.Max(deltaTime, 0f));
+        }
+
+        /// <summary>Takes the stance the standing parts give at once and lifts the root to it: a body that spawns, the menu preview.</summary>
+        public void SnapStance()
+        {
+            Stance = MeasureStance();
+            Root.localPosition = Vector3.up * Stance;
+        }
+
+        /// <summary>Counts a part view among those the core stands on; parts in the Locomotion socket join by themselves.</summary>
+        internal void AddStandingPart(BodyPartView view)
+        {
+            if (view == null)
+            {
+                throw new ArgumentNullException(nameof(view));
+            }
+
+            _standing.Add(view);
         }
 
         /// <summary>The owner color softened for a textured mesh, so the tier and the player still read without flattening the texture.</summary>
@@ -263,6 +301,33 @@ namespace DemonFighter.Presentation.Demons
             {
                 Root.position += Vector3.up * (_root.position.y - lowest);
             }
+        }
+
+        private void StandOnIfLocomotion(BodyPart part, BodyPartView view)
+        {
+            if (part.Spec.Socket == SocketKind.Locomotion)
+            {
+                _standing.Add(view);
+            }
+        }
+
+        // The lowest point a standing part reaches in the space of the root at rest; the core stands that far up.
+        // Rig and placeholder space are children of the root without rotation, so a height maps by position and scale.
+        private float MeasureStance()
+        {
+            float lowest = 0f;
+            for (int i = 0; i < _standing.Count; i++)
+            {
+                BodyPartView view = _standing[i];
+                float? point = view != null ? view.RestLowestPoint() : null;
+                if (point.HasValue)
+                {
+                    Transform space = view!.transform.parent;
+                    lowest = Mathf.Min(lowest, space.localPosition.y + (space.localScale.y * point.Value));
+                }
+            }
+
+            return -lowest;
         }
 
         private static Transform FindOrCreate(Transform parent, string name)

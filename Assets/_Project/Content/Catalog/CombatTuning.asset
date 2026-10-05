@@ -28,18 +28,18 @@ MonoBehaviour:
   _bleedReductionPerConstitution: 0.05
   _minBleedFraction: 0.2
   _inCombatSeconds: 5
-  _killXpBase: 50
+  _killXpBase: 100
+  _killXpPerVictimLevel: 0.25
   _rewardBonusPerTierAbove: 0.5
   _rewardFactorFarBelow: 0.1
   _levelXpBase: 30
   _levelXpExponent: 1.2
+  _levelXpPerTier: 1
   _statPointsPerLevel: 3
-  _characterXpPerSkillXp: 0.5
   _eatBiomassPerSecond: 15
   _eatReachPerMeter: 1.5
   _corpseBiomassPerTier: 20
   _foodDecaySeconds: 90
-  _tierInvestmentStep: 4
   _sizeStepPerTier: 0.5
   _partHpPerUpgradeLevel: 0.15
   _transformationSeconds: 2
@@ -49,8 +49,9 @@ MonoBehaviour:
   _characterLevelPerUpgradeLevel: 2
   _knockbackSeconds: 0.3
   _firstEvolutionLevel: 5
-  _secondEvolutionLevel: 10
+  _secondEvolutionLevel: 5
   _baseStatCap: 10
+  _perceptionPerSenseLevel: 0.3
   _stats:
   - _id: stat.strength
     _name: Strength
@@ -61,3 +62,4 @@ MonoBehaviour:
   - _id: stat.agility
     _name: Agility
     _description: Movement speed, attack speed, stamina.
+  _progressionVersion: 2

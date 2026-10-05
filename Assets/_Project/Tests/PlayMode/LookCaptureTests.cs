@@ -92,6 +92,12 @@ namespace DemonFighter.PlayMode.Tests
                 capture.transform.position = center + fromSide.normalized * (radius * 2.2f) + Vector3.up * (radius * 0.9f + 4f);
                 capture.transform.LookAt(center);
                 Capture(capture, "2-lava");
+
+                // Standing at the shore, as the player sees a pool: the edge where ground and lava meet.
+                Vector3 shore = center + (fromSide.normalized * (radius + 4f));
+                capture.transform.position = new Vector3(shore.x, center.y + 1.6f, shore.z);
+                capture.transform.LookAt(center + (Vector3.up * 0.3f));
+                Capture(capture, "6-lava-shore");
             }
 
             capture.transform.position = playerPosition + new Vector3(-30f, 35f, -30f);

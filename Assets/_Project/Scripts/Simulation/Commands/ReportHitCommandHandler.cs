@@ -4,7 +4,6 @@ using System.Numerics;
 using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Combat;
 using DemonFighter.Simulation.Events;
-using DemonFighter.Simulation.Progression;
 using DemonFighter.Simulation.Skills;
 
 namespace DemonFighter.Simulation.Commands
@@ -130,9 +129,6 @@ namespace DemonFighter.Simulation.Commands
                 {
                     _events.Publish(new SkillLevelUp(actor.Id, use.Skill.Spec.Id, use.Skill.Level));
                 }
-
-                // A share of skill XP feeds character XP (GAME_DESIGN, "Skill levels").
-                XpSystem.Grant(actor, xp * state.Catalog.Tuning.CharacterXpPerSkillXp, XpSource.SkillUse, state.Catalog.Tuning, _events);
             }
 
             return CommandResult.Accepted;

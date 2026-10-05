@@ -83,7 +83,7 @@ namespace DemonFighter.Simulation.Anatomy
             }
         }
 
-        /// <summary>Body investment for the tier: every part beyond the core, lost or not, plus every upgrade level.</summary>
+        /// <summary>Body investment: every part beyond the core, lost or not, plus every upgrade level. No longer raises the tier (D-091).</summary>
         public int InvestmentPoints
         {
             get
@@ -95,6 +95,24 @@ namespace DemonFighter.Simulation.Anatomy
                 }
 
                 return points;
+            }
+        }
+
+        /// <summary>Fraction the attached parts add to the body's size (D-091); a lost part adds nothing until it is regrown.</summary>
+        public float SizeBonus
+        {
+            get
+            {
+                float bonus = 0f;
+                for (int i = 0; i < _parts.Count; i++)
+                {
+                    if (!_parts[i].IsLost)
+                    {
+                        bonus += _parts[i].Spec.SizeBonus;
+                    }
+                }
+
+                return bonus;
             }
         }
 

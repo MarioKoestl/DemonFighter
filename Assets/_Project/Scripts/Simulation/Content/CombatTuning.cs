@@ -54,8 +54,11 @@ namespace DemonFighter.Simulation.Content
         /// <summary>Seconds without dealing or taking damage before a demon is out of combat (D-014).</summary>
         public float InCombatSeconds { get; init; } = 5f;
 
-        /// <summary>XP for a kill at equal tier.</summary>
-        public float KillXpBase { get; init; } = 50f;
+        /// <summary>XP for killing a Tier 0, level 1 demon at equal tier (D-090).</summary>
+        public float KillXpBase { get; init; } = 100f;
+
+        /// <summary>Kill XP bonus per level the victim has above level 1, as a fraction (D-090): a level 5 victim gives double.</summary>
+        public float KillXpPerVictimLevel { get; init; } = 0.25f;
 
         /// <summary>Reward bonus per tier the victim stands above the killer, as a fraction.</summary>
         public float RewardBonusPerTierAbove { get; init; } = 0.5f;
@@ -70,9 +73,6 @@ namespace DemonFighter.Simulation.Content
 
         public int StatPointsPerLevel { get; init; } = 3;
 
-        /// <summary>Share of every skill XP gain that also becomes character XP (GAME_DESIGN, "Skill levels").</summary>
-        public float CharacterXpPerSkillXp { get; init; } = 0.5f;
-
         /// <summary>Biomass moved from food to eater per second of eating.</summary>
         public float EatBiomassPerSecond { get; init; } = 15f;
 
@@ -83,9 +83,6 @@ namespace DemonFighter.Simulation.Content
         public float CorpseBiomassPerTier { get; init; } = 20f;
 
         public float FoodDecaySeconds { get; init; } = 90f;
-
-        /// <summary>Body investment points (parts and upgrade levels) per tier gained (D-054).</summary>
-        public int TierInvestmentStep { get; init; } = 4;
 
         /// <summary>Fraction of the spawn size a demon grows per tier gained (D-018).</summary>
         public float SizeStepPerTier { get; init; } = 0.5f;
@@ -111,8 +108,14 @@ namespace DemonFighter.Simulation.Content
         /// <summary>Seconds a knockback keeps pushing; the knockback distance of the skill is covered in this time.</summary>
         public float KnockbackSeconds { get; init; } = 0.3f;
 
-        /// <summary>Character levels at which an evolution is offered, ascending (GAME_DESIGN, "Evolution": 5 and 10 in v1).</summary>
-        public IReadOnlyList<int> EvolutionLevels { get; init; } = new[] { 5, 10 };
+        /// <summary>
+        /// The level each tier evolves at, one entry per evolution: the first for Tier 0, the next for Tier 1 (D-091). The
+        /// level starts again at 1 after every evolution and waits at this level until the demon evolves.
+        /// </summary>
+        public IReadOnlyList<int> EvolutionLevels { get; init; } = new[] { 5, 5 };
+
+        /// <summary>Extra XP per level for every tier, as a fraction: a level in Tier N costs (1 + N x this) times as much (D-091).</summary>
+        public float LevelXpPerTier { get; init; } = 1f;
 
         /// <summary>Points a stat can hold before evolutions raise its cap.</summary>
         public int BaseStatCap { get; init; } = 10;
@@ -150,14 +153,25 @@ namespace DemonFighter.Simulation.Content
         }
 
         /// <summary>XP needed to advance from the given character level to the next one.</summary>
-        public float LevelXpForNext(int currentLevel)
+        public float LevelXpForNext(int currentLevel, int tier = 0)
         {
             if (currentLevel < 1)
             {
                 throw new ArgumentOutOfRangeException(nameof(currentLevel), currentLevel, "Levels start at 1.");
             }
 
-            return LevelXpBase * MathF.Pow(currentLevel, LevelXpExponent);
+            // Kill XP grows with the victim's tier, so the levels of a higher tier cost more in step (D-091).
+            return LevelXpBase * MathF.Pow(currentLevel, LevelXpExponent) * (1f + (LevelXpPerTier * Math.Max(0, tier)));
+        }
+
+        /// <summary>
+        /// Character XP for a kill, its only source (D-090): the base, times the victim's tier plus one, times a bonus
+        /// per level the victim has above one, times the reward factor of the tier gap.
+        /// </summary>
+        public float KillXp(int killerTier, int victimTier, int victimLevel)
+        {
+            float levelBonus = 1f + (KillXpPerVictimLevel * Math.Max(0, victimLevel - 1));
+            return KillXpBase * (victimTier + 1) * levelBonus * RewardFactor(killerTier, victimTier);
         }
 
         /// <summary>
@@ -188,18 +202,17 @@ namespace DemonFighter.Simulation.Content
             Require(RegenBasePerSecond >= 0f && RegenPerConstitution >= 0f, "Regeneration is never negative.");
             Require(BleedReductionPerConstitution >= 0f && MinBleedFraction > 0f && MinBleedFraction <= 1f, "Bleed resistance values are out of range.");
             Require(InCombatSeconds >= 0f, "InCombatSeconds is never negative.");
-            Require(KillXpBase >= 0f && RewardBonusPerTierAbove >= 0f, "Reward values are never negative.");
+            Require(KillXpBase >= 0f && KillXpPerVictimLevel >= 0f && RewardBonusPerTierAbove >= 0f, "Reward values are never negative.");
             Require(RewardFactorFarBelow >= 0f && RewardFactorFarBelow <= 1f, "RewardFactorFarBelow must be in [0, 1].");
-            Require(LevelXpBase > 0f && LevelXpExponent >= 0f && StatPointsPerLevel >= 0, "Level values are out of range.");
-            Require(CharacterXpPerSkillXp >= 0f, "CharacterXpPerSkillXp is never negative.");
+            Require(LevelXpBase > 0f && LevelXpExponent >= 0f && LevelXpPerTier >= 0f && StatPointsPerLevel >= 0, "Level values are out of range.");
             Require(EatBiomassPerSecond > 0f && EatReachPerMeter > 0f && CorpseBiomassPerTier >= 0f && FoodDecaySeconds > 0f, "Food values are out of range.");
-            Require(TierInvestmentStep >= 1 && SizeStepPerTier >= 0f && PartHpPerUpgradeLevel >= 0f, "Body values are out of range.");
+            Require(SizeStepPerTier >= 0f && PartHpPerUpgradeLevel >= 0f, "Body values are out of range.");
             Require(TransformationSeconds >= 0f && RepeatCostMultiplier >= 1f && UpgradeCostFraction >= 0f && RegrowCostFraction >= 0f && CharacterLevelPerUpgradeLevel >= 0, "Mutation values are out of range.");
             Require(KnockbackSeconds >= 0f, "KnockbackSeconds is never negative.");
             Require(EvolutionLevels != null && BaseStatCap >= 1, "Evolution values are out of range.");
             for (int i = 0; i < EvolutionLevels.Count; i++)
             {
-                Require(EvolutionLevels[i] >= 1 && (i == 0 || EvolutionLevels[i] > EvolutionLevels[i - 1]), "EvolutionLevels must be positive and ascending.");
+                Require(EvolutionLevels[i] >= 1, "EvolutionLevels start at 1.");
             }
             Require(Stats != null && Stats.Count > 0, "At least one stat is required.");
         }

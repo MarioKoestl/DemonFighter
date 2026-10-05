@@ -137,6 +137,36 @@ namespace DemonFighter.Simulation.Tests
             speed.Should().BeApproximately(4f * 1.3f, Tolerance);
         }
 
+        // A demon waits at the level of its next evolution; XP beyond it is not kept (D-091).
+        [Test]
+        public void GainXp_PastTheEvolutionLevel_StopsThere()
+        {
+            Demon demon = new DemonBuilder().SpawnInto(new RunStateBuilder().Build());
+
+            int levels = demon.GainXp(100000f, TestContent.Tuning);
+
+            levels.Should().Be(4);
+            demon.Level.Should().Be(5);
+            demon.Xp.Should().Be(0f);
+            demon.Stats.UnspentPoints.Should().Be(12);
+        }
+
+        // Kill XP grows with the victim's tier, so the levels of a higher tier cost more (D-091).
+        [Test]
+        public void GainXp_InTierOne_ALevelCostsDouble()
+        {
+            Demon demon = new DemonBuilder().SpawnInto(new RunStateBuilder().Build());
+            demon.RecordEvolution();
+            float tierZeroCost = TestContent.Tuning.LevelXpForNext(1);
+
+            int first = demon.GainXp(tierZeroCost, TestContent.Tuning);
+            int second = demon.GainXp(tierZeroCost, TestContent.Tuning);
+
+            first.Should().Be(0);
+            second.Should().Be(1);
+            demon.Level.Should().Be(2);
+        }
+
         [Test]
         public void GainXp_EnoughForOneLevel_GrantsStatPoints()
         {

@@ -188,24 +188,29 @@ Same for **stumps** (arm and legs): a stump is a damaged version of the same par
 
 ---
 
-## Step 3: jaws, arm, legs, thick hide
+## Step 3: the body parts
 
-Same process as step 2, with these differences.
+Same process as step 2, with these differences. Every part model goes into `Assets/_Project/Art/Models/BodyParts/`; each brief names its file, its pose, its prompt words and the values to set in Unity.
 
-| Brief | File name | Folder | Triangles |
+| Brief | File name | Pose in Meshy | Triangles |
 |---|---|---|---|
-| `jaws.md` | `BP_Jaws_Intact.fbx` | `Assets/_Project/Art/Models/BodyParts/` | 5,000 |
-| `arm.md` | `BP_Arm_Intact.fbx` | `Assets/_Project/Art/Models/BodyParts/` | 5,000 |
-| `legs.md` | `BP_Legs_Intact.fbx` | `Assets/_Project/Art/Models/BodyParts/` | 5,000 |
-| `hide-thick.md` | `BP_Hide_Thick_Intact.fbx` | `Assets/_Project/Art/Models/BodyParts/` | 5,000 |
+| `jaws.md` | `BP_Jaws_Intact.fbx` | facing you | 5,000 |
+| `eyes.md` | `BP_Eyes_Intact.fbx` | facing you | 3,000 |
+| `arm.md` | `BP_Arm_Intact.fbx` | upright on the shoulder | 5,000 |
+| `legs.md` | `BP_Legs_Intact.fbx` | standing on its feet | 5,000 |
+| `tail.md` | `BP_Tail_Intact.fbx` | upright on the root | 5,000 |
+| `hide-thick.md` | `BP_Hide_Thick_Intact.fbx` | lying flat, hollow side down | 5,000 |
+| `plates.md` | `BP_Hide_Plates_Intact.fbx` | lying flat, hollow side down | 5,000 |
+| `spines.md` | `BP_Spines_Intact.fbx` | lying flat, spines up | 5,000 |
+| `elastic-tissue.md` | `BP_Hide_Elastic_Intact.fbx` | lying flat, hollow side down | 5,000 |
 
-Settings in Meshy: Symmetry **Auto or On** for jaws, arm and legs, Off for the hide. Everything else as in step 2.3.
+Settings in Meshy: the Symmetry setting each brief names. Everything else as in step 2.3. The briefs README (`docs/briefs/README.md`) explains the poses in one table.
 
 ### 3.1 Where the part sits
 
 Each part grows out of a fixed spot of the blob, its socket: jaws on the upper front, arms on both flanks, legs underneath, hide on the back. `core-blob.md` lists them under "Sockets". The game puts the part's origin onto that spot and turns the part so it points away from the body. The second arm goes onto the other flank by itself.
 
-The game takes the bottom center of each model, as it stood in Meshy, as the point where the part meets the body, wherever Meshy put the origin. So generate each part **standing upright on the end that touches the body**: the arm on its shoulder, claws up. Then you never need Blender for it. The arm brief's prompt words already say so. The jaws, legs and hide briefs get the same rewrite before you make those parts.
+The game takes the bottom center of each model, as it stood in Meshy, as the point where the part meets the body, wherever Meshy put the origin. So the pose in Meshy decides how a part attaches, and each brief names it: upright on the end that touches the body (arm, tail), facing you (jaws, eyes), standing on its feet (legs), or lying flat with the body side underneath (hide, plates, spines, elastic tissue). The prompt words in each brief already ask for the pose. You never need Blender for it. Legs are the one part the body rests on: the game lifts the blob until their feet touch the ground, so their Offset only says how far they reach out below it (D-094).
 
 ### 3.2 Fit it on the part asset
 
@@ -455,7 +460,7 @@ If something else goes wrong: copy the red lines from Unity's Console into the c
 - [ ] Audacity installed
 - [ ] Meshy Pro for one month; terms and invoice saved as PDF
 - [ ] `BP_Core_Intact.fbx` in the game and fitted
-- [ ] `BP_Jaws_Intact.fbx`, `BP_Arm_Intact.fbx`, `BP_Legs_Intact.fbx`, `BP_Hide_Thick_Intact.fbx` in the game and fitted
+- [ ] The part models of step 3 (jaws, eyes, arm, legs, tail, thick hide, plates, spines, elastic tissue) in the game and fitted
 - [ ] Meshy cancelled after the downloads
 - [ ] 18 sound effects assigned in the `AE_` assets
 - [ ] Cave drone and lava loop assigned on `BI_AshCavern.asset`

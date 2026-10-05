@@ -69,7 +69,7 @@ RunState
 Demon
   Id (DemonId, a simulation id, never a Unity instance id)
   ControllerKind: Player | Ai
-  Level, Xp, Biomass, Tier (derived from body investment and evolutions, D-054), SizeMeters (derived from the tier)
+  Level, Xp, Biomass, Tier (the spec tier plus evolutions, D-091), SizeMeters (derived from the tier and the size bonus of the attached parts)
   BaseStats (Strength, Constitution, Agility; extensible as data; unspent points; caps raised by evolutions)
   DerivedStats (computed from the effective stats: base stats plus part bonuses; recomputed on change)
   Body
@@ -124,7 +124,7 @@ Everything the outside world needs to show goes out as an event:
 
 ```csharp
 CommandRejected(actor, command, reason)
-DamageApplied(target, part, amount, damageType, attacker), PartWounded, PartSevered(demon, part, foodId), PartDestroyed
+DamageApplied(target, part, amount, damageType, attacker), DamageBlocked(same, test mode only), PartWounded, PartSevered(demon, part, foodId), PartDestroyed
 DemonDied(demon, killer), DemonSpawned(demon), DemonHeld(target, by, untilTick)
 FoodSpawned(food), FoodConsumed(food, eater, biomass), FoodRemoved(food, reason)
 SkillActivated(actor, skill, ...), SkillXpGained(demon, skill, amount), SkillLevelUp(demon, skill, newLevel)
@@ -139,7 +139,7 @@ Events are structs published on a `SimulationEvents` bus. Presentation, UI and a
 
 The simulation advances in fixed steps (`SimulationTick`, 20 Hz for v1, configurable). One tick:
 
-1. Apply queued commands (validated: does the actor exist and live, is it transforming, held, staggered or busy, is the cooldown over, is the stamina there; a hit report counts only inside the active window, within reach and arc). Skill XP and its character XP share are granted here and may raise a level. Mutate and Evolve apply here and start a transformation; a skill behaviour may hold or push a demon. Right after the commands, test mode refills Biomass and stat points of a demon in it (`TestModeSystem`, D-089); a paused menu runs the same refill after its commands.
+1. Apply queued commands (validated: does the actor exist and live, is it transforming, held, staggered or busy, is the cooldown over, is the stamina there; a hit report counts only inside the active window, within reach and arc). Skill XP is granted here and may raise a skill level; character XP comes only from kills (D-090). Mutate and Evolve apply here and start a transformation; a skill behaviour may hold or push a demon. Right after the commands, test mode refills Biomass and stat points of a demon in it (`TestModeSystem`, D-089); a paused menu runs the same refill after its commands.
 2. Hold: a grabbed demon is pushed toward its spot beside the holder, or released when the hold ended or a side died (D-061).
 3. Movement: integrate the demons that have no Unity body; expired knockback and dash velocities end.
 4. Sprint: a sprinting demon drains stamina and earns Sprint XP.
@@ -180,7 +180,7 @@ Why: writing our own 3D physics is out of scope, and Unity's physics also runs h
 
 - `IWorldGenerator.Generate(seed, BiomeSpec) -> WorldLayout`
 - `WorldLayout` is data only: heightfield, feature placements (rock, fissure, pool, bone pile), spawn clusters, elder routes.
-- Pools lie in basins the generator carves into the heightfield (D-086), so a pool never hides under the ground; the burning zones of lava and fissures (`HazardMap`) are exactly the visible ones.
+- Pools lie on flat beds the generator shapes into the heightfield, with a flat shore that meets their edge all around (D-086), so a pool never hides under the ground and never stands in a moat; the burning zones of lava and fissures (`HazardMap`) are exactly the visible ones.
 - `WorldBuilder` in Presentation turns a `WorldLayout` into terrain, meshes and colliders at run start.
 
 ## Content pipeline
@@ -201,7 +201,7 @@ Addressables are not used in v1 (see `DECISIONS.md`). All content loads with the
 
 - `DemonView` (MonoBehaviour): binds a `Demon` to a Unity object. Owns the `CharacterController` and the body part views, composes its body through `DemonFigure`, follows the size, the tier and the wounds of the demon, drives the `BodyAnimator` from the velocity the simulation decided and the attacks, hits and transformations the presenter reports, and becomes the corpse on death (flat, dark, on the `Food` layer, carrying the `FoodView`).
 - `BodyAnimator`: the procedural motion (D-082), plain arithmetic over clocks the view advances: breathing, stretch and squash with speed, a gait bob, the bite swell and nod, the lunge stretch, the hit wobble and the transformation throb for the figure; stepping legs, swinging and striking limbs, snapping jaws and swaying tails for the parts, by the `PartMotion` of the part asset and the `SkillMotion` of the skill asset. Amplitudes come from `DemonViewSettings`. A part with a legacy clip on its mesh set plays that instead.
-- `DemonFigure`: the transforms a body is composed of, shared by `DemonView` and `BodyPreviewRig`: the Body (the prefab capsule, or the bound core mesh fitted to the body height), the Placeholders (capsule-unit space where primitives of unbound parts hang as before) and the Rig (body-unit space where mesh parts hang on the socket anchors of the core, `SocketAnchors`). `PartVisuals` reads mesh sets and anchors from the part assets and creates the views; the figure tilts for the corpse pose.
+- `DemonFigure`: the transforms a body is composed of, shared by `DemonView` and `BodyPreviewRig`: the Body (the prefab capsule, or the bound core mesh fitted to the body height), the Placeholders (capsule-unit space where primitives of unbound parts hang as before) and the Rig (body-unit space where mesh parts hang on the socket anchors of the core, `SocketAnchors`). `PartVisuals` reads mesh sets and anchors from the part assets and creates the views; the figure stands the core on its parts in the Locomotion socket, as high as they reach below it (`Stance`, eased, D-094), and tilts for the corpse pose.
 - `BodyPartView`: one per part with a trigger collider on the `Demon` layer for hit detection. Shows the damage stage (`DamageStages`, D-080): a primitive darkens and shrinks when wounded or mangled and hides when lost; a bound mesh set swaps to its wounded, mangled or stump mesh, keeps its imported material and wears the owner color (player teal, AI tier) as a tint.
 - `CombatPresenter`: detects hits for active skills and reports them, keeps the food under the crosshair for the eat prompt, highlights the body part under the crosshair and holds the Analyze lock for the HUD (D-065, D-066), and turns `DamageApplied`, `PartSevered`, `PartDestroyed`, `DemonDied`, `FoodRemoved`, `MutationStarted` and `Evolved` into gore (D-081): blood on the hit part through the skin shader (drying after 15 seconds, D-068), splats and corpse pools on the ground (`BloodDecalPool`, URP decal projectors), viscera bursts (`VisceraPool`, code-built meshes on a ballistic arc), fallen parts that keep the look of their view (`FoodView` with a rigidbody), corpses and the transformation throb. `GoreSettings` holds the tuning.
 - Shader `DemonFighter/DemonSkin` (`Assets/_Project/Art/Shaders`): URP Lit with a blood mask in the forward pass, fed per renderer by `BodyPartView`; every demon material and every bound part material uses it.
@@ -227,12 +227,13 @@ Presentation never changes simulation state directly. It sends commands or hit r
 ## Input
 
 - One Input Actions asset (`Settings/DemonFighter.inputactions`) with action maps `Gameplay` and `Menu`.
-- `PlayerInputAdapter` reads actions and produces commands for the demon of the player: move (with the sprint flag, facing the camera while attacking), one skill use per attack key pressed, resolved through the skill slot the key stands for (`SkillSlots.Find`: left mouse Primary, right mouse Secondary, Space Lunge, Q Tail Swing), eat while the key is held on the food Presentation found under the crosshair (`IPlayerAim`). It raises `MenuToggled(MenuTab)` for Tab and C, `AnalyzeRequested` for F and `PauseRequested` for Esc. Nothing else in the project reads input. No `Input.GetKey` anywhere.
+- `PlayerInputAdapter` reads actions and produces commands for the demon of the player: move (with the sprint flag, facing the camera while attacking unless a third-person camera looks at the face, D-093), one skill use per attack key pressed, resolved through the skill slot the key stands for (`SkillSlots.Find`: left mouse Primary, right mouse Secondary, Space Lunge, Q Tail Swing), eat while the key is held on the food Presentation found under the crosshair (`IPlayerAim`). It raises `MenuToggled(MenuTab)` for Tab and C, `AnalyzeRequested` for F and `PauseRequested` for Esc. Nothing else in the project reads input. No `Input.GetKey` anywhere.
 - Adding gamepad later means adding bindings to the asset, no code changes.
 
 ## UI
 
 - `MainMenuScreen` and `PausePanel` share the `SettingsPanel` (tabs Graphics, Audio, Controls, Playtest, D-085); both only raise requests (`NewRunRequested` with the parsed seed, `SettingsChanged` with the whole value set, `QuitRequested`) that `SceneFlow` and `RunController` act on. `MenuStyles` gives the menus one look in code.
+- `DamageNumbersLayer` (UI, under the HUD panels) shows a number over the target of every hit the player lands and over the player for damage it takes (D-092): it listens to `DamageApplied` and, for the player in test mode, `DamageBlocked`, keeps the numbers in `FloatingDamage` (plain, tested) and projects each over the target's head every frame.
 - `HudScreen` (UI Toolkit, built in code) shows the run and hosts the `MutationMenu`, the `StatsPanel` inside it, the `PausePanel` and the `RunSummaryPanel`. The menu reads `RunState`, the offer policy and the rules every frame while open and only raises requests (`MutationsRequested` with every selected mutation, `EvolutionRequested`, `StatPointRequested`); `RunController` turns them into commands, pauses the runner while the menu is open and resumes it on confirm. The Mutate tab is a planner like Stats (D-064): it composes a preview `Body` (own parts plus selected offers) and hands it to an `IBodyPreview`, which the App layer implements over the `BodyPreviewRig`, so UI never references Presentation. The HUD names the aimed part under the crosshair and shows the analysis panel of a locked target through a `TargetFocus` callback composed the same way, revealing by the sense level of the player (D-066). First-run hints appear once per installation, remembered in PlayerPrefs through `HintMemory` (D-076). The UI never changes simulation state directly.
 
 ## Multiplayer readiness

@@ -104,6 +104,12 @@ namespace DemonFighter.Presentation.Combat
         /// <summary>The demon the Analyze key locked for the HUD, or None; the lock drops when it dies (D-066).</summary>
         public DemonId LockedDemon { get; private set; }
 
+        /// <summary>How high a demon's core stands on its legs, in meters (D-094); zero without a body or legs.</summary>
+        public float StanceOf(DemonId demon)
+        {
+            return _views.TryGetValue(demon, out DemonView? view) ? view.Stance : 0f;
+        }
+
         /// <summary>Locks the demon under the crosshair for analysis, or releases the current lock.</summary>
         public void ToggleLock()
         {
@@ -359,7 +365,7 @@ namespace DemonFighter.Presentation.Combat
         private bool OverlapFront(DemonView attacker, float reach, out BodyPartView part, out Vector3 point)
         {
             Vector3 forward = attacker.transform.forward;
-            Vector3 origin = attacker.transform.position + Vector3.up * (attacker.Demon!.SizeMeters * 0.5f);
+            Vector3 origin = attacker.BodyCenter;
             Vector3 center = origin + forward * (reach * FrontVolumeCenterPerReach);
             int count = Physics.OverlapSphereNonAlloc(center, reach * FrontVolumeRadiusPerReach, _colliders, Layers.DemonMask, QueryTriggerInteraction.Collide);
             BodyPartView? nearest = null;
@@ -511,7 +517,7 @@ namespace DemonFighter.Presentation.Combat
 
             float size = view.Demon.SizeMeters;
             BodyPartView? part = view.FindPart(evt.PartIndex);
-            Vector3 position = part != null ? part.transform.position : view.transform.position + Vector3.up * (size * 0.5f);
+            Vector3 position = part != null ? part.transform.position : view.BodyCenter;
             CreateSeveredPiece(food, position, size, launch: true, part);
             _viscera.Burst(position, size, GoreMath.BurstCount(size, _gore.SeverBurstPerMeter));
             _blood.SplashGround(position, size);
@@ -542,7 +548,7 @@ namespace DemonFighter.Presentation.Combat
 
             _pendingUses.Remove(evt.Demon);
             float size = view.Demon.SizeMeters;
-            Vector3 center = view.transform.position + Vector3.up * (size * 0.5f);
+            Vector3 center = view.BodyCenter;
             _viscera.Burst(center, size, GoreMath.BurstCount(size, _gore.DeathBurstPerMeter));
             view.BecomeCorpse(_palette.Corpse);
             float biomass = 0f;

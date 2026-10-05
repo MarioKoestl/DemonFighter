@@ -7,6 +7,7 @@ using DemonFighter.Common;
 using DemonFighter.Simulation;
 using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Content;
+using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Evolution;
 using DemonFighter.Simulation.Hazards;
 using DemonFighter.Simulation.Mutation;
@@ -51,6 +52,7 @@ namespace DemonFighter.UI
 
         private UIDocument _document = null!;
         private VisualElement _overlay = null!;
+        private DamageNumbersLayer? _damageNumbers;
         private Label _health = null!;
         private VisualElement _partList = null!;
         private Label _stamina = null!;
@@ -138,7 +140,7 @@ namespace DemonFighter.UI
         public bool IsMenuOpen => _menu != null && _menu.IsOpen;
 
         /// <summary>Shows the run and follows the demon of the player from now on; the aim callback feeds the eat prompt, the preview the menu.</summary>
-        public void Bind(RunState state, Demon player, Func<FoodId> aimedFood, IMutationOfferPolicy offers, IBodyPreview? preview = null, Func<TargetFocus>? targetFocus = null)
+        public void Bind(RunState state, Demon player, Func<FoodId> aimedFood, IMutationOfferPolicy offers, IBodyPreview? preview = null, Func<TargetFocus>? targetFocus = null, SimulationEvents? events = null, Func<DemonId, float>? stanceOf = null)
         {
             _state = state ?? throw new ArgumentNullException(nameof(state));
             _player = player ?? throw new ArgumentNullException(nameof(player));
@@ -147,6 +149,18 @@ namespace DemonFighter.UI
             if (offers == null)
             {
                 throw new ArgumentNullException(nameof(offers));
+            }
+
+            // Damage numbers over the targets of the player's hits (D-092), under every HUD panel.
+            if (events != null)
+            {
+                if (_damageNumbers == null)
+                {
+                    _damageNumbers = new DamageNumbersLayer();
+                    _document.rootVisualElement.Insert(0, _damageNumbers.Root);
+                }
+
+                _damageNumbers.Bind(state, events, player.Id, stanceOf);
             }
 
             ResetCaches();
@@ -253,11 +267,21 @@ namespace DemonFighter.UI
             _pause.ResetHintsRequested += OnResetHints;
         }
 
+        private void OnDestroy()
+        {
+            _damageNumbers?.Dispose();
+        }
+
         private void OnEnable()
         {
             VisualElement root = _document.rootVisualElement;
             root.Clear();
             root.pickingMode = PickingMode.Ignore;
+            if (_damageNumbers != null)
+            {
+                root.Add(_damageNumbers.Root);
+            }
+
             _overlay = BuildLayout();
             root.Add(_overlay);
             if (_menu != null)
@@ -282,6 +306,8 @@ namespace DemonFighter.UI
             {
                 return;
             }
+
+            _damageNumbers?.Update(Time.deltaTime, Camera.main);
 
             if (_menu != null && _menu.IsOpen)
             {
@@ -334,7 +360,7 @@ namespace DemonFighter.UI
                 ShowHint(HintMemory.FirstBiomass, "Biomass. Press Tab to spend it on new body parts.");
             }
 
-            int xpNext = Mathf.RoundToInt(tuning.LevelXpForNext(_player.Level));
+            int xpNext = Mathf.RoundToInt(tuning.LevelXpForNext(_player.Level, _player.Tier));
             if (Changed(ref _levelValue, _player.Level) | Changed(ref _xp, Mathf.RoundToInt(_player.Xp)) | Changed(ref _xpNext, xpNext))
             {
                 _level.text = "Level " + _levelValue + "   XP " + _xp + " / " + _xpNext;

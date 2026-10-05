@@ -41,6 +41,7 @@ MonoBehaviour:
   _biomassCost: 0
   _minLevel: 1
   _repeatMinLevel: 1
+  _sizeBonus: 0
   _requiredParts: []
   _requiresUnlock: 0
   _visual:
@@ -85,4 +86,4 @@ MonoBehaviour:
       _position: {x: 0, y: 0.3, z: -0.28}
       _euler: {x: 25, y: 180, z: 0}
   _severSound: {fileID: 11400000, guid: e8756f31f9b786d4fabff46f4182e6e8, type: 2}
-  _contentVersion: 6
+  _contentVersion: 7

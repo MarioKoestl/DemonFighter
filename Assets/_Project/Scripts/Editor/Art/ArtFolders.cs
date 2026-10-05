@@ -18,7 +18,7 @@ namespace DemonFighter.Editor.Art
         public const string Effects = Textures + "/Effects";
         public const string Surfaces = Textures + "/Surfaces";
 
-        private const int CoreTriangles = 8000;
+        private const int CoreTriangles = 8500;
         private const int BodyPartTriangles = 5000;
         private const int ElderTriangles = 40000;
         private const int WorldTriangles = 3000;

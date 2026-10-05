@@ -204,7 +204,9 @@ namespace DemonFighter.App
                 () => combat.AimedFood,
                 offers,
                 new BodyPreviewAdapter(preview),
-                () => new TargetFocus(combat.FocusedDemon, combat.FocusedPartIndex, combat.FocusInReach, combat.LockedDemon));
+                () => new TargetFocus(combat.FocusedDemon, combat.FocusedPartIndex, combat.FocusInReach, combat.LockedDemon),
+                _services.Events,
+                combat.StanceOf);
             root.Hud.StatPointRequested += OnStatPointRequested;
             root.Hud.MutationsRequested += OnMutationsRequested;
             root.Hud.EvolutionRequested += OnEvolutionRequested;

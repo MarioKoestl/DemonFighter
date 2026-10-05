@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections.Generic;
 using AwesomeAssertions;
 using DemonFighter.Simulation.Commands;
 using DemonFighter.Simulation.Content;
@@ -88,6 +89,24 @@ namespace DemonFighter.Simulation.Tests.Playtest
             scenario.Target.Body.Core.IsBleeding.Should().BeFalse();
             scenario.Damage.Should().BeEmpty();
             scenario.Deaths.Should().BeEmpty();
+        }
+
+        // The damage numbers still show what a blocked hit would have done (D-092).
+        [Test]
+        public void ApplyHit_TargetInTestMode_ReportsTheBlockedDamage()
+        {
+            var scenario = new CombatScenario();
+            var blocked = new List<DamageBlocked>();
+            scenario.Events.Subscribe<DamageBlocked>(blocked.Add);
+            scenario.Submit(new SetTestModeCommand(scenario.Target.Id, true));
+            scenario.Tick(1);
+
+            scenario.HitCore(TestContent.Bite);
+
+            blocked.Should().ContainSingle();
+            blocked[0].Amount.Should().BeApproximately(12f, Tolerance);
+            blocked[0].Attacker.Should().Be(scenario.Attacker.Id);
+            blocked[0].DamageType.Should().Be(DamageType.Pierce);
         }
 
         [Test]

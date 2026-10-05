@@ -44,5 +44,44 @@ namespace DemonFighter.Editor.Tests.Presentation
             result.max.y.Should().BeApproximately(3f, Tolerance);
             result.size.x.Should().BeApproximately(2f, Tolerance);
         }
+
+        // A diamond turned by 45 degrees: its lowest vertex is 0.71 down, the turned corner of its box 1.41.
+        [Test]
+        public void LowestY_ReadableMesh_IsExactFromTheVertices()
+        {
+            Mesh diamond = Diamond();
+            try
+            {
+                MeshBounds.LowestY(diamond, Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, 45f))).Should().BeApproximately(-0.7071f, Tolerance);
+            }
+            finally
+            {
+                Object.DestroyImmediate(diamond);
+            }
+        }
+
+        [Test]
+        public void LowestY_UnreadableMesh_FallsBackToTheCornersOfItsBounds()
+        {
+            Mesh diamond = Diamond();
+            diamond.UploadMeshData(true);
+            try
+            {
+                MeshBounds.LowestY(diamond, Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, 45f))).Should().BeApproximately(-1.4142f, Tolerance);
+            }
+            finally
+            {
+                Object.DestroyImmediate(diamond);
+            }
+        }
+
+        private static Mesh Diamond()
+        {
+            var mesh = new Mesh();
+            mesh.vertices = new[] { new Vector3(1f, 0f, 0f), new Vector3(0f, 1f, 0f), new Vector3(-1f, 0f, 0f), new Vector3(0f, -1f, 0f) };
+            mesh.triangles = new[] { 0, 2, 1, 0, 3, 2 };
+            mesh.RecalculateBounds();
+            return mesh;
+        }
     }
 }

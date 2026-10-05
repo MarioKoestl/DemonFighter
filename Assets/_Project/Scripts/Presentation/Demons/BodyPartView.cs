@@ -56,6 +56,8 @@ namespace DemonFighter.Presentation.Demons
         private bool _highlighted;
         private bool _hasShown;
         private DamageStage _shown;
+        private Mesh? _measuredMesh;
+        private float _measuredLowest;
 
         /// <summary>The body this part belongs to; null before the owner binds, and on a menu preview figure.</summary>
         public DemonView? Owner { get; private set; }
@@ -264,6 +266,7 @@ namespace DemonFighter.Presentation.Demons
             _burn = 0f;
             _woundRadius = 0f;
             _hasShown = false;
+            _measuredMesh = null;
             ShowDamage(DamageStage.Intact);
         }
 
@@ -273,7 +276,34 @@ namespace DemonFighter.Presentation.Demons
             _baseScale = transform.localScale;
             _restRotation = transform.localRotation;
             _animationRotation = Quaternion.identity;
+            _measuredMesh = null;
             ApplyPose();
+        }
+
+        /// <summary>
+        /// The lowest point of what the part draws, in its rest pose (no swing, no wound shrink) and in its parent's
+        /// space; null when it draws nothing or is lost. The figure stands the core on it (D-094). Measured once per mesh.
+        /// </summary>
+        internal float? RestLowestPoint()
+        {
+            if (_filter == null)
+            {
+                _filter = GetComponent<MeshFilter>();
+            }
+
+            Mesh? mesh = _filter != null ? _filter.sharedMesh : null;
+            if (_lost || !_drawn || mesh == null)
+            {
+                return null;
+            }
+
+            if (mesh != _measuredMesh)
+            {
+                _measuredLowest = MeshBounds.LowestY(mesh, Matrix4x4.TRS(Vector3.zero, _restRotation, _baseScale));
+                _measuredMesh = mesh;
+            }
+
+            return transform.localPosition.y + _measuredLowest;
         }
 
         /// <summary>Hides the part for the first-person camera; a lost part stays hidden either way.</summary>

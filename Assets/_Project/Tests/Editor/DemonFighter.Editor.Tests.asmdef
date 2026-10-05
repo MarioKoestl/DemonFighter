@@ -12,7 +12,8 @@
     "DemonFighter.Presentation",
     "DemonFighter.Data",
     "DemonFighter.Simulation",
-    "DemonFighter.Common"
+    "DemonFighter.Common",
+    "DemonFighter.Input"
   ],
   "includePlatforms": [
     "Editor"

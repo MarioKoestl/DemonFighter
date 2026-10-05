@@ -22,11 +22,27 @@ namespace DemonFighter.Simulation.Tests.Progression
             scenario.DamageSystem.ApplyDamage(scenario.Target, scenario.Target.Body.Core, 1000f, DamageType.Pierce, scenario.Attacker.Id);
             scenario.Events.Flush();
 
-            scenario.Attacker.Xp.Should().BeApproximately(50f, Tolerance);
             scenario.XpGains.Should().ContainSingle();
             scenario.XpGains[0].Source.Should().Be(XpSource.Kill);
-            scenario.XpGains[0].Amount.Should().BeApproximately(50f, Tolerance);
-            scenario.LevelUps.Should().BeEmpty();
+            scenario.XpGains[0].Amount.Should().BeApproximately(100f, Tolerance);
+            scenario.Attacker.Level.Should().Be(2, "one kill of an equal blob is a level at the start (D-090)");
+            scenario.LevelUps.Should().ContainSingle();
+        }
+
+        // The higher the victim, the more it is worth: a level 5 blob gives double (D-090).
+        [Test]
+        public void Kill_VictimOfLevelFive_GrantsDoubleXp()
+        {
+            var scenario = new CombatScenario();
+            while (scenario.Target.Level < 5)
+            {
+                scenario.Target.GainXp(TestContent.Tuning.LevelXpForNext(scenario.Target.Level), TestContent.Tuning);
+            }
+
+            scenario.DamageSystem.ApplyDamage(scenario.Target, scenario.Target.Body.Core, 100000f, DamageType.Pierce, scenario.Attacker.Id);
+            scenario.Events.Flush();
+
+            scenario.XpGains.Should().ContainSingle().Which.Amount.Should().BeApproximately(200f, Tolerance);
         }
 
         [Test]
@@ -36,7 +52,7 @@ namespace DemonFighter.Simulation.Tests.Progression
 
             scenario.DamageSystem.ApplyDamage(scenario.Target, scenario.Target.Body.Core, 1000f, DamageType.Pierce, scenario.Attacker.Id);
 
-            scenario.Attacker.Xp.Should().BeApproximately(5f, Tolerance);
+            scenario.Attacker.Xp.Should().BeApproximately(10f, Tolerance);
         }
 
         [Test]
@@ -48,11 +64,12 @@ namespace DemonFighter.Simulation.Tests.Progression
             scenario.DamageSystem.ApplyDamage(elder, elder.Body.Core, 100000f, DamageType.Pierce, scenario.Attacker.Id);
             scenario.Events.Flush();
 
-            scenario.Attacker.Level.Should().Be(4);
-            scenario.Attacker.Stats.UnspentPoints.Should().Be(9);
+            // 100 x (tier 6 + 1) x the bonus of four for six tiers above = 2800 XP: level 5, just short of 6.
+            scenario.Attacker.Level.Should().Be(5);
+            scenario.Attacker.Stats.UnspentPoints.Should().Be(12);
             scenario.LevelUps.Should().ContainSingle();
-            scenario.LevelUps[0].NewLevel.Should().Be(4);
-            scenario.LevelUps[0].UnspentStatPoints.Should().Be(9);
+            scenario.LevelUps[0].NewLevel.Should().Be(5);
+            scenario.LevelUps[0].UnspentStatPoints.Should().Be(12);
         }
 
         [Test]
@@ -67,8 +84,9 @@ namespace DemonFighter.Simulation.Tests.Progression
             scenario.Attacker.Xp.Should().Be(0f);
         }
 
+        // Skill XP raises the skill and nothing else; character XP comes from kills only (D-090).
         [Test]
-        public void Tick_LandedBite_FeedsHalfTheSkillXpIntoCharacterXp()
+        public void Tick_LandedBite_GrantsSkillXpButNoCharacterXp()
         {
             var scenario = new CombatScenario();
             scenario.StartBiteAndReachActiveWindow();
@@ -76,8 +94,9 @@ namespace DemonFighter.Simulation.Tests.Progression
             scenario.Submit(new ReportHitCommand(scenario.Attacker.Id, scenario.Target.Id, scenario.Target.Body.Core.Index));
             scenario.Tick(1);
 
-            scenario.Attacker.Xp.Should().BeApproximately(5f, Tolerance);
-            scenario.XpGains.Should().ContainSingle().Which.Source.Should().Be(XpSource.SkillUse);
+            scenario.SkillXp.Should().ContainSingle();
+            scenario.Attacker.Xp.Should().Be(0f);
+            scenario.XpGains.Should().BeEmpty();
         }
     }
 }

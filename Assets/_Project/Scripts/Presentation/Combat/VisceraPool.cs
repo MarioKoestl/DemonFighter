@@ -148,11 +148,7 @@ namespace DemonFighter.Presentation.Combat
 
         private static float GroundBelow(Vector3 position)
         {
-            int mask = ~(Layers.DemonMask | Layers.FoodMask);
-            Vector3 origin = position + Vector3.up * GroundProbeHeight;
-            return Physics.Raycast(origin, Vector3.down, out RaycastHit hit, GroundProbeHeight + GroundProbeDepth, mask, QueryTriggerInteraction.Ignore)
-                ? hit.point.y
-                : position.y;
+            return GroundProbe.TryFind(position, GroundProbeHeight, GroundProbeDepth, out Vector3 ground) ? ground.y : position.y;
         }
 
         private sealed class Piece

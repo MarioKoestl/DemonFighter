@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using UnityEngine;
 
 namespace DemonFighter.Presentation.Demons
@@ -22,6 +23,32 @@ namespace DemonFighter.Presentation.Demons
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// The lowest height of the mesh after the transform: exact from its vertices when the mesh is readable (the
+        /// body part models are), from the corners of its bounds otherwise, which can reach a little lower.
+        /// </summary>
+        public static float LowestY(Mesh mesh, Matrix4x4 matrix)
+        {
+            if (mesh == null)
+            {
+                throw new ArgumentNullException(nameof(mesh));
+            }
+
+            Vector3[] vertices = mesh.isReadable ? mesh.vertices : Array.Empty<Vector3>();
+            if (vertices.Length == 0)
+            {
+                return Transform(mesh.bounds, matrix).min.y;
+            }
+
+            float lowest = float.MaxValue;
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                lowest = Mathf.Min(lowest, matrix.MultiplyPoint3x4(vertices[i]).y);
+            }
+
+            return lowest;
         }
     }
 }

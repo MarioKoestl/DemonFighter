@@ -44,7 +44,7 @@ namespace DemonFighter.Editor.Generate
         /// Raise this whenever the generator writes something new or migrates an asset; the editor then reruns the
         /// generator by itself once (GeneratedAssetsGuard), so nobody has to remember the menu after pulling.
         /// </summary>
-        internal const int Version = 8;
+        internal const int Version = 10;
 
         // Generator versions that changed generated assets in place; assets written by an older version get the change
         // once: the post exposure and texture tint, then the painted surfaces, brighter and seamless (both D-087).
@@ -262,6 +262,13 @@ namespace DemonFighter.Editor.Generate
                     EditorUtility.SetDirty(part);
                 }
 
+                if (part.NeedsSizeDefaults)
+                {
+                    // Tiers come from evolutions now; bulky parts still make the body bigger (D-091).
+                    part.ApplySizeDefaults(spec.SizeBonus);
+                    EditorUtility.SetDirty(part);
+                }
+
                 parts[spec.Id] = part;
             }
 
@@ -280,7 +287,14 @@ namespace DemonFighter.Editor.Generate
                 evolutions[spec.Id] = evolution;
             }
 
-            EditorAssets.LoadOrCreate<CombatTuningDefinition>(CombatTuningPath, tuning => tuning.Configure(new CombatTuning()));
+            var combatTuning = EditorAssets.LoadOrCreate<CombatTuningDefinition>(CombatTuningPath, tuning => tuning.Configure(new CombatTuning()));
+            if (combatTuning.NeedsProgressionDefaults)
+            {
+                // Kill XP (D-090) and tiers through evolution (D-091) changed the progression; an older asset gets it once.
+                combatTuning.ApplyProgressionDefaults();
+                EditorUtility.SetDirty(combatTuning);
+            }
+
             BodyPartDefinition core = parts[PlaceholderContent.CoreId];
             BiomeSpec ashCavern = BiomeSpec.AshCavern;
             DemonDefinition blob = Demon(ashCavern.BlobDemon, core, parts, evolutions);

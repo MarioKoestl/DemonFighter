@@ -7,6 +7,7 @@ using DemonFighter.Simulation.Commands;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Evolution;
 using DemonFighter.Simulation.Food;
+using DemonFighter.Simulation.Hazards;
 using DemonFighter.Simulation.Mutation;
 using DemonFighter.Simulation.Skills;
 
@@ -519,7 +520,10 @@ namespace DemonFighter.Simulation.Ai
                     return;
                 }
 
-                commands.Submit(new MoveCommand(Demon.Id, AvoidHazards(state, facing), sprint: false));
+                // A hunter follows its prey into lava or onto a fissure and burns there (D-086, Mario): lava is a trap
+                // to lure it into. Prey outside a hazard is reached around it as before.
+                bool preyInHazard = state.Hazards.KindAt(prey.Position) != HazardKind.None;
+                commands.Submit(new MoveCommand(Demon.Id, preyInHazard ? facing : AvoidHazards(state, facing), sprint: false));
                 return;
             }
 

@@ -148,8 +148,10 @@ namespace DemonFighter.Presentation.Demons
                 figure.CreatePart(_visuals, part, null, _ownerMaterial, copyIndex, out _);
             }
 
+            // Measured before the part views are stripped: the core stands on its legs here too (D-094).
+            figure.SnapStance();
             StripForPreview(figureObject);
-            FrameCamera(sizeMeters);
+            FrameCamera(sizeMeters + figure.Stance);
             ApplyYaw();
         }
 

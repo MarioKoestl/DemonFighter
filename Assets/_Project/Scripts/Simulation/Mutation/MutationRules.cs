@@ -64,7 +64,7 @@ namespace DemonFighter.Simulation.Mutation
             return part.Spec.BiomassCost * tuning.RegrowCostFraction;
         }
 
-        /// <summary>Character level the next upgrade of the part needs.</summary>
+        /// <summary>Progress level (over every tier, D-091) the next upgrade of the part needs.</summary>
         public static int UpgradeLevelRequirement(BodyPart part, CombatTuning tuning)
         {
             return (part.UpgradeLevel + 1) * tuning.CharacterLevelPerUpgradeLevel;
@@ -93,7 +93,7 @@ namespace DemonFighter.Simulation.Mutation
             }
 
             int minLevel = CountCopies(demon, spec) > 0 ? Math.Max(spec.MinLevel, spec.RepeatMinLevel) : spec.MinLevel;
-            if (demon.Level < minLevel)
+            if (demon.ProgressLevel < minLevel)
             {
                 reason = LevelTooLow;
                 return false;
@@ -149,7 +149,7 @@ namespace DemonFighter.Simulation.Mutation
                 return false;
             }
 
-            if (demon.Level < UpgradeLevelRequirement(part, tuning))
+            if (demon.ProgressLevel < UpgradeLevelRequirement(part, tuning))
             {
                 reason = LevelTooLow;
                 return false;

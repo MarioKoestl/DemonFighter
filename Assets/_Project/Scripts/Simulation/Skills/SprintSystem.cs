@@ -1,8 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
-using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Events;
-using DemonFighter.Simulation.Progression;
 
 namespace DemonFighter.Simulation.Skills
 {
@@ -15,7 +13,6 @@ namespace DemonFighter.Simulation.Skills
     {
         public static void Advance(RunState state, SimulationEvents events, float seconds)
         {
-            CombatTuning tuning = state.Catalog.Tuning;
             IReadOnlyList<Demon> demons = state.Demons;
             for (int i = 0; i < demons.Count; i++)
             {
@@ -43,8 +40,6 @@ namespace DemonFighter.Simulation.Skills
                 {
                     events.Publish(new SkillLevelUp(demon.Id, sprint.Spec.Id, sprint.Level));
                 }
-
-                XpSystem.Grant(demon, whole * tuning.CharacterXpPerSkillXp, XpSource.SkillUse, tuning, events);
             }
         }
     }

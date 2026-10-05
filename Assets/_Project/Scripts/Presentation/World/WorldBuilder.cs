@@ -139,11 +139,18 @@ namespace DemonFighter.Presentation.World
         }
 
         // Pools are flat cylinders whose top sits just above the ground; nothing collides with them.
-        private GameObject Disc(string name, Vector3 groundPosition, float yaw, Vector3 size, Material material, Transform parent)
+        // The surface of a pool: the round disc mesh scaled to the pool, 5 cm above its flat bed (D-086).
+        private static GameObject Disc(string name, Vector3 groundPosition, float yaw, Vector3 size, Material material, Transform parent)
         {
-            var scale = new Vector3(size.x, size.y / CylinderMeshHeight, size.z);
-            Vector3 center = groundPosition + Vector3.up * (FlatFeatureLift - size.y * 0.5f);
-            return Primitive(PrimitiveType.Cylinder, name, center, yaw, scale, material, parent, false);
+            var disc = new GameObject(name);
+            disc.transform.SetParent(parent, false);
+            disc.transform.SetPositionAndRotation(groundPosition + (Vector3.up * FlatFeatureLift), SimulationVectors.YawToRotation(yaw));
+            disc.transform.localScale = new Vector3(size.x, 1f, size.z);
+            disc.AddComponent<MeshFilter>().sharedMesh = DiscMesh.Shared;
+            MeshRenderer renderer = disc.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            return disc;
         }
 
         // The glowing ceiling lights from above with soft shadows; the ambient comes from three sides so the undersides

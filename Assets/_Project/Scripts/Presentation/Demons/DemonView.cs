@@ -23,6 +23,7 @@ namespace DemonFighter.Presentation.Demons
     public sealed class DemonView : MonoBehaviour
     {
         private const float EyeHeightFraction = 0.9f;
+        private const float ControllerRefitMeters = 0.005f;
 
         [SerializeField] private Transform _body = null!;
         [SerializeField] private Transform? _figureRoot;
@@ -51,8 +52,14 @@ namespace DemonFighter.Presentation.Demons
         /// <summary>When set, the body faces this heading instead of its movement direction (first person).</summary>
         public IHeadingProvider? HeadingOverride { get; set; }
 
-        /// <summary>World position of the eyes: near the top of the body.</summary>
-        public Vector3 EyePosition => transform.position + Vector3.up * (_controller.height * EyeHeightFraction);
+        /// <summary>World position of the eyes: near the top of the core, which stands on its legs (D-094).</summary>
+        public Vector3 EyePosition => transform.position + (Vector3.up * (_figure.Stance + (_appliedSize * EyeHeightFraction)));
+
+        /// <summary>World position of the middle of the core, where attacks start and a death bursts.</summary>
+        public Vector3 BodyCenter => transform.position + (Vector3.up * (_figure.Stance + (_appliedSize * 0.5f)));
+
+        /// <summary>How high the core stands on its legs right now, in meters; zero while it crawls (D-094).</summary>
+        public float Stance => _figure.Stance;
 
         /// <summary>True once the demon died and this body lies on the ground as food.</summary>
         public bool IsCorpse { get; private set; }
@@ -101,6 +108,8 @@ namespace DemonFighter.Presentation.Demons
             _figure.SetDecorationsVisible(_bodyVisible);
             _lodDirty = true;
             SyncParts();
+            _figure.SnapStance();
+            FitController(force: true);
 
             // Moving a CharacterController by transform only takes effect while it is disabled.
             _controller.enabled = false;
@@ -199,6 +208,8 @@ namespace DemonFighter.Presentation.Demons
             if (!IsCorpse)
             {
                 FollowSizeAndTier();
+                _figure.UpdateStance(deltaTime);
+                FitController(force: false);
                 Animate(deltaTime);
             }
 
@@ -372,9 +383,7 @@ namespace DemonFighter.Presentation.Demons
 
             _appliedSize = sizeMeters;
             float radius = sizeMeters * _settings.RadiusPerMeter;
-            _controller.height = sizeMeters;
             _controller.radius = radius;
-            _controller.center = Vector3.up * (sizeMeters * 0.5f);
             _controller.stepOffset = Mathf.Min(sizeMeters * _settings.StepOffsetPerMeter, sizeMeters * 0.5f);
             _controller.skinWidth = sizeMeters * _settings.SkinWidthPerMeter;
             _controller.slopeLimit = _settings.SlopeLimitDegrees;
@@ -384,6 +393,22 @@ namespace DemonFighter.Presentation.Demons
             {
                 _parts[0].RememberBasePose();
             }
+
+            FitController(force: true);
+        }
+
+        // The capsule reaches from the feet to the top of the core, which stands on its legs (D-094); refit only on a
+        // real change, since the stance eases every frame for a moment after legs grow or are lost.
+        private void FitController(bool force)
+        {
+            float height = _appliedSize + _figure.Stance;
+            if (!force && Mathf.Abs(height - _controller.height) < ControllerRefitMeters)
+            {
+                return;
+            }
+
+            _controller.height = height;
+            _controller.center = Vector3.up * (height * 0.5f);
         }
     }
 }

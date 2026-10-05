@@ -20,7 +20,6 @@ namespace DemonFighter.Simulation.Worldgen
         private const float PoolDepth = 0.4f;
         private const float BonePileHeight = 1f;
         private const float SpawnAreaFraction = 0.4f;
-        private const float BasinDepth = 0.3f;
         private const float BasinShoreCells = 1.5f;
         private const float BasinBankSlope = 0.45f;
         private const float BasinBankReach = 12f;
@@ -50,10 +49,12 @@ namespace DemonFighter.Simulation.Worldgen
         }
 
         /// <summary>
-        /// Sinks the floor under every pool (D-086): the surface of a pool lies at the lowest point of the ground it covers,
-        /// the floor under it and a shore of one and a half cells around it drop below that surface, and beyond the shore
-        /// a bank rises at a gentle, walkable slope until it meets the terrain. A flat pool on a slope was half buried before, and the buried half still burned.
-        /// Pools move to their surface height; every other feature is set onto the carved ground.
+        /// Beds every pool in the ground (D-086): its surface lies at the lowest point of the ground it covers, the ground
+        /// under it and a shore of one and a half cells around it lie flat at that height, cut into the high side and
+        /// built up on the low side, and beyond the shore the ground eases back to the terrain at a walkable slope. A
+        /// flat pool on a slope was half buried at first, and the buried half still burned; a basin dug below the surface
+        /// then left a moat around every pool. Pools move to their surface height; every other feature is set onto the
+        /// shaped ground.
         /// </summary>
         internal static Heightfield CarveBasins(Heightfield field, List<FeaturePlacement> features)
         {
@@ -75,7 +76,6 @@ namespace DemonFighter.Simulation.Worldgen
 
                 float radius = pool.Size.X * 0.5f;
                 float level = LowestWithin(current, pool.Position, radius);
-                float floor = level - BasinDepth;
                 float reach = radius + shore + BasinBankReach;
                 int minX = Math.Max(0, (int)MathF.Floor((pool.Position.X - reach - field.OriginX) / field.CellSize));
                 int maxX = Math.Min(field.VertexCountX - 1, (int)MathF.Ceiling((pool.Position.X + reach - field.OriginX) / field.CellSize));
@@ -94,13 +94,24 @@ namespace DemonFighter.Simulation.Worldgen
                         }
 
                         int index = iz * field.VertexCountX + ix;
-                        // A cone around the basin: never higher than the terrain, never steeper than the bank slope.
-                        float bank = MathF.Max(0f, distance - radius - shore);
-                        heights[index] = MathF.Min(heights[index], floor + bank * BasinBankSlope);
+                        // Flat at the surface under the pool and on its shore; beyond, the ground may leave the surface
+                        // height only as fast as the bank slope allows, up into a hill or down into a hollow.
+                        float ease = MathF.Max(0f, distance - radius - shore) * BasinBankSlope;
+                        heights[index] = Math.Clamp(heights[index], level - ease, level + ease);
                     }
                 }
 
                 features[f] = new FeaturePlacement(pool.Kind, new Vector3(pool.Position.X, level, pool.Position.Z), pool.Yaw, pool.Size);
+            }
+
+            // The shore of a later pool may have built ground up inside an earlier one; every bed is cut back down.
+            for (int f = 0; f < features.Count; f++)
+            {
+                FeaturePlacement pool = features[f];
+                if (pool.Kind == FeatureKind.LavaPool || pool.Kind == FeatureKind.WaterPool)
+                {
+                    LowerWithin(current, heights, pool.Position, pool.Size.X * 0.5f, pool.Position.Y);
+                }
             }
 
             for (int f = 0; f < features.Count; f++)
@@ -114,6 +125,27 @@ namespace DemonFighter.Simulation.Worldgen
             }
 
             return current;
+        }
+
+        private static void LowerWithin(Heightfield field, float[] heights, Vector3 center, float radius, float height)
+        {
+            int minX = Math.Max(0, (int)MathF.Floor((center.X - radius - field.OriginX) / field.CellSize));
+            int maxX = Math.Min(field.VertexCountX - 1, (int)MathF.Ceiling((center.X + radius - field.OriginX) / field.CellSize));
+            int minZ = Math.Max(0, (int)MathF.Floor((center.Z - radius - field.OriginZ) / field.CellSize));
+            int maxZ = Math.Min(field.VertexCountZ - 1, (int)MathF.Ceiling((center.Z + radius - field.OriginZ) / field.CellSize));
+            for (int iz = minZ; iz <= maxZ; iz++)
+            {
+                for (int ix = minX; ix <= maxX; ix++)
+                {
+                    float dx = field.OriginX + ix * field.CellSize - center.X;
+                    float dz = field.OriginZ + iz * field.CellSize - center.Z;
+                    if (dx * dx + dz * dz <= radius * radius)
+                    {
+                        int index = iz * field.VertexCountX + ix;
+                        heights[index] = MathF.Min(heights[index], height);
+                    }
+                }
+            }
         }
 
         // The lowest ground under a disc: every vertex inside it and points along its rim, where the slope may dip lowest.

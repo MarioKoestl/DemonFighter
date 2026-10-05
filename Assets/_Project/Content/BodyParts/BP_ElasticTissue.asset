@@ -32,6 +32,7 @@ MonoBehaviour:
   _biomassCost: 35
   _minLevel: 1
   _repeatMinLevel: 1
+  _sizeBonus: 0.05
   _requiredParts: []
   _requiresUnlock: 1
   _visual:
@@ -58,4 +59,4 @@ MonoBehaviour:
       _importVersion: 0
     _anchors: []
   _severSound: {fileID: 11400000, guid: e8756f31f9b786d4fabff46f4182e6e8, type: 2}
-  _contentVersion: 6
+  _contentVersion: 7

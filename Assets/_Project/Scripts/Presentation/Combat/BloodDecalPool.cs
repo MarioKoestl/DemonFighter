@@ -127,11 +127,7 @@ namespace DemonFighter.Presentation.Combat
 
         private Vector3 FindGround(Vector3 position)
         {
-            int mask = ~(Layers.DemonMask | Layers.FoodMask);
-            Vector3 origin = position + Vector3.up * GroundProbeHeight;
-            return Physics.Raycast(origin, Vector3.down, out RaycastHit hit, GroundProbeHeight + GroundProbeDepth, mask, QueryTriggerInteraction.Ignore)
-                ? hit.point
-                : position;
+            return GroundProbe.TryFind(position, GroundProbeHeight, GroundProbeDepth, out Vector3 ground) ? ground : position;
         }
 
         private Decal Take(Decal?[] pool, ref int next)

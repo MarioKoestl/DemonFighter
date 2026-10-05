@@ -175,6 +175,7 @@ namespace DemonFighter.Editor.Generate
         {
             Id = LegsId,
             Name = "Legs",
+            SizeBonus = 0.1f,
             Socket = SocketKind.Locomotion,
             MaxHp = 30f,
             Fate = PartFate.Severed,
@@ -189,6 +190,7 @@ namespace DemonFighter.Editor.Generate
         {
             Id = ThickHideId,
             Name = "Thick Hide",
+            SizeBonus = 0.05f,
             Socket = SocketKind.Hide,
             MaxHp = 40f,
             Defense = DefenseType.ThickHide,
@@ -202,6 +204,7 @@ namespace DemonFighter.Editor.Generate
         {
             Id = PlatesId,
             Name = "Plates",
+            SizeBonus = 0.1f,
             Socket = SocketKind.Hide,
             MaxHp = 50f,
             Defense = DefenseType.Plates,
@@ -215,6 +218,7 @@ namespace DemonFighter.Editor.Generate
         {
             Id = ElasticTissueId,
             Name = "Elastic Tissue",
+            SizeBonus = 0.05f,
             Socket = SocketKind.Hide,
             MaxHp = 35f,
             Defense = DefenseType.ElasticTissue,

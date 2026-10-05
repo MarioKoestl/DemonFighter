@@ -15,7 +15,8 @@ namespace DemonFighter.Data
     public sealed class BodyPartDefinition : ScriptableObject
     {
         private const int M3ContentVersion = 3;
-        private const int CurrentContentVersion = 6;
+        private const int M5ContentVersion = 6;
+        private const int CurrentContentVersion = 7;
 
         [Header("Identity")]
         [SerializeField] private string _id = "part.new";
@@ -42,6 +43,7 @@ namespace DemonFighter.Data
         [SerializeField] private float _biomassCost = 30f;
         [SerializeField] private int _minLevel = 1;
         [SerializeField] private int _repeatMinLevel = 1;
+        [SerializeField] private float _sizeBonus;
         [SerializeField] private BodyPartDefinition[] _requiredParts = Array.Empty<BodyPartDefinition>();
         [SerializeField] private bool _requiresUnlock;
 
@@ -72,7 +74,10 @@ namespace DemonFighter.Data
         internal bool NeedsM3Defaults => _contentVersion < M3ContentVersion;
 
         /// <summary>True for an asset created before M5 that still lacks the socket anchors and mesh fit.</summary>
-        internal bool NeedsM5Defaults => _contentVersion < CurrentContentVersion;
+        internal bool NeedsM5Defaults => _contentVersion < M5ContentVersion;
+
+        /// <summary>True for an asset created before parts could make a body bigger (D-091).</summary>
+        internal bool NeedsSizeDefaults => _contentVersion < CurrentContentVersion;
 
         /// <summary>Builds the immutable spec; throws for invalid content or a missing reference.</summary>
         public BodyPartSpec ToSpec()
@@ -126,6 +131,7 @@ namespace DemonFighter.Data
                 BiomassCost = _biomassCost,
                 MinLevel = _minLevel,
                 RepeatMinLevel = _repeatMinLevel,
+                SizeBonus = _sizeBonus,
                 RequiredPartIds = required,
                 RequiresUnlock = _requiresUnlock,
             };
@@ -198,6 +204,13 @@ namespace DemonFighter.Data
                 _visual.Meshes.SetFit(1f, meshOffset, Vector3.zero);
             }
 
+            _contentVersion = M5ContentVersion;
+        }
+
+        /// <summary>Gives an older asset its size bonus once (D-091); bulky parts make the body bigger.</summary>
+        internal void ApplySizeDefaults(float sizeBonus)
+        {
+            _sizeBonus = sizeBonus;
             _contentVersion = CurrentContentVersion;
         }
 

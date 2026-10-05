@@ -32,6 +32,7 @@ MonoBehaviour:
   _biomassCost: 40
   _minLevel: 2
   _repeatMinLevel: 1
+  _sizeBonus: 0.1
   _requiredParts: []
   _requiresUnlock: 0
   _visual:
@@ -43,19 +44,19 @@ MonoBehaviour:
     _mirrorSecondCopy: 0
     _motion: 1
     _meshes:
-      _intact: {fileID: 0}
+      _intact: {fileID: -9037851627997230718, guid: 5702471e52e962e40abe269c7bb0f7b0, type: 3}
       _wounded: {fileID: 0}
       _mangled: {fileID: 0}
       _stump: {fileID: 0}
-      _material: {fileID: 0}
+      _material: {fileID: 2100000, guid: 97d75b0dde474814eaf9693c7b48d476, type: 2}
       _clip: {fileID: 0}
-      _scale: 1
-      _offset: {x: 0, y: 0, z: 0}
-      _euler: {x: 0, y: 0, z: 0}
-      _importScale: 1
-      _importRotation: {x: 0, y: 0, z: 0, w: 1}
-      _importPivot: {x: 0, y: 0, z: 0}
-      _importVersion: 0
+      _scale: 0.6
+      _offset: {x: 0, y: 0, z: 0.6}
+      _euler: {x: -90, y: 0, z: 0}
+      _importScale: 52.7916
+      _importRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071067}
+      _importPivot: {x: 0.000018550156, y: -0.000004139005, z: -0.009508149}
+      _importVersion: 2
     _anchors: []
   _severSound: {fileID: 11400000, guid: 6695ebbe30c15fe4f802d21f0f21c2b0, type: 2}
-  _contentVersion: 6
+  _contentVersion: 7
