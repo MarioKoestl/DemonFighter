@@ -1,0 +1,282 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+using DemonFighter.Data;
+using DemonFighter.Simulation.Anatomy;
+using UnityEngine;
+
+namespace DemonFighter.Presentation.Demons
+{
+    /// <summary>
+    /// The transforms a demon body is composed of and the rules that place things on them, shared by the world view
+    /// and the menu preview. Under the figure root sit the Body (the core: the prefab capsule, or the core mesh once
+    /// a model is bound), the Placeholders (scaled like the capsule, where primitives of unbound parts hang as they
+    /// did before M5) and the Rig (scaled by the body size, where parts with meshes hang on the socket anchors of
+    /// the core). The root carries the procedural motion of the whole body (D-082) and tilts for the corpse pose.
+    /// No game rules live here.
+    /// </summary>
+    public sealed class DemonFigure
+    {
+        public const float CapsuleMeshHeight = 2f;
+        public const float CapsuleMeshRadius = 0.5f;
+        public const string FigureName = "Figure";
+        public const string PlaceholdersName = "Placeholders";
+        public const string RigName = "Rig";
+
+        private const float MinimumHeight = 0.0001f;
+        private const int CapsuleAlongY = 1;
+        private static readonly Vector3 FallbackAnchor = new Vector3(0f, 0.5f, 0f);
+        private static readonly Quaternion LyingRotation = Quaternion.Euler(-90f, 0f, 0f);
+
+        private readonly Transform _root;
+        private readonly CapsuleCollider? _coreCapsule;
+        private readonly Renderer[] _decorations;
+        private PartMeshSet? _coreMeshes;
+        private Bounds _coreBounds;
+        private IReadOnlyList<SocketAnchorDefinition> _anchors = Array.Empty<SocketAnchorDefinition>();
+        private float _ownerTintBlend;
+
+        /// <summary>Wires the figure under the view root; transforms the prefab lacks are created, so an older prefab still works.</summary>
+        public DemonFigure(Transform root, Transform? figure, Transform body, Transform? placeholders, Transform? rig)
+        {
+            _root = root != null ? root : throw new ArgumentNullException(nameof(root));
+            Body = body != null ? body : throw new ArgumentNullException(nameof(body));
+            Root = figure != null ? figure : FindOrCreate(root, FigureName);
+            if (Body.parent != Root)
+            {
+                Body.SetParent(Root, false);
+            }
+
+            Placeholders = placeholders != null ? placeholders : FindOrCreate(Root, PlaceholdersName);
+            Rig = rig != null ? rig : FindOrCreate(Root, RigName);
+            _coreCapsule = Body.GetComponent<CapsuleCollider>();
+
+            // Renderers under the body that are no part of their own decorate the capsule (the snout).
+            Renderer[] renderers = Body.GetComponentsInChildren<Renderer>(true);
+            var decorations = new List<Renderer>(renderers.Length);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i].GetComponent<BodyPartView>() == null)
+                {
+                    decorations.Add(renderers[i]);
+                }
+            }
+
+            _decorations = decorations.ToArray();
+        }
+
+        /// <summary>Carries the body motion while the demon lives and tilts for the corpse pose.</summary>
+        public Transform Root { get; }
+
+        /// <summary>The core: the prefab capsule or the bound core mesh, with the core part view and its trigger capsule.</summary>
+        public Transform Body { get; }
+
+        /// <summary>Capsule-unit space for the primitives of parts without meshes.</summary>
+        public Transform Placeholders { get; }
+
+        /// <summary>Body-unit space (scaled by the body size) for parts with meshes, hung on the socket anchors.</summary>
+        public Transform Rig { get; }
+
+        /// <summary>True when the core wears a bound mesh instead of the capsule.</summary>
+        public bool HasCoreMesh => _coreMeshes.HasValue;
+
+        /// <summary>Reads the core meshes and the socket anchors from the content, once per bind.</summary>
+        public void Prepare(PartVisuals visuals, string coreSpecId, DemonViewSettings settings)
+        {
+            if (visuals == null)
+            {
+                throw new ArgumentNullException(nameof(visuals));
+            }
+
+            if (settings == null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            _ownerTintBlend = settings.OwnerTintBlend;
+            _anchors = visuals.AnchorsFor(coreSpecId);
+            _coreMeshes = visuals.MeshesFor(coreSpecId);
+            if (_coreMeshes.HasValue)
+            {
+                PartMeshSet set = _coreMeshes.Value;
+                _coreBounds = MeshBounds.Transform(set.Intact.bounds, Matrix4x4.TRS(Vector3.zero, set.Rotation, Vector3.one * set.Scale));
+            }
+        }
+
+        /// <summary>
+        /// Sizes everything to the body: the capsule to the controller shape, the core mesh so its height is the body
+        /// size with its base and center on the root, the placeholder space like the capsule, the rig by the size.
+        /// </summary>
+        public void ApplySize(float sizeMeters, float radiusPerMeter)
+        {
+            float radius = sizeMeters * radiusPerMeter;
+            var capsuleScale = new Vector3(radius / CapsuleMeshRadius, sizeMeters / CapsuleMeshHeight, radius / CapsuleMeshRadius);
+            Placeholders.localPosition = Vector3.up * (sizeMeters * 0.5f);
+            Placeholders.localScale = capsuleScale;
+            Rig.localPosition = Vector3.zero;
+            Rig.localScale = Vector3.one * sizeMeters;
+
+            if (_coreMeshes.HasValue)
+            {
+                PartMeshSet set = _coreMeshes.Value;
+                float fit = sizeMeters / Mathf.Max(_coreBounds.size.y, MinimumHeight);
+                Body.localScale = Vector3.one * (fit * set.Scale);
+                Body.localRotation = set.Rotation;
+                Body.localPosition = new Vector3(-_coreBounds.center.x, -_coreBounds.min.y, -_coreBounds.center.z) * fit + set.Offset * sizeMeters;
+                if (_coreCapsule != null)
+                {
+                    // In the body's own units, before its scale and rotation: the trigger hugs the mesh.
+                    Bounds local = set.Intact.bounds;
+                    _coreCapsule.direction = CapsuleAlongY;
+                    _coreCapsule.center = local.center;
+                    _coreCapsule.height = local.size.y;
+                    _coreCapsule.radius = Mathf.Min(local.size.y * 0.5f, Mathf.Max(local.extents.x, local.extents.z));
+                }
+
+                return;
+            }
+
+            // The capsule mesh is 2 units tall with radius 0.5; scale it to the controller's shape.
+            Body.localScale = capsuleScale;
+            Body.localRotation = Quaternion.identity;
+            Body.localPosition = Vector3.up * (sizeMeters * 0.5f);
+            if (_coreCapsule != null)
+            {
+                _coreCapsule.direction = CapsuleAlongY;
+                _coreCapsule.center = Vector3.zero;
+                _coreCapsule.height = CapsuleMeshHeight;
+                _coreCapsule.radius = CapsuleMeshRadius;
+            }
+        }
+
+        /// <summary>Poses the whole figure for this frame: the bob, the tilt and the squash and stretch of the body motion.</summary>
+        public void Animate(Vector3 localPosition, Quaternion rotation, Vector3 scale)
+        {
+            Root.localPosition = localPosition;
+            Root.localRotation = rotation;
+            Root.localScale = scale;
+        }
+
+        /// <summary>Gives the core view its look: the capsule in the owner material, or the core meshes in their own material tinted by the owner.</summary>
+        public void InitializeCore(BodyPartView core, DemonView? owner, int partIndex, Material ownerMaterial)
+        {
+            if (core == null)
+            {
+                throw new ArgumentNullException(nameof(core));
+            }
+
+            if (_coreMeshes.HasValue)
+            {
+                PartMeshSet set = _coreMeshes.Value;
+                core.SetMeshes(set);
+                Material material = set.Material != null ? set.Material : ownerMaterial;
+                core.Initialize(owner, partIndex, material, set.HasOwnMaterial ? OwnerTint(ownerMaterial) : (Color?)null);
+            }
+            else
+            {
+                core.Initialize(owner, partIndex, ownerMaterial, null);
+            }
+
+            core.SetMotion(PartMotion.None, 0, false);
+        }
+
+        /// <summary>
+        /// Creates and initializes the view of a part: on the rig at its socket anchor when the part has meshes, as
+        /// a primitive in the placeholder space otherwise; null when the part is drawn by the body itself.
+        /// </summary>
+        public BodyPartView? CreatePart(PartVisuals visuals, BodyPart part, DemonView? owner, Material ownerMaterial, int copyIndex, out bool ownerColored)
+        {
+            if (visuals == null)
+            {
+                throw new ArgumentNullException(nameof(visuals));
+            }
+
+            if (part == null)
+            {
+                throw new ArgumentNullException(nameof(part));
+            }
+
+            PartMeshSet? meshes = visuals.MeshesFor(part.Spec.Id);
+            PartMotion motion = visuals.MotionFor(part.Spec.Id);
+            if (meshes.HasValue)
+            {
+                if (!SocketAnchors.TryFind(_anchors, part.Spec.Socket, copyIndex, out Vector3 position, out Quaternion rotation))
+                {
+                    position = FallbackAnchor;
+                    rotation = Quaternion.identity;
+                }
+
+                BodyPartView view = visuals.CreateMeshPart(part, meshes.Value, Rig, position, rotation, ownerMaterial, out Material material, out ownerColored);
+                view.Initialize(owner, part.Index, material, ownerColored && meshes.Value.HasOwnMaterial ? OwnerTint(ownerMaterial) : (Color?)null);
+                view.SetMotion(motion, copyIndex, meshes.Value.Clip != null);
+                return view;
+            }
+
+            BodyPartView? primitive = visuals.Create(part, Placeholders, ownerMaterial, copyIndex, out Material primitiveMaterial, out ownerColored);
+            if (primitive != null)
+            {
+                primitive.Initialize(owner, part.Index, primitiveMaterial, null);
+                primitive.SetMotion(motion, copyIndex, false);
+            }
+
+            return primitive;
+        }
+
+        /// <summary>The owner color softened for a textured mesh, so the tier and the player still read without flattening the texture.</summary>
+        public Color OwnerTint(Material ownerMaterial)
+        {
+            if (ownerMaterial == null)
+            {
+                throw new ArgumentNullException(nameof(ownerMaterial));
+            }
+
+            return Color.Lerp(Color.white, ownerMaterial.color, _ownerTintBlend);
+        }
+
+        /// <summary>Shows or hides the capsule decorations; a bound core mesh hides them for good.</summary>
+        public void SetDecorationsVisible(bool visible)
+        {
+            bool shown = visible && !HasCoreMesh;
+            for (int i = 0; i < _decorations.Length; i++)
+            {
+                _decorations[i].enabled = shown;
+            }
+        }
+
+        /// <summary>Lays the figure flat for the corpse pose, then lifts it so its lowest visible point rests on the ground.</summary>
+        public void LieFlat()
+        {
+            Root.localRotation = LyingRotation;
+            Root.localPosition = Vector3.zero;
+            Root.localScale = Vector3.one;
+            Renderer[] renderers = Root.GetComponentsInChildren<Renderer>(false);
+            float lowest = float.MaxValue;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i].enabled)
+                {
+                    lowest = Mathf.Min(lowest, renderers[i].bounds.min.y);
+                }
+            }
+
+            if (lowest < float.MaxValue)
+            {
+                Root.position += Vector3.up * (_root.position.y - lowest);
+            }
+        }
+
+        private static Transform FindOrCreate(Transform parent, string name)
+        {
+            Transform? existing = parent.Find(name);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var created = new GameObject(name);
+            created.layer = parent.gameObject.layer;
+            created.transform.SetParent(parent, false);
+            return created.transform;
+        }
+    }
+}

@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e84f5393ea6807a4daa2081f20552b5b, type: 3}
+  m_Name: AudioCatalog
+  m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.AudioCatalogDefinition
+  _footstep: {fileID: 11400000, guid: 3d6e6fb678c787743bab190acd3650fe, type: 2}
+  _eat: {fileID: 11400000, guid: fba6c024172289044b1fd6cceefbb7b8, type: 2}
+  _footstepStridePerMeter: 0.8
+  _wetImpact: {fileID: 11400000, guid: 3e19ef14750e01140801e6f4976de08e, type: 2}
+  _partSevered: {fileID: 11400000, guid: 6695ebbe30c15fe4f802d21f0f21c2b0, type: 2}
+  _partDestroyed: {fileID: 11400000, guid: e8756f31f9b786d4fabff46f4182e6e8, type: 2}
+  _demonDeath: {fileID: 11400000, guid: 0b1c5450ee70e32479b7ebe210359434, type: 2}
+  _playerDeath: {fileID: 11400000, guid: a22c46f59f933e345ab71a6949568ba5, type: 2}
+  _mutationStart: {fileID: 11400000, guid: 92d3d9b3a3eff4149a2fc9bd0f2ff9d8, type: 2}
+  _mutationComplete: {fileID: 11400000, guid: e4cd968cce2ffac43b88e9286cac2068, type: 2}
+  _evolved: {fileID: 11400000, guid: de3a00f559788f54f8313d549486c24e, type: 2}
+  _levelUp: {fileID: 11400000, guid: eb8c635c3156e144284e743ac6bfd635, type: 2}
+  _threatRise: {fileID: 11400000, guid: 7ec6a693dbc525c48b845652b277eab7, type: 2}
+  _burn: {fileID: 11400000, guid: 76cfe3706ddff6448bb68ca3d5f482ff, type: 2}
+  _menuTrack: {fileID: 8300000, guid: 06a71d7221485944397ba1c6dac9999a, type: 3}
+  _musicFadeSeconds: 2

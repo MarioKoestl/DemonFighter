@@ -9,12 +9,13 @@ namespace DemonFighter.Data
     /// <summary>
     /// A body part kind as an asset, converted to an immutable <see cref="BodyPartSpec"/> at load. Granted skills,
     /// skill bonuses and required parts are asset references, so a broken link shows in the Inspector instead of at
-    /// run start. The visual block says how the placeholder stage draws the part on the body.
+    /// run start. The visual block says how the part is drawn: a primitive until a model is bound, then its meshes.
     /// </summary>
     [CreateAssetMenu(menuName = "Demon Fighter/Content/Body Part", fileName = "BP_NewPart")]
     public sealed class BodyPartDefinition : ScriptableObject
     {
-        private const int CurrentContentVersion = 3;
+        private const int M3ContentVersion = 3;
+        private const int CurrentContentVersion = 6;
 
         [Header("Identity")]
         [SerializeField] private string _id = "part.new";
@@ -44,19 +45,34 @@ namespace DemonFighter.Data
         [SerializeField] private BodyPartDefinition[] _requiredParts = Array.Empty<BodyPartDefinition>();
         [SerializeField] private bool _requiresUnlock;
 
-        [Header("Placeholder visual")]
+        [Header("Visual")]
         [SerializeField] private PartVisualDefinition _visual = new PartVisualDefinition();
+
+        [Header("Audio")]
+        [SerializeField] private AudioEventDefinition? _severSound;
 
         [SerializeField, HideInInspector] private int _contentVersion;
 
         /// <summary>Stable content id.</summary>
         public string Id => _id;
 
-        /// <summary>How the placeholder stage draws this part.</summary>
+        /// <summary>What happens to the part at zero HP; the view wants a stump mesh only for severed parts.</summary>
+        public PartFate Fate => _fate;
+
+        /// <summary>True for the root part; it carries the socket anchors and never a stump.</summary>
+        public bool IsCore => _socket == SocketKind.Core;
+
+        /// <summary>How the part is drawn.</summary>
         public PartVisualDefinition Visual => _visual;
 
+        /// <summary>The sound of losing this part (D-084); null falls back to the audio catalog.</summary>
+        public AudioEventDefinition? SeverSound => _severSound;
+
         /// <summary>True for an asset created before M3 that still lacks the M3 fields.</summary>
-        internal bool NeedsM3Defaults => _contentVersion < CurrentContentVersion;
+        internal bool NeedsM3Defaults => _contentVersion < M3ContentVersion;
+
+        /// <summary>True for an asset created before M5 that still lacks the socket anchors and mesh fit.</summary>
+        internal bool NeedsM5Defaults => _contentVersion < CurrentContentVersion;
 
         /// <summary>Builds the immutable spec; throws for invalid content or a missing reference.</summary>
         public BodyPartSpec ToSpec()
@@ -164,6 +180,24 @@ namespace DemonFighter.Data
             _repeatMinLevel = spec.RepeatMinLevel;
             _requiredParts = requiredParts;
             _requiresUnlock = spec.RequiresUnlock;
+            _contentVersion = M3ContentVersion;
+        }
+
+        /// <summary>
+        /// Gives an older asset the M5 fields once: the socket anchors of the placeholder capsule (only the core has
+        /// any), the default fit of a mesh set that is not bound yet, and the procedural motion of the part. Bound
+        /// meshes and tuned fits are never touched.
+        /// </summary>
+        internal void ApplyM5Defaults(SocketAnchorDefinition[] anchors, Vector3 meshOffset, PartMotion motion, AudioEventDefinition? severSound)
+        {
+            _visual.SetAnchors(anchors);
+            _visual.SetMotion(motion);
+            _severSound = severSound;
+            if (!_visual.Meshes.HasMeshes)
+            {
+                _visual.Meshes.SetFit(1f, meshOffset, Vector3.zero);
+            }
+
             _contentVersion = CurrentContentVersion;
         }
 

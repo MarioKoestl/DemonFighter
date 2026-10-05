@@ -4,7 +4,7 @@ Milestones are ordered. Each has acceptance criteria that Mario can check in Pla
 
 ## Current milestone
 
-**M4: A living ecosystem.** M3 is merged. All Claude Code items of M4 are done on branch `feat/m4-ecosystem` (2026-10-04): a threat level that rises half a level per minute, with a meter in the HUD (D-069); a spawn table with stronger kinds born with parts, Biomass, levels and an evolution, a population cap and a respawn interval that follow the threat, and elders drawn toward the player (D-070); three blob personalities as assets, drawn by weight, with fleeing back on (D-071); AI demons that spend stat points, evolve and buy, regrow or upgrade parts in calm moments (D-072); a plain save snapshot with capture and restore (D-073) and one JSON slot behind Esc, Save and Quit, save on quit and Continue in the menu (D-074); the full death summary and the no-op meta-progression hook (D-075); first-run hints and a settings box with the random offers toggle (D-076); a headless autoplay harness with a simulation-side hit resolver, and a stress test at about 0.06 ms per tick with 50 demons and 200 food items (D-077); 407 EditMode and 4 PlayMode tests. First playtest: the world was too quiet, so the spawning was doubled (D-078). Open: the run tuning target needs more playtests (the harness gives first numbers), the Option B decision, and the two acceptance checks are Mario's. Next: M5 look and feel.
+**M5: Look and feel.** M4 is merged. The code side of M5 is done on branch `feat/m5-look-and-feel` (2026-10-05): the art pipeline with import rules, a binder that maps `BP_<Part>_<State>` models to part assets by name, socket anchors as data, a validator and five briefs in `docs/briefs/` (D-079); four visual damage stages and mesh sets with stumps (D-080); gore stage 2 with URP decal projectors, corpse pools, code-born viscera, parts that fall as they looked and the `DemonFighter/DemonSkin` shader that soaks bodies in blood (D-081); procedural motion for bodies and parts with a clip slot per part (D-082); the render look with a generated volume profile, three graphics presets as pipeline assets, a shadow budget, flickering lights, painted surface textures and two-level LODs (D-083); data-driven audio over a pooled player with synthesized placeholder clips, ambient and lava loops and crossfading music (D-084); the main menu with a seed field and Quit, the pause menu, the shared settings panel and `settings.json` (D-085); 565 EditMode and 5 PlayMode tests. Open and Mario's: generate the first meshes from the briefs and drop them in, source real clips and the three music tracks with license entries, tune the look in Play Mode. Next: M6 Steam prep.
 
 (Claude Code: update this section when a milestone completes. Do not rewrite other sections without asking.)
 
@@ -123,12 +123,12 @@ Acceptance:
 
 ## M5: Look and feel
 
-- [ ] First real assets through the pipeline in `ASSET_PIPELINE.md`: core blob, jaws, arm, legs, hide, with damage states
-- [ ] Gore stage 2: mesh damage states, stump meshes, viscera, blood accumulation
-- [ ] Animation: procedural movement for the blob, Mixamo or hand-made clips for limbed bodies
-- [ ] URP look: post-processing volume (color grading, bloom, vignette, SSAO), fog, lighting pass on the world
-- [ ] Audio: bites, wet impacts, footsteps, cavern ambient, lava, mutation and evolution; AI-generated music with a license entry
-- [ ] Main menu, settings menu, pause menu
+- [ ] First real assets through the pipeline in `ASSET_PIPELINE.md`: core blob, jaws, arm, legs, hide, with damage states (pipeline, binder, validator and briefs done, D-079; the meshes are Mario's, see `docs/briefs/`)
+- [x] Gore stage 2: mesh damage states, stump meshes, viscera, blood accumulation (D-080, D-081)
+- [x] Animation: procedural movement for the blob, Mixamo or hand-made clips for limbed bodies (procedural for everything, clip slot per part, D-082)
+- [x] URP look: post-processing volume (color grading, bloom, vignette, SSAO), fog, lighting pass on the world (D-083)
+- [x] Audio: bites, wet impacts, footsteps, cavern ambient, lava, mutation and evolution; AI-generated music with a license entry (synthesized placeholders in place, D-084; the real clips, the music and their license entries are Mario's)
+- [x] Main menu, settings menu, pause menu (D-085)
 
 ## M6: Steam prep
 

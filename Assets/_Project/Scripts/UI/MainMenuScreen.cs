@@ -6,42 +6,36 @@ using UnityEngine.UIElements;
 namespace DemonFighter.UI
 {
     /// <summary>
-    /// Main menu built in code with UI Toolkit: New Run, Continue while a saved run exists (D-074), and a small
-    /// Settings box with the random offers toggle and the hint reset (D-076). It only raises requests; the App layer
-    /// decides what happens, so this screen holds no flow logic. Styling here is a placeholder until the real menus of
-    /// M5 move it into USS.
+    /// Main menu built in code with UI Toolkit (GAME_DESIGN, "UI"; D-085): New Run with an optional seed, Continue
+    /// while a saved run exists (D-074), Settings (the shared panel) and Quit. It only raises requests; the App layer
+    /// decides what happens, so this screen holds no flow logic.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public sealed class MainMenuScreen : MonoBehaviour
     {
         private const string TitleText = "DEMON FIGHTER";
-        private const string NewRunText = "New Run";
-        private const string ContinueText = "Continue";
-        private const string SettingsText = "Settings";
-        private const string ShopOffersText = "Offers: the whole shop";
-        private const string RandomOffersText = "Offers: a random hand of three";
-        private const string ResetHintsText = "Show first-run hints again";
-
-        private static readonly Color MutedText = new Color(0.75f, 0.7f, 0.65f);
+        private const string SeedLabel = "Seed (optional)";
+        private const string SeedNote = "Leave the seed empty for a random cavern. Any word works as a seed and gives the same cavern every time.";
 
         private UIDocument _document = null!;
-        private Button? _newRunButton;
+        private VisualElement? _menuList;
+        private SettingsPanel? _settings;
+        private TextField? _seedField;
         private Button? _continueButton;
-        private Button? _settingsButton;
-        private Button? _randomOffersButton;
-        private Button? _resetHintsButton;
-        private VisualElement? _settingsBox;
         private bool _continueShown;
-        private bool _randomOffers;
+        private SettingsValues _settingsValues = new SettingsValues();
 
-        /// <summary>Raised when the player clicks New Run.</summary>
-        public event Action? NewRunRequested;
+        /// <summary>Raised when the player clicks New Run, with the seed they typed or null for a random one.</summary>
+        public event Action<int?>? NewRunRequested;
 
         /// <summary>Raised when the player clicks Continue.</summary>
         public event Action? ContinueRequested;
 
-        /// <summary>Raised when the player flips the offers setting; carries the new value.</summary>
-        public event Action<bool>? RandomOffersToggled;
+        /// <summary>Raised when the player clicks Quit.</summary>
+        public event Action? QuitRequested;
+
+        /// <summary>Raised with the complete settings after any control changed.</summary>
+        public event Action<SettingsValues>? SettingsChanged;
 
         /// <summary>Raised when the player asks to see the first-run hints again.</summary>
         public event Action? ResetHintsRequested;
@@ -56,14 +50,11 @@ namespace DemonFighter.UI
             }
         }
 
-        /// <summary>Shows the current offers setting on its toggle.</summary>
-        public void ShowSettings(bool randomOffers)
+        /// <summary>Shows these settings in the panel.</summary>
+        public void ConfigureSettings(SettingsValues values)
         {
-            _randomOffers = randomOffers;
-            if (_randomOffersButton != null)
-            {
-                _randomOffersButton.text = randomOffers ? RandomOffersText : ShopOffersText;
-            }
+            _settingsValues = values ?? throw new ArgumentNullException(nameof(values));
+            _settings?.Configure(_settingsValues);
         }
 
         private void Awake()
@@ -80,12 +71,17 @@ namespace DemonFighter.UI
 
         private void OnDisable()
         {
-            Unhook(ref _newRunButton, OnNewRunClicked);
-            Unhook(ref _continueButton, OnContinueClicked);
-            Unhook(ref _settingsButton, OnSettingsClicked);
-            Unhook(ref _randomOffersButton, OnRandomOffersClicked);
-            Unhook(ref _resetHintsButton, OnResetHintsClicked);
-            _settingsBox = null;
+            if (_settings != null)
+            {
+                _settings.Changed -= OnSettingsChanged;
+                _settings.ResetHintsRequested -= OnResetHints;
+                _settings.BackRequested -= OnBack;
+                _settings = null;
+            }
+
+            _menuList = null;
+            _seedField = null;
+            _continueButton = null;
         }
 
         private VisualElement BuildLayout()
@@ -94,103 +90,73 @@ namespace DemonFighter.UI
             container.style.flexGrow = 1f;
             container.style.alignItems = Align.Center;
             container.style.justifyContent = Justify.Center;
-            container.style.backgroundColor = new Color(0.05f, 0.02f, 0.02f);
+            container.style.backgroundColor = MenuStyles.Backdrop;
 
-            var title = new Label(TitleText) { name = "title" };
-            title.style.fontSize = 64;
-            title.style.color = new Color(0.8f, 0.1f, 0.1f);
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            title.style.marginBottom = 48;
+            container.Add(MenuStyles.Heading("title", TitleText, 64));
 
-            _continueButton = new Button { name = "continue", text = ContinueText };
-            StyleButton(_continueButton, 320);
+            _menuList = new VisualElement { name = "menu-list" };
+            _menuList.style.alignItems = Align.Center;
+
+            _continueButton = MenuStyles.Button("continue", "Continue", () => ContinueRequested?.Invoke(), MenuStyles.ButtonWidth, 72);
             _continueButton.style.display = _continueShown ? DisplayStyle.Flex : DisplayStyle.None;
-            _continueButton.clicked += OnContinueClicked;
+            _menuList.Add(_continueButton);
 
-            _newRunButton = new Button { name = "new-run", text = NewRunText };
-            StyleButton(_newRunButton, 320);
-            _newRunButton.clicked += OnNewRunClicked;
+            _menuList.Add(MenuStyles.Button("new-run", "New Run", OnNewRunClicked, MenuStyles.ButtonWidth, 72));
 
-            _settingsButton = new Button { name = "settings", text = SettingsText };
-            StyleButton(_settingsButton, 320);
-            _settingsButton.style.fontSize = 22;
-            _settingsButton.style.height = 52;
-            _settingsButton.clicked += OnSettingsClicked;
+            _seedField = new TextField(SeedLabel) { name = "seed" };
+            _seedField.style.width = MenuStyles.ButtonWidth;
+            _seedField.style.fontSize = 18;
+            _seedField.style.color = MenuStyles.Text;
+            _seedField.style.marginBottom = 4;
+            _menuList.Add(_seedField);
+            Label seedNote = MenuStyles.Note("seed-note", SeedNote, MenuStyles.ButtonWidth + 80);
+            seedNote.style.marginBottom = 16;
+            _menuList.Add(seedNote);
 
-            _settingsBox = new VisualElement { name = "settings-box" };
-            _settingsBox.style.display = DisplayStyle.None;
-            _settingsBox.style.alignItems = Align.Center;
-            _settingsBox.style.marginTop = 16;
-            var note = new Label("Playtest settings; the real settings menu comes later.") { name = "settings-note" };
-            note.style.fontSize = 14;
-            note.style.color = MutedText;
-            note.style.marginBottom = 8;
-            _settingsBox.Add(note);
-            _randomOffersButton = new Button { name = "random-offers", text = _randomOffers ? RandomOffersText : ShopOffersText };
-            StyleButton(_randomOffersButton, 420);
-            _randomOffersButton.style.fontSize = 20;
-            _randomOffersButton.style.height = 48;
-            _randomOffersButton.clicked += OnRandomOffersClicked;
-            _settingsBox.Add(_randomOffersButton);
-            _resetHintsButton = new Button { name = "reset-hints", text = ResetHintsText };
-            StyleButton(_resetHintsButton, 420);
-            _resetHintsButton.style.fontSize = 20;
-            _resetHintsButton.style.height = 48;
-            _resetHintsButton.clicked += OnResetHintsClicked;
-            _settingsBox.Add(_resetHintsButton);
+            _menuList.Add(MenuStyles.Button("settings", "Settings", OnSettingsClicked, MenuStyles.ButtonWidth, 52, 22));
+            _menuList.Add(MenuStyles.Button("quit", "Quit", () => QuitRequested?.Invoke(), MenuStyles.ButtonWidth, 52, 22));
+            container.Add(_menuList);
 
-            container.Add(title);
-            container.Add(_continueButton);
-            container.Add(_newRunButton);
-            container.Add(_settingsButton);
-            container.Add(_settingsBox);
+            _settings = new SettingsPanel();
+            _settings.Configure(_settingsValues);
+            _settings.SetVisible(false);
+            _settings.Changed += OnSettingsChanged;
+            _settings.ResetHintsRequested += OnResetHints;
+            _settings.BackRequested += OnBack;
+            container.Add(_settings.Root);
             return container;
-        }
-
-        private static void StyleButton(Button button, int width)
-        {
-            button.style.fontSize = 28;
-            button.style.width = width;
-            button.style.height = 72;
-            button.style.marginBottom = 12;
-        }
-
-        private static void Unhook(ref Button? button, Action handler)
-        {
-            if (button != null)
-            {
-                button.clicked -= handler;
-                button = null;
-            }
         }
 
         private void OnNewRunClicked()
         {
-            NewRunRequested?.Invoke();
-        }
-
-        private void OnContinueClicked()
-        {
-            ContinueRequested?.Invoke();
+            NewRunRequested?.Invoke(SeedParser.Parse(_seedField != null ? _seedField.value : null));
         }
 
         private void OnSettingsClicked()
         {
-            if (_settingsBox != null)
+            if (_menuList != null && _settings != null)
             {
-                bool open = _settingsBox.style.display == DisplayStyle.None;
-                _settingsBox.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
+                _menuList.style.display = DisplayStyle.None;
+                _settings.SetVisible(true);
             }
         }
 
-        private void OnRandomOffersClicked()
+        private void OnBack()
         {
-            _randomOffers = !_randomOffers;
-            ShowSettings(_randomOffers);
-            RandomOffersToggled?.Invoke(_randomOffers);
+            if (_menuList != null && _settings != null)
+            {
+                _settings.SetVisible(false);
+                _menuList.style.display = DisplayStyle.Flex;
+            }
         }
 
-        private void OnResetHintsClicked()
+        private void OnSettingsChanged(SettingsValues values)
+        {
+            _settingsValues = values;
+            SettingsChanged?.Invoke(values);
+        }
+
+        private void OnResetHints()
         {
             ResetHintsRequested?.Invoke();
         }

@@ -39,7 +39,8 @@ namespace DemonFighter.Simulation.Combat
                 throw new ArgumentOutOfRangeException(nameof(skillLevel), skillLevel, "Skill levels start at 1.");
             }
 
-            if (!target.IsAlive || part.IsLost || target.IsTransforming(_state.Tick))
+            // A demon in test mode shrugs the whole hit off: no damage, no bleeding, no stagger (D-089).
+            if (!target.IsAlive || part.IsLost || target.IsTransforming(_state.Tick) || target.InTestMode)
             {
                 return;
             }
@@ -95,7 +96,8 @@ namespace DemonFighter.Simulation.Combat
             }
 
             // A transforming body is invulnerable (D-014); the time is short and the menu cannot be opened in combat.
-            if (!target.IsAlive || part.IsLost || amount <= 0f || target.IsTransforming(_state.Tick))
+            // A demon in test mode is too (D-089), against hits, thorns, bleeding and hazards alike.
+            if (!target.IsAlive || part.IsLost || amount <= 0f || target.IsTransforming(_state.Tick) || target.InTestMode)
             {
                 return target.IsAlive;
             }

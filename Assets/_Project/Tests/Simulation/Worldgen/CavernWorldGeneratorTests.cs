@@ -77,7 +77,8 @@ namespace DemonFighter.Simulation.Tests.Worldgen
         public void Generate_AshCavern_HeightsStayWithinTheAmplitude()
         {
             WorldLayout layout = new CavernWorldGenerator().Generate(Seed, Biome);
-            float limit = Biome.HeightAmplitude * 1.5f + 0.001f;
+            // Pools sink their floor a little below the lowest ground they cover (D-086).
+            float limit = Biome.HeightAmplitude * 1.5f + 0.3f + 0.001f;
 
             foreach (float height in layout.Heightfield.Heights)
             {

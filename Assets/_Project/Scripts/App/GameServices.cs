@@ -1,6 +1,8 @@
 #nullable enable
 using System;
 using DemonFighter.Data;
+using DemonFighter.Presentation.Audio;
+using DemonFighter.Presentation.Rendering;
 using DemonFighter.Simulation;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Events;
@@ -30,7 +32,13 @@ namespace DemonFighter.App
             IMetaProgression meta,
             IMutationOfferPolicy randomOffers,
             GameSettings settings,
-            InputActionAsset actions)
+            InputActionAsset actions,
+            AudioCatalogDefinition audio,
+            BiomeDefinition biomeDefinition,
+            AudioMix mix,
+            MusicPlayer music,
+            GraphicsPresetCatalog graphicsPresets,
+            SettingsApplier applier)
         {
             SimulationConfig = simulationConfig ?? throw new ArgumentNullException(nameof(simulationConfig));
             Events = events ?? throw new ArgumentNullException(nameof(events));
@@ -44,6 +52,12 @@ namespace DemonFighter.App
             RandomOffers = randomOffers ?? throw new ArgumentNullException(nameof(randomOffers));
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             Actions = actions != null ? actions : throw new ArgumentNullException(nameof(actions));
+            Audio = audio != null ? audio : throw new ArgumentNullException(nameof(audio));
+            BiomeDefinition = biomeDefinition != null ? biomeDefinition : throw new ArgumentNullException(nameof(biomeDefinition));
+            Mix = mix ?? throw new ArgumentNullException(nameof(mix));
+            Music = music != null ? music : throw new ArgumentNullException(nameof(music));
+            GraphicsPresets = graphicsPresets != null ? graphicsPresets : throw new ArgumentNullException(nameof(graphicsPresets));
+            Applier = applier ?? throw new ArgumentNullException(nameof(applier));
         }
 
         /// <summary>Tick timing every run starts with.</summary>
@@ -81,5 +95,23 @@ namespace DemonFighter.App
 
         /// <summary>The input actions asset the player input adapter reads.</summary>
         public InputActionAsset Actions { get; }
+
+        /// <summary>The sounds that belong to no skill, part or biome, and the menu music (D-084).</summary>
+        public AudioCatalogDefinition Audio { get; }
+
+        /// <summary>The biome asset itself; the audio director reads its loops and tracks.</summary>
+        public BiomeDefinition BiomeDefinition { get; }
+
+        /// <summary>The four volume knobs.</summary>
+        public AudioMix Mix { get; }
+
+        /// <summary>The music player on the persistent bootstrap object; it outlives every run.</summary>
+        public MusicPlayer Music { get; }
+
+        /// <summary>The graphics presets the settings menu offers (D-083).</summary>
+        public GraphicsPresetCatalog GraphicsPresets { get; }
+
+        /// <summary>Pushes the settings file into graphics, screen and audio and serves the settings panels (D-085).</summary>
+        public SettingsApplier Applier { get; }
     }
 }

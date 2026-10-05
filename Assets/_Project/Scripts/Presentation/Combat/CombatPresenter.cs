@@ -5,6 +5,7 @@ using DemonFighter.Common;
 using DemonFighter.Presentation.Demons;
 using DemonFighter.Presentation.Food;
 using DemonFighter.Simulation;
+using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Commands;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Events;
@@ -19,9 +20,10 @@ namespace DemonFighter.Presentation.Combat
     /// <summary>
     /// The Unity side of combat for one run. Detects the hits of active skills (the part under the crosshair for the
     /// player, otherwise whatever stands in front within reach, which is all AI uses) and reports them for the
-    /// simulation to judge (ARCHITECTURE, "Movement, collision and hits"), and turns combat events into blood,
-    /// corpses and fallen parts (GAME_DESIGN, "Visible damage and gore", stage 1). The run controller creates it,
-    /// hands it the views and disposes it with the run.
+    /// simulation to judge (ARCHITECTURE, "Movement, collision and hits"), and turns combat events into gore
+    /// (GAME_DESIGN, "Visible damage and gore", stage 2): blood on the hit part and on the ground, parts that fall off
+    /// as the meshes they were, viscera bursts, corpses with pools spreading under them. The run controller creates
+    /// it, hands it the views and disposes it with the run.
     /// </summary>
     public sealed class CombatPresenter : ICommandSource, IFrameUpdatable, IDisposable
     {
@@ -31,19 +33,24 @@ namespace DemonFighter.Presentation.Combat
         private const float CrosshairSweepRadiusPerMeter = 0.1f;
         private const float FrontVolumeCenterPerReach = 0.5f;
         private const float FrontVolumeRadiusPerReach = 0.6f;
-        private const float SeveredPartSizePerMeter = 0.25f;
-        private const float SeveredPartImpulse = 2.5f;
         private const float SplashOffsetPerMeter = 0.3f;
-        private const int BleedDripEveryTicks = 10;
+        private const float SeverBodyBlood = 0.6f;
+        private const float DestroyBodyBlood = 0.4f;
+        private const float DeathSplashSizeFactor = 1.5f;
+        private const float HitWobblePerHpFraction = 2f;
         private const int DeathSplashes = 3;
 
         private static readonly Vector3 ViewportCenter = new Vector3(0.5f, 0.5f, 0f);
 
         private readonly RunState _state;
         private readonly PlaceholderPalette _palette;
+        private readonly GoreSettings _gore;
         private readonly DemonId _player;
         private readonly Transform _root;
         private readonly BloodDecalPool _blood;
+        private readonly VisceraPool _viscera;
+        private readonly ParticleSystem? _sparks;
+        private float _sparkCarry;
         private readonly Dictionary<DemonId, DemonView> _views = new Dictionary<DemonId, DemonView>();
         private readonly Dictionary<FoodId, FoodView> _foodViews = new Dictionary<FoodId, FoodView>();
         private readonly Dictionary<DemonId, PendingUse> _pendingUses = new Dictionary<DemonId, PendingUse>();
@@ -56,7 +63,7 @@ namespace DemonFighter.Presentation.Combat
         private Camera? _camera;
         private BodyPartView? _focusedPart;
 
-        public CombatPresenter(RunState state, SimulationEvents events, PlaceholderPalette palette, DemonId player, Transform root)
+        public CombatPresenter(RunState state, SimulationEvents events, PlaceholderPalette palette, GoreSettings gore, DemonId player, Transform root)
         {
             _state = state ?? throw new ArgumentNullException(nameof(state));
             if (events == null)
@@ -65,9 +72,13 @@ namespace DemonFighter.Presentation.Combat
             }
 
             _palette = palette != null ? palette : throw new ArgumentNullException(nameof(palette));
+            _gore = gore != null ? gore : throw new ArgumentNullException(nameof(gore));
             _player = player;
             _root = root != null ? root : throw new ArgumentNullException(nameof(root));
-            _blood = new BloodDecalPool(palette.Blood, root);
+            _blood = new BloodDecalPool(gore, palette.BloodSplats, palette.BloodPool, root);
+            _viscera = new VisceraPool(gore, palette.Viscera, root);
+            // A palette from before D-086 has no ember material yet; the fire then burns without sparks until the generator ran.
+            _sparks = palette.Embers != null ? EmberEffects.CreateSparks(palette.Embers, root) : null;
             _subscriptions.Add(events.Subscribe<SkillActivated>(OnSkillActivated));
             _subscriptions.Add(events.Subscribe<DamageApplied>(OnDamageApplied));
             _subscriptions.Add(events.Subscribe<PartSevered>(OnPartSevered));
@@ -163,7 +174,7 @@ namespace DemonFighter.Presentation.Combat
                 }
 
                 float size = _state.TryGetDemon(item.Source, out Demon? source) ? source.SizeMeters : 1f;
-                CreateSeveredPiece(item, item.Position.ToUnity() + Vector3.up * (size * SeveredPartSizePerMeter * 0.5f), size, launch: false);
+                CreateSeveredPiece(item, item.Position.ToUnity() + Vector3.up * (size * _gore.SeveredFallbackSizePerMeter * 0.5f), size, launch: false, source: null);
             }
         }
 
@@ -179,6 +190,7 @@ namespace DemonFighter.Presentation.Combat
             AimedFood = FindAimedFood();
             UpdateFocus();
             _blood.Update(Time.time);
+            _viscera.Update(Time.deltaTime, Time.time);
         }
 
         /// <inheritdoc />
@@ -208,6 +220,8 @@ namespace DemonFighter.Presentation.Combat
             }
 
             _blood.Destroy();
+            _viscera.Destroy();
+            EmberEffects.Destroy(_sparks);
         }
 
         // The part under the crosshair within the aim range glows and is reported to the HUD every frame, with whether
@@ -418,40 +432,76 @@ namespace DemonFighter.Presentation.Combat
                 return;
             }
 
-            view.PlayAttackPulse();
-            _pendingUses[evt.Actor] = new PendingUse(_state.Catalog.GetSkill(evt.SkillId), evt.ActiveFromTick, evt.ActiveUntilTick);
+            SkillSpec skill = _state.Catalog.GetSkill(evt.SkillId);
+            view.PlayAttack(evt.SkillId, skill.WindupSeconds, skill.ActiveSeconds, skill.RecoverySeconds);
+            _pendingUses[evt.Actor] = new PendingUse(skill, evt.ActiveFromTick, evt.ActiveUntilTick);
         }
 
+        // A hit soaks the part where it landed and splashes the ground; bleeding seeps on the part and drips a trail.
         private void OnDamageApplied(DamageApplied evt)
         {
-            if (!_views.TryGetValue(evt.Target, out DemonView? view) || view.Demon == null)
-            {
-                return;
-            }
-
-            if (evt.Amount <= 0f)
+            if (!_views.TryGetValue(evt.Target, out DemonView? view) || view.Demon == null || evt.Amount <= 0f)
             {
                 return;
             }
 
             float size = view.Demon.SizeMeters;
+            BodyPartView? part = view.FindPart(evt.PartIndex);
+            if (evt.DamageType == DamageType.Fire)
+            {
+                Burn(view, part, evt, size);
+                return;
+            }
+
             if (evt.Attacker.IsValid)
             {
-                // Blood sticks to the part that was hit, so it lies down with the body when the demon dies.
-                BodyPartView? part = view.FindPart(evt.PartIndex);
-                Transform body = part != null ? part.transform : view.transform;
-                Vector3 point = _lastHitPoints.TryGetValue(evt.Target, out Vector3 hitPoint) ? hitPoint : body.position;
+                Vector3 fallback = part != null ? part.transform.position : view.transform.position;
+                Vector3 point = _lastHitPoints.TryGetValue(evt.Target, out Vector3 hitPoint) ? hitPoint : fallback;
                 _lastHitPoints.Remove(evt.Target);
-                _blood.SplashBody(body, point, size);
+                if (part != null && view.Demon.Body.HasPart(evt.PartIndex))
+                {
+                    BodyPart target = view.Demon.Body.GetPart(evt.PartIndex);
+                    float fraction = evt.Amount / Mathf.Max(target.MaxHp, 0.01f);
+                    part.AddBlood(fraction * _gore.BloodPerHpFraction, point);
+                    view.PlayHit(fraction * HitWobblePerHpFraction);
+                }
+
                 _blood.SplashGround(view.transform.position + RandomOffset(size), size);
+                return;
             }
-            else if (_state.Tick % BleedDripEveryTicks == 0)
+
+            if (part != null)
             {
-                // Bleeding drips onto the ground now and then, so a wounded demon leaves a trail.
+                part.AddBlood(_gore.BleedBloodPerSecond * _state.Config.TickSeconds);
+            }
+
+            if (_state.Tick % _gore.BleedDripEveryTicks == 0)
+            {
                 _blood.SplashGround(view.transform.position + RandomOffset(size), size * 0.5f);
             }
         }
 
+        // Fire chars the part it eats and throws sparks off the body; no blood, the heat seals the wound (D-086).
+        private void Burn(DemonView view, BodyPartView? part, DamageApplied evt, float size)
+        {
+            if (part != null && view.Demon != null && view.Demon.Body.HasPart(evt.PartIndex))
+            {
+                BodyPart burning = view.Demon.Body.GetPart(evt.PartIndex);
+                part.AddBurn(evt.Amount / Mathf.Max(burning.MaxHp, 0.01f) * _gore.BurnCharPerHpFraction);
+            }
+
+            // Fire damage arrives every tick; sparks are metered so their number follows time, not the tick rate.
+            _sparkCarry += _gore.SparksPerSecondPerMeter * size * _state.Config.TickSeconds;
+            int count = Mathf.FloorToInt(_sparkCarry);
+            _sparkCarry -= count;
+            if (count > 0 && _sparks != null)
+            {
+                Vector3 center = part != null ? part.transform.position : view.transform.position + Vector3.up * (size * 0.3f);
+                EmberEffects.Spark(_sparks, center, size, count);
+            }
+        }
+
+        // The part flies off as the mesh it was, viscera burst from the wound, the body is soaked at the stump.
         private void OnPartSevered(PartSevered evt)
         {
             if (!_views.TryGetValue(evt.Demon, out DemonView? view) || view.Demon == null || !_state.TryGetFood(evt.Food, out FoodItem? food))
@@ -462,30 +512,10 @@ namespace DemonFighter.Presentation.Combat
             float size = view.Demon.SizeMeters;
             BodyPartView? part = view.FindPart(evt.PartIndex);
             Vector3 position = part != null ? part.transform.position : view.transform.position + Vector3.up * (size * 0.5f);
-            CreateSeveredPiece(food, position, size, launch: true);
-            _blood.SplashBody(view.transform, position, size);
+            CreateSeveredPiece(food, position, size, launch: true, part);
+            _viscera.Burst(position, size, GoreMath.BurstCount(size, _gore.SeverBurstPerMeter));
             _blood.SplashGround(position, size);
-        }
-
-        // A severed part as a small dark sphere with a rigidbody; a fresh one flies off, a restored one just lies there.
-        private void CreateSeveredPiece(FoodItem food, Vector3 position, float size, bool launch)
-        {
-            GameObject piece = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            piece.name = "Severed part " + food.Id.Value;
-            piece.layer = Layers.Food;
-            piece.transform.SetParent(_root, false);
-            piece.transform.position = position;
-            piece.transform.localScale = Vector3.one * (size * SeveredPartSizePerMeter);
-            piece.GetComponent<Renderer>().sharedMaterial = _palette.Corpse;
-            Rigidbody body = piece.AddComponent<Rigidbody>();
-            if (launch)
-            {
-                body.AddForce((Random.insideUnitSphere + Vector3.up).normalized * SeveredPartImpulse, ForceMode.VelocityChange);
-            }
-
-            FoodView foodView = piece.AddComponent<FoodView>();
-            foodView.Bind(food, body);
-            _foodViews[food.Id] = foodView;
+            SoakBody(view, SeverBodyBlood, position);
         }
 
         private void OnPartDestroyed(PartDestroyed evt)
@@ -495,11 +525,14 @@ namespace DemonFighter.Presentation.Combat
                 return;
             }
 
+            float size = view.Demon.SizeMeters;
             BodyPartView? part = view.FindPart(evt.PartIndex);
             Vector3 position = part != null ? part.transform.position : view.transform.position;
-            _blood.SplashBody(view.transform, position, view.Demon.SizeMeters);
+            _viscera.Burst(position, size, GoreMath.BurstCount(size, _gore.DestroyBurstPerMeter));
+            SoakBody(view, DestroyBodyBlood, position);
         }
 
+        // The body becomes the corpse, a pool spreads under it with its Biomass, and viscera burst from the kill.
         private void OnDemonDied(DemonDied evt)
         {
             if (!_views.TryGetValue(evt.Demon, out DemonView? view) || view.Demon == null)
@@ -508,18 +541,63 @@ namespace DemonFighter.Presentation.Combat
             }
 
             _pendingUses.Remove(evt.Demon);
+            float size = view.Demon.SizeMeters;
+            Vector3 center = view.transform.position + Vector3.up * (size * 0.5f);
+            _viscera.Burst(center, size, GoreMath.BurstCount(size, _gore.DeathBurstPerMeter));
             view.BecomeCorpse(_palette.Corpse);
+            float biomass = 0f;
             if (_state.TryGetFood(evt.Corpse, out FoodItem? corpse))
             {
+                biomass = corpse.BiomassRemaining;
                 FoodView foodView = view.gameObject.AddComponent<FoodView>();
                 foodView.Bind(corpse, null);
                 _foodViews[corpse.Id] = foodView;
             }
 
-            float size = view.Demon.SizeMeters;
+            _blood.PoolUnderCorpse(view.transform.position, size, biomass);
             for (int i = 0; i < DeathSplashes; i++)
             {
-                _blood.SplashGround(view.transform.position + RandomOffset(size), size * 1.5f);
+                _blood.SplashGround(view.transform.position + RandomOffset(size), size * DeathSplashSizeFactor);
+            }
+        }
+
+        // A severed part keeps the look of the view it had: the same mesh, material and tint, now loose with physics.
+        // A fresh one flies off, a restored one just lies there; without a view to copy a dark sphere stands in.
+        private void CreateSeveredPiece(FoodItem food, Vector3 position, float size, bool launch, BodyPartView? source)
+        {
+            GameObject piece;
+            if (source != null)
+            {
+                piece = source.CreateDetachedCopy(_root);
+            }
+            else
+            {
+                piece = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                piece.transform.SetParent(_root, false);
+                piece.transform.localScale = Vector3.one * (size * _gore.SeveredFallbackSizePerMeter);
+                piece.GetComponent<Renderer>().sharedMaterial = _palette.Corpse;
+            }
+
+            piece.name = "Severed part " + food.Id.Value;
+            piece.layer = Layers.Food;
+            piece.transform.position = position;
+            Rigidbody body = piece.AddComponent<Rigidbody>();
+            if (launch)
+            {
+                body.AddForce((Random.insideUnitSphere + Vector3.up).normalized * _gore.SeveredImpulse, ForceMode.VelocityChange);
+            }
+
+            FoodView foodView = piece.AddComponent<FoodView>();
+            foodView.Bind(food, body);
+            _foodViews[food.Id] = foodView;
+        }
+
+        // Blood on the core around a point: the stump of a severed limb, the crater of a destroyed part.
+        private static void SoakBody(DemonView view, float amount, Vector3 point)
+        {
+            if (view.Parts.Count > 0)
+            {
+                view.Parts[0].AddBlood(amount, point);
             }
         }
 

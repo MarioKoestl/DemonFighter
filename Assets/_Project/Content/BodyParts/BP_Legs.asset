@@ -41,4 +41,21 @@ MonoBehaviour:
     _localScale: {x: 0.9, y: 0.3, z: 0.5}
     _localEuler: {x: 0, y: 0, z: 0}
     _mirrorSecondCopy: 0
-  _contentVersion: 3
+    _motion: 1
+    _meshes:
+      _intact: {fileID: 0}
+      _wounded: {fileID: 0}
+      _mangled: {fileID: 0}
+      _stump: {fileID: 0}
+      _material: {fileID: 0}
+      _clip: {fileID: 0}
+      _scale: 1
+      _offset: {x: 0, y: 0, z: 0}
+      _euler: {x: 0, y: 0, z: 0}
+      _importScale: 1
+      _importRotation: {x: 0, y: 0, z: 0, w: 1}
+      _importPivot: {x: 0, y: 0, z: 0}
+      _importVersion: 0
+    _anchors: []
+  _severSound: {fileID: 11400000, guid: 6695ebbe30c15fe4f802d21f0f21c2b0, type: 2}
+  _contentVersion: 6

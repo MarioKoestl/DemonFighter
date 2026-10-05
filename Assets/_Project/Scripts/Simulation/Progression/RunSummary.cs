@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using DemonFighter.Simulation.Anatomy;
+using DemonFighter.Simulation.Hazards;
 
 namespace DemonFighter.Simulation.Progression
 {
@@ -41,6 +42,9 @@ namespace DemonFighter.Simulation.Progression
         /// <summary>Kind name of the killer; empty when nothing living dealt the final blow.</summary>
         public string KillerName { get; init; } = string.Empty;
 
+        /// <summary>The hazard the player stood in when it died (D-086); None when it died outside lava and fissures.</summary>
+        public HazardKind DeathHazard { get; init; }
+
         /// <summary>Reads the summary off the run and the dead player; the killer may be None or already gone.</summary>
         public static RunSummary From(RunState state, Demon player, DemonId killer)
         {
@@ -76,6 +80,7 @@ namespace DemonFighter.Simulation.Progression
                 PartIds = partIds,
                 KillerSpecId = killerDemon != null ? killerDemon.Spec.Id : string.Empty,
                 KillerName = killerDemon != null ? killerDemon.Spec.Name : string.Empty,
+                DeathHazard = player.Hazard,
             };
         }
     }

@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using DemonFighter.Common;
 using DemonFighter.Input;
+using DemonFighter.Presentation.Audio;
+using DemonFighter.Presentation.Cameras;
 using DemonFighter.Presentation.Combat;
 using DemonFighter.Presentation.Demons;
 using DemonFighter.Presentation.World;
@@ -14,6 +16,7 @@ using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Evolution;
 using DemonFighter.Simulation.Mutation;
 using DemonFighter.Simulation.Persistence;
+using DemonFighter.Simulation.Playtest;
 using DemonFighter.Simulation.Progression;
 using DemonFighter.Simulation.Worldgen;
 using DemonFighter.UI;
@@ -36,10 +39,13 @@ namespace DemonFighter.App
         private Transform? _demons;
         private PlayerInputAdapter? _input;
         private CombatPresenter? _combat;
+        private AudioDirector? _audio;
+        private CameraRig? _cameraRig;
         private SimulationTicker? _ticker;
         private HudScreen? _hud;
         private Demon? _player;
         private IDisposable? _deathSubscription;
+        private bool _testModeSent;
         private IDisposable? _spawnSubscription;
         private DemonViewFactory? _factory;
         private BodyPreviewRig? _preview;
@@ -127,6 +133,9 @@ namespace DemonFighter.App
                 _hud.BackToMenuRequested -= OnBackToMenuRequested;
                 _hud.ResumeRequested -= OnResumeRequested;
                 _hud.SaveAndQuitRequested -= OnSaveAndQuitRequested;
+                _hud.SettingsChanged -= OnSettingsChanged;
+                _hud.QuitRequested -= OnQuitRequested;
+                _hud.ResetHintsRequested -= OnResetHintsRequested;
                 _hud = null;
             }
 
@@ -137,6 +146,10 @@ namespace DemonFighter.App
             _factory = null;
             _combat?.Dispose();
             _combat = null;
+            _audio?.Dispose();
+            _audio = null;
+            _services.Settings.Changed -= OnSettingsFileChanged;
+            _cameraRig = null;
             _ticker = null;
             _player = null;
             SetCursorLocked(false);
@@ -170,7 +183,7 @@ namespace DemonFighter.App
             RunState state = ticker.State;
             WorldLayout layout = state.World ?? throw new InvalidOperationException("The run has no world.");
             _world = new WorldBuilder(root.Palette, root.WorldSettings).Build(layout, root.transform);
-            var combat = new CombatPresenter(state, _services.Events, root.Palette, player.Id, root.transform);
+            var combat = new CombatPresenter(state, _services.Events, root.Palette, root.GoreSettings, player.Id, root.transform);
             _combat = combat;
             DemonView playerView = SpawnViews(state, player, root, combat);
             if (resumed)
@@ -179,6 +192,9 @@ namespace DemonFighter.App
             }
 
             root.CameraRig.Follow(playerView, root.CameraSettings);
+            _cameraRig = root.CameraRig;
+            ApplyLook();
+            _services.Settings.Changed += OnSettingsFileChanged;
             BodyPreviewRig preview = BodyPreviewRig.Create(root.transform, root.DemonPrefab, root.Palette, root.DemonSettings, _services.CatalogDefinition, root.Palette.ForDemon(player));
             _preview = preview;
             IMutationOfferPolicy offers = _services.Settings.RandomOffers ? _services.RandomOffers : _services.OfferPolicy;
@@ -195,9 +211,14 @@ namespace DemonFighter.App
             root.Hud.BackToMenuRequested += OnBackToMenuRequested;
             root.Hud.ResumeRequested += OnResumeRequested;
             root.Hud.SaveAndQuitRequested += OnSaveAndQuitRequested;
+            root.Hud.ConfigureSettings(_services.Applier.ToValues());
+            root.Hud.SettingsChanged += OnSettingsChanged;
+            root.Hud.QuitRequested += OnQuitRequested;
+            root.Hud.ResetHintsRequested += OnResetHintsRequested;
             _hud = root.Hud;
             _ticker = ticker;
             _player = player;
+            SendTestMode(force: true);
             _deathSubscription = _services.Events.Subscribe<DemonDied>(OnDemonDied);
             _spawnSubscription = _services.Events.Subscribe<DemonSpawned>(OnDemonSpawned);
 
@@ -213,6 +234,8 @@ namespace DemonFighter.App
             _runner.AddFrameUpdatable(_input);
             _runner.AddCommandSource(_combat);
             _runner.AddFrameUpdatable(_combat);
+            _audio = new AudioDirector(state, _services.Events, _services.CatalogDefinition, _services.Audio, _services.BiomeDefinition, _services.Mix, _services.Music, player.Id, root.transform);
+            _runner.AddFrameUpdatable(_audio);
             _runner.Initialize(ticker);
 
             CurrentRun = state;
@@ -277,6 +300,51 @@ namespace DemonFighter.App
         private void OnSaveAndQuitRequested()
         {
             SaveAndQuit();
+        }
+
+        // The pause menu's settings go through the applier like the main menu's (D-085); the look follows the file.
+        private void OnSettingsChanged(SettingsValues values)
+        {
+            _services.Applier.Apply(values);
+        }
+
+        private void OnSettingsFileChanged()
+        {
+            ApplyLook();
+            SendTestMode(force: false);
+        }
+
+        // Test mode (D-089) belongs to the simulation, so the setting reaches the run as a command: once when the run
+        // starts or resumes, and again whenever the toggle changes. The runner applies it even while paused.
+        private void SendTestMode(bool force)
+        {
+            bool wanted = _services.Settings.Data.TestMode;
+            if (_ticker == null || _player == null || (!force && wanted == _testModeSent))
+            {
+                return;
+            }
+
+            _testModeSent = wanted;
+            _ticker.Commands.Submit(new SetTestModeCommand(_player.Id, wanted));
+        }
+
+        private void ApplyLook()
+        {
+            if (_cameraRig != null)
+            {
+                _cameraRig.SetLook(_services.Applier.LookSensitivity, _services.Applier.InvertY);
+            }
+        }
+
+        // Quitting to the desktop saves the run on the way out (D-074), through the quitting hook.
+        private static void OnQuitRequested()
+        {
+            SceneFlow.Quit();
+        }
+
+        private static void OnResetHintsRequested()
+        {
+            HintMemory.Reset();
         }
 
         // Tab and C open the mutation menu and freeze the run; any menu key closes it again (GAME_DESIGN, "Mutation").

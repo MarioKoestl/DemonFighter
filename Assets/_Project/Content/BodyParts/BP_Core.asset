@@ -50,4 +50,39 @@ MonoBehaviour:
     _localScale: {x: 1, y: 1, z: 1}
     _localEuler: {x: 0, y: 0, z: 0}
     _mirrorSecondCopy: 0
-  _contentVersion: 3
+    _motion: 0
+    _meshes:
+      _intact: {fileID: -9037851627997230718, guid: b0125a67959e7434fa1cdda9080ec363, type: 3}
+      _wounded: {fileID: 0}
+      _mangled: {fileID: 0}
+      _stump: {fileID: 0}
+      _material: {fileID: 2100000, guid: 12fd030e628529c4cbe853e1f72d5712, type: 2}
+      _clip: {fileID: 0}
+      _scale: 1
+      _offset: {x: 0, y: 0, z: 0}
+      _euler: {x: 0, y: 0, z: 0}
+      _importScale: 100.00001
+      _importRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071067}
+      _importPivot: {x: 0.00000505954, y: -0.000011844931, z: -2.994352e-10}
+      _importVersion: 2
+    _anchors:
+    - _kind: 1
+      _position: {x: 0, y: 0.62, z: 0.28}
+      _euler: {x: 0, y: 0, z: 0}
+    - _kind: 2
+      _position: {x: 0.29, y: 0.52, z: 0.06}
+      _euler: {x: 0, y: 90, z: 0}
+    - _kind: 2
+      _position: {x: -0.29, y: 0.52, z: 0.06}
+      _euler: {x: 0, y: -90, z: 0}
+    - _kind: 3
+      _position: {x: 0, y: 0.04, z: 0}
+      _euler: {x: 90, y: 0, z: 0}
+    - _kind: 4
+      _position: {x: 0, y: 0.55, z: -0.28}
+      _euler: {x: 0, y: 180, z: 0}
+    - _kind: 5
+      _position: {x: 0, y: 0.3, z: -0.28}
+      _euler: {x: 25, y: 180, z: 0}
+  _severSound: {fileID: 11400000, guid: e8756f31f9b786d4fabff46f4182e6e8, type: 2}
+  _contentVersion: 6

@@ -34,6 +34,9 @@ namespace DemonFighter.Presentation.Cameras
         /// <inheritdoc />
         public float YawRadians => _yawDegrees * Mathf.Deg2Rad;
 
+        private float _sensitivityScale = 1f;
+        private bool? _invertYOverride;
+
         /// <summary>True while the first-person camera is the live one.</summary>
         public bool IsFirstPerson { get; private set; }
 
@@ -65,6 +68,13 @@ namespace DemonFighter.Presentation.Cameras
             ApplyAxes();
         }
 
+        /// <summary>Overrides the tuned mouse look with the player's settings (D-085): a multiplier and the Y direction.</summary>
+        public void SetLook(float sensitivityScale, bool invertY)
+        {
+            _sensitivityScale = Mathf.Max(0.01f, sensitivityScale);
+            _invertYOverride = invertY;
+        }
+
         /// <inheritdoc />
         public void AddLook(Vector2 deltaPixels)
         {
@@ -73,9 +83,10 @@ namespace DemonFighter.Presentation.Cameras
                 return;
             }
 
-            float sensitivity = _settings.LookSensitivityDegreesPerPixel;
+            float sensitivity = _settings.LookSensitivityDegreesPerPixel * _sensitivityScale;
+            bool invertY = _invertYOverride ?? _settings.InvertY;
             _yawDegrees = WrapDegrees(_yawDegrees + deltaPixels.x * sensitivity);
-            float pitchDelta = deltaPixels.y * sensitivity * (_settings.InvertY ? 1f : -1f);
+            float pitchDelta = deltaPixels.y * sensitivity * (invertY ? 1f : -1f);
             _pitchDegrees = Mathf.Clamp(_pitchDegrees + pitchDelta, _settings.PitchMinDegrees, _settings.PitchMaxDegrees);
         }
 

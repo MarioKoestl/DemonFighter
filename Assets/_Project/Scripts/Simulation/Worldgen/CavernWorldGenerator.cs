@@ -8,7 +8,8 @@ namespace DemonFighter.Simulation.Worldgen
     /// <summary>
     /// The v1 generator: a gently rolling cavern floor from two octaves of value noise, a spawn cluster in the middle
     /// third, an elder loop around the center and features scattered by rejection sampling so they keep clear of each
-    /// other, the spawn and the route. All randomness comes from one generator seeded with the world seed.
+    /// other, the spawn and the route. Pools sit in basins carved into the floor (D-086), so the ground never covers
+    /// the lava that burns. All randomness comes from one generator seeded with the world seed.
     /// </summary>
     public sealed class CavernWorldGenerator : IWorldGenerator
     {
@@ -19,6 +20,11 @@ namespace DemonFighter.Simulation.Worldgen
         private const float PoolDepth = 0.4f;
         private const float BonePileHeight = 1f;
         private const float SpawnAreaFraction = 0.4f;
+        private const float BasinDepth = 0.3f;
+        private const float BasinShoreCells = 1.5f;
+        private const float BasinBankSlope = 0.45f;
+        private const float BasinBankReach = 12f;
+        private const float RimSampleSpacing = 1f;
 
         /// <inheritdoc />
         public WorldLayout Generate(int seed, BiomeSpec biome)
@@ -37,9 +43,108 @@ namespace DemonFighter.Simulation.Worldgen
             Vector3 spawnCenter = PickSpawnCenter(rng, biome, heights);
             List<Vector3> route = BuildElderRoute(rng, biome, featureArea, heights, spawnCenter);
             List<FeaturePlacement> features = PlaceFeatures(rng, biome, featureArea, heights, spawnCenter, route);
+            heights = CarveBasins(heights, features);
             List<Vector3> spawns = PlaceSpawnPoints(rng, biome, heights, spawnCenter, features);
 
             return new WorldLayout(seed, biome, bounds, heights, features, spawns, route);
+        }
+
+        /// <summary>
+        /// Sinks the floor under every pool (D-086): the surface of a pool lies at the lowest point of the ground it covers,
+        /// the floor under it and a shore of one and a half cells around it drop below that surface, and beyond the shore
+        /// a bank rises at a gentle, walkable slope until it meets the terrain. A flat pool on a slope was half buried before, and the buried half still burned.
+        /// Pools move to their surface height; every other feature is set onto the carved ground.
+        /// </summary>
+        internal static Heightfield CarveBasins(Heightfield field, List<FeaturePlacement> features)
+        {
+            var heights = new float[field.VertexCountX * field.VertexCountZ];
+            for (int i = 0; i < heights.Length; i++)
+            {
+                heights[i] = field.Heights[i];
+            }
+
+            var current = new Heightfield(field.VertexCountX, field.VertexCountZ, field.CellSize, field.OriginX, field.OriginZ, heights);
+            float shore = field.CellSize * BasinShoreCells;
+            for (int f = 0; f < features.Count; f++)
+            {
+                FeaturePlacement pool = features[f];
+                if (pool.Kind != FeatureKind.LavaPool && pool.Kind != FeatureKind.WaterPool)
+                {
+                    continue;
+                }
+
+                float radius = pool.Size.X * 0.5f;
+                float level = LowestWithin(current, pool.Position, radius);
+                float floor = level - BasinDepth;
+                float reach = radius + shore + BasinBankReach;
+                int minX = Math.Max(0, (int)MathF.Floor((pool.Position.X - reach - field.OriginX) / field.CellSize));
+                int maxX = Math.Min(field.VertexCountX - 1, (int)MathF.Ceiling((pool.Position.X + reach - field.OriginX) / field.CellSize));
+                int minZ = Math.Max(0, (int)MathF.Floor((pool.Position.Z - reach - field.OriginZ) / field.CellSize));
+                int maxZ = Math.Min(field.VertexCountZ - 1, (int)MathF.Ceiling((pool.Position.Z + reach - field.OriginZ) / field.CellSize));
+                for (int iz = minZ; iz <= maxZ; iz++)
+                {
+                    for (int ix = minX; ix <= maxX; ix++)
+                    {
+                        float dx = field.OriginX + ix * field.CellSize - pool.Position.X;
+                        float dz = field.OriginZ + iz * field.CellSize - pool.Position.Z;
+                        float distance = MathF.Sqrt(dx * dx + dz * dz);
+                        if (distance > reach)
+                        {
+                            continue;
+                        }
+
+                        int index = iz * field.VertexCountX + ix;
+                        // A cone around the basin: never higher than the terrain, never steeper than the bank slope.
+                        float bank = MathF.Max(0f, distance - radius - shore);
+                        heights[index] = MathF.Min(heights[index], floor + bank * BasinBankSlope);
+                    }
+                }
+
+                features[f] = new FeaturePlacement(pool.Kind, new Vector3(pool.Position.X, level, pool.Position.Z), pool.Yaw, pool.Size);
+            }
+
+            for (int f = 0; f < features.Count; f++)
+            {
+                FeaturePlacement feature = features[f];
+                if (feature.Kind != FeatureKind.LavaPool && feature.Kind != FeatureKind.WaterPool)
+                {
+                    float ground = current.SampleHeight(feature.Position.X, feature.Position.Z);
+                    features[f] = new FeaturePlacement(feature.Kind, new Vector3(feature.Position.X, ground, feature.Position.Z), feature.Yaw, feature.Size);
+                }
+            }
+
+            return current;
+        }
+
+        // The lowest ground under a disc: every vertex inside it and points along its rim, where the slope may dip lowest.
+        private static float LowestWithin(Heightfield field, Vector3 center, float radius)
+        {
+            float lowest = field.SampleHeight(center.X, center.Z);
+            int rimSamples = Math.Max(8, (int)MathF.Ceiling(MathF.PI * 2f * radius / RimSampleSpacing));
+            for (int i = 0; i < rimSamples; i++)
+            {
+                float angle = i * MathF.PI * 2f / rimSamples;
+                lowest = MathF.Min(lowest, field.SampleHeight(center.X + MathF.Sin(angle) * radius, center.Z + MathF.Cos(angle) * radius));
+            }
+
+            int minX = Math.Max(0, (int)MathF.Floor((center.X - radius - field.OriginX) / field.CellSize));
+            int maxX = Math.Min(field.VertexCountX - 1, (int)MathF.Ceiling((center.X + radius - field.OriginX) / field.CellSize));
+            int minZ = Math.Max(0, (int)MathF.Floor((center.Z - radius - field.OriginZ) / field.CellSize));
+            int maxZ = Math.Min(field.VertexCountZ - 1, (int)MathF.Ceiling((center.Z + radius - field.OriginZ) / field.CellSize));
+            for (int iz = minZ; iz <= maxZ; iz++)
+            {
+                for (int ix = minX; ix <= maxX; ix++)
+                {
+                    float dx = field.OriginX + ix * field.CellSize - center.X;
+                    float dz = field.OriginZ + iz * field.CellSize - center.Z;
+                    if (dx * dx + dz * dz <= radius * radius)
+                    {
+                        lowest = MathF.Min(lowest, field.HeightAt(ix, iz));
+                    }
+                }
+            }
+
+            return lowest;
         }
 
         /// <summary>Shortest distance on the ground from a point to a closed polyline.</summary>

@@ -31,3 +31,11 @@ MonoBehaviour:
   _maw: {fileID: 2100000, guid: 0e9d36576813d4a4b9df5a6b34366b66, type: 2}
   _eye: {fileID: 2100000, guid: dbb2dc86624a0654381de55954f00b1f, type: 2}
   _plate: {fileID: 2100000, guid: deff2abb66f433247af559b8fd943259, type: 2}
+  _bloodSplats:
+  - {fileID: 2100000, guid: f25a0e9a5f730074092e51e06d9ffd73, type: 2}
+  - {fileID: 2100000, guid: 4c4bb85f5513f404e98171a078b4623b, type: 2}
+  - {fileID: 2100000, guid: 54d55dd0bede79340ba685eaa722a334, type: 2}
+  _bloodPool: {fileID: 2100000, guid: f52cff4811c76394092132af307a6ba4, type: 2}
+  _viscera: {fileID: 2100000, guid: 5ef61bc723e17a0478a262a6e423d7f7, type: 2}
+  _embers: {fileID: 2100000, guid: f35a526392e5699479bd7ab21d46dae4, type: 2}
+  _generatorVersion: 8

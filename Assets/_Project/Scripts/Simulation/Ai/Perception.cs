@@ -5,6 +5,7 @@ using System.Numerics;
 using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Food;
+using DemonFighter.Simulation.Hazards;
 
 namespace DemonFighter.Simulation.Ai
 {
@@ -105,7 +106,9 @@ namespace DemonFighter.Simulation.Ai
             for (int i = 0; i < food.Count; i++)
             {
                 FoodItem item = food[i];
-                if (item.IsDepleted)
+
+                // Food lying in lava or a fissure is out of reach for a demon that will not walk into fire (D-086).
+                if (item.IsDepleted || state.Hazards.KindAt(item.Position) != HazardKind.None)
                 {
                     continue;
                 }

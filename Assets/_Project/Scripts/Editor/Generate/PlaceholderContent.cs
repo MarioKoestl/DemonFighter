@@ -367,6 +367,79 @@ namespace DemonFighter.Editor.Generate
         };
 
         /// <summary>One placeholder visual, ready to write into a part definition.</summary>
+        /// <summary>
+        /// Where parts plug into the placeholder capsule, in body units (1 is the body height, origin at the base), the
+        /// first limb anchor on the right like the primitives. A core model with Socket_ transforms replaces them.
+        /// </summary>
+        public static readonly IReadOnlyList<SocketAnchor> DefaultAnchors = new[]
+        {
+            new SocketAnchor(SocketKind.Head, new Vector3(0f, 0.62f, 0.28f), Vector3.zero),
+            new SocketAnchor(SocketKind.Limb, new Vector3(0.29f, 0.52f, 0.06f), new Vector3(0f, 90f, 0f)),
+            new SocketAnchor(SocketKind.Limb, new Vector3(-0.29f, 0.52f, 0.06f), new Vector3(0f, -90f, 0f)),
+            new SocketAnchor(SocketKind.Locomotion, new Vector3(0f, 0.04f, 0f), new Vector3(90f, 0f, 0f)),
+            new SocketAnchor(SocketKind.Hide, new Vector3(0f, 0.55f, -0.28f), new Vector3(0f, 180f, 0f)),
+            new SocketAnchor(SocketKind.Tail, new Vector3(0f, 0.3f, -0.28f), new Vector3(25f, 180f, 0f)),
+        };
+
+        /// <summary>How the view moves each placeholder part (D-082); hides, eyes, plates and spines sit still.</summary>
+        public static PartMotion MotionFor(string partId)
+        {
+            switch (partId)
+            {
+                case JawsId:
+                    return PartMotion.Jaws;
+                case ArmId:
+                    return PartMotion.Limb;
+                case LegsId:
+                    return PartMotion.Legs;
+                case TailId:
+                    return PartMotion.Tail;
+                default:
+                    return PartMotion.None;
+            }
+        }
+
+        /// <summary>How the view animates each placeholder skill (D-082); sprint has no motion of its own.</summary>
+        public static SkillMotion SkillMotionFor(string skillId)
+        {
+            switch (skillId)
+            {
+                case BiteId:
+                    return SkillMotion.Bite;
+                case ClawId:
+                case GrabId:
+                    return SkillMotion.Swipe;
+                case LungeId:
+                    return SkillMotion.Lunge;
+                case TailSwingId:
+                    return SkillMotion.TailSwing;
+                default:
+                    return SkillMotion.None;
+            }
+        }
+
+        /// <summary>Default shift of a bound mesh from its anchor in body units; eyes sit above the jaws that share the head socket.</summary>
+        public static Vector3 MeshOffsetFor(string partId)
+        {
+            return partId == EyesId ? new Vector3(0f, 0.12f, 0.02f) : Vector3.zero;
+        }
+
+        internal readonly struct SocketAnchor
+        {
+            public SocketAnchor(SocketKind kind, Vector3 position, Vector3 euler)
+            {
+                Kind = kind;
+                Position = position;
+                Euler = euler;
+            }
+
+            public SocketKind Kind { get; }
+
+            public Vector3 Position { get; }
+
+            public Vector3 Euler { get; }
+        }
+
         internal readonly struct PartVisual
         {
             public PartVisual(PartVisualKind kind, PartMaterialRole material, Vector3 position, Vector3 scale, Vector3 euler, bool mirrorSecondCopy)

@@ -66,6 +66,15 @@ namespace DemonFighter.Simulation.Worldgen
 
         public float LavaPoolRadiusMax { get; init; } = 12f;
 
+        /// <summary>Share of the touching part's health lava burns per second (D-086); 0.2 burns a part away in five seconds.</summary>
+        public float LavaBurnFractionPerSecond { get; init; } = 0.2f;
+
+        /// <summary>Share of the touching part's health a glowing fissure burns per second (D-086).</summary>
+        public float FissureBurnFractionPerSecond { get; init; } = 0.05f;
+
+        /// <summary>How far AI demons keep their bodies from the edge of lava and fissures, in meters (D-086).</summary>
+        public float HazardAvoidMarginMeters { get; init; } = 1.5f;
+
         public int WaterPoolCount { get; init; } = 3;
 
         public float WaterPoolRadiusMin { get; init; } = 5f;
@@ -293,6 +302,7 @@ namespace DemonFighter.Simulation.Worldgen
             RequireRange(FissureCountMin, FissureCountMax, "Fissure count");
             RequireRange(BonePileCountMin, BonePileCountMax, "Bone pile count");
             Require(LavaPoolCount >= 0 && WaterPoolCount >= 0, "Pool counts are never negative.");
+            Require(LavaBurnFractionPerSecond >= 0f && FissureBurnFractionPerSecond >= 0f && HazardAvoidMarginMeters >= 0f, "Hazard burn and margin are never negative.");
             RequireRange(RockSizeMin, RockSizeMax, "Rock size");
             RequireRange(FissureLengthMin, FissureLengthMax, "Fissure length");
             Require(FissureWidth > 0f, "FissureWidth must be positive.");

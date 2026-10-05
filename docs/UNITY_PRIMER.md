@@ -63,6 +63,28 @@ Unity's Package Manager is NuGet for Unity. `Packages/manifest.json` lists them.
 
 The Universal Render Pipeline is Unity's standard renderer for most projects. Materials use URP shaders (Lit, Unlit, Shader Graph). Post-processing (color grading, bloom, ambient occlusion) is configured with a Volume component in the scene. You do not need to understand the pipeline to write gameplay code; it matters when importing assets (use URP materials) and in M5.
 
+## Meshes, importers and the asset pipeline
+
+A `MeshFilter` holds the geometry, a `MeshRenderer` draws it with a `Material`. Swapping `MeshFilter.sharedMesh` is how a body part changes its damage state; nothing else about the object changes. A `MaterialPropertyBlock` overrides a few shader values (we use `_BaseColor`) for one renderer without copying the material, which is how the owner tint, the wound darkening and the aim highlight work on a shared material.
+
+An FBX file imports as a model: a prefab-like asset with child objects, and the meshes and materials inside it as sub-assets. The `ModelImporter` and the `TextureImporter` hold the import settings you would otherwise click in the Inspector. An `AssetPostprocessor` is a hook that runs while an asset is imported, like a build step: `ArtImportRules` sets the importer fields for everything under `Assets/_Project/Art/`, so a dropped file comes in right. Editor code reads imported models with `AssetDatabase.LoadAssetAtPath<GameObject>` and walks their children like any hierarchy. `Mesh.bounds` is the axis-aligned box of a mesh in its own space; after a rotation the box around the eight transformed corners is the honest bound, which is what `MeshBounds.Transform` computes. Unity ignores files and folders whose names start with a dot, so a `.gitkeep` keeps an empty art folder in Git without becoming an asset.
+
+Mapping: an import pipeline with per-file-type rules, like MSBuild item metadata, with the rules written in code instead of clicked.
+
+## Decals, renderer features and shader passes
+
+A **Decal Projector** is a box that projects a material onto whatever surfaces lie inside it; URP draws it in a renderer feature ("Decals") that has to be on the renderer asset, which `RenderPipelineSetup` adds from code. We use projectors for blood on the floor because they wrap over slopes and steps where a flat quad would float or clip. A **renderer feature** is a plug-in pass on the URP renderer, like middleware in a request pipeline; SSAO and decals are the two we use.
+
+A **Volume** is a scene object that holds a **Volume Profile**, the list of post-processing overrides (tonemapping, bloom, vignette and so on) a camera blends in; our scenes carry one global volume with the cavern profile the generator built. **Quality presets** in this project are whole URP pipeline assets: switching `QualitySettings.renderPipeline` swaps render scale, shadows and renderer features in one go, which is simpler to reason about than Unity's quality levels with their per-level overrides.
+
+A **shader** has one or more passes, each a small program for one purpose: the forward pass shades the surface, the shadow caster writes depth into shadow maps, the depth and depth-normals passes feed SSAO and decals. Our skin shader keeps the URP Lit passes and replaces only the forward one, including the URP source files, so a pipeline update updates the lighting for free. Values set per renderer through a MaterialPropertyBlock reach uniforms that are not material properties; that is how blood is per body part without a material copy.
+
+## Animation without clips
+
+Unity animates with clips (keyframed curves) played by an `Animator` (state machine) or the older `Animation` component (legacy clips, plain play and loop). We use neither for the bodies: `BodyAnimator` computes rotations and scales from the simulation state every frame and writes them to the transforms, the same way a shader computes a color from inputs. The upside is that every demon of every size moves right without a rig; the downside is that nothing can be hand-tuned keyframe by keyframe. Parts that do get a hand-made clip use the legacy `Animation` component, because it needs no controller asset.
+
+Mapping: a clip is recorded data, procedural animation is a pure function of state; think a stored report versus a computed view.
+
 ## Physics
 
 - `Rigidbody` makes an object move under physics. `Collider` gives it a shape for collisions. A `CharacterController` is a special capsule for characters that moves by code and handles slopes and steps without being thrown around by physics.
@@ -78,6 +100,16 @@ The HUD and menus are built in code from `VisualElement`, `Label` and `Button` o
 ## Input System
 
 Actions (`Move`, `Look`, `Attack`) are defined in an asset and bound to devices. Code reads actions, not keys. This is what makes adding a gamepad a data change later. Only `PlayerInputAdapter` reads them.
+
+## Audio
+
+An `AudioSource` component plays an `AudioClip`; an `AudioListener` on the camera hears. With `spatialBlend` 1 the source sits in the world and falls off with distance, with 0 it plays flat in both ears. There is no event system of its own, so we built a small one: `SoundPlayer` keeps a pool of sources and sets clip, volume, pitch and position per play, `MusicPlayer` crossfades two looping sources. Unity's `AudioMixer` asset would give us volume groups, but it cannot be created from code, so the four knobs live in a plain class and every player reads them. Import settings (`AudioImporter`) decide compression and whether a clip streams or sits decompressed in memory.
+
+Mapping: an `AudioClip` is a sample buffer, an `AudioSource` a channel strip you configure per play.
+
+## UI Toolkit controls
+
+Besides buttons and labels, UI Toolkit ships the usual form controls: `Slider`, `Toggle`, `DropdownField`, `TextField`. Each has a `value`, raises a `ChangeEvent` through `RegisterValueChangedCallback` when the player moves it, and offers `SetValueWithoutNotify` for filling it from code without firing the event; the settings panel uses the latter when it shows the file and the former when the player edits. Elements are found by `name` with `Q<T>("name")`, which is also how the Play Mode tests click them by sending a `NavigationSubmitEvent`.
 
 ## Saving and settings
 

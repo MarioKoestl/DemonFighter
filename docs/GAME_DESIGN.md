@@ -218,7 +218,7 @@ Whatever the stage: every wound must be visible on the body.
 ## World generation
 
 - Seeded. Same seed, same world.
-- v1: one biome, a bounded cavern of roughly 300 x 300 meters. Height variation, rock formations, lava pools and glowing fissures (light, damage on contact), shallow water pools, bone piles that hold a little free Biomass, cavern walls at the edge.
+- v1: one biome, a bounded cavern of roughly 300 x 300 meters. Height variation, rock formations, lava pools and glowing fissures (light, damage on contact: lava burns hard, fissures a little, the legs burn first; AI demons walk around them, D-086), shallow water pools, bone piles that hold a little free Biomass, cavern walls at the edge.
 - Spawn points for Tier 0 demons are clustered so early encounters are guaranteed. Elder routes are generated as loops through the area.
 - No jumping or climbing in v1; the generator must not create terrain that requires it. Flying is a later idea.
 - Later: multiple biomes, more hazards, vertical structures.

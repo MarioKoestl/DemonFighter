@@ -5,6 +5,7 @@ using System.Numerics;
 using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Evolution;
+using DemonFighter.Simulation.Hazards;
 using DemonFighter.Simulation.Persistence;
 using DemonFighter.Simulation.Skills;
 using DemonFighter.Simulation.Stats;
@@ -150,6 +151,15 @@ namespace DemonFighter.Simulation
 
         /// <summary>False once the core is destroyed; a dead demon is a corpse and takes no commands.</summary>
         public bool IsAlive => !Body.IsCoreDestroyed;
+
+        /// <summary>The hazard the demon stood in at the last tick (D-086); the HUD and the death screen read it. Not saved, the next tick finds it again.</summary>
+        public HazardKind Hazard { get; private set; }
+
+        /// <summary>
+        /// Test mode (D-089), a playtest setting: takes no damage, and Biomass and stat points never fall below 1000. Not
+        /// saved; the run applies the setting to the player after starting or loading.
+        /// </summary>
+        public bool InTestMode { get; private set; }
 
         /// <summary>Tick until which a Blunt hit keeps this demon from acting; -1 when never staggered.</summary>
         public long StaggeredUntilTick { get; private set; } = -1;
@@ -320,6 +330,35 @@ namespace DemonFighter.Simulation
         internal void SetIntent(MovementIntent intent)
         {
             Intent = intent;
+        }
+
+        /// <summary>Records the hazard the demon stands in this tick; the hazard system calls it.</summary>
+        internal void SetHazard(HazardKind kind)
+        {
+            Hazard = kind;
+        }
+
+        /// <summary>Switches test mode (D-089); the command handler calls it.</summary>
+        internal void SetTestMode(bool enabled)
+        {
+            InTestMode = enabled;
+        }
+
+        /// <summary>
+        /// Raises Biomass and unspent stat points to at least the given amounts (D-089). Neither counts as eaten or
+        /// earned, so the run summary stays honest.
+        /// </summary>
+        internal void TopUp(float biomass, int statPoints)
+        {
+            if (Biomass < biomass)
+            {
+                Biomass = biomass;
+            }
+
+            if (Stats.UnspentPoints < statPoints)
+            {
+                Stats.GrantPoints(statPoints - Stats.UnspentPoints);
+            }
         }
 
         /// <summary>Records that this demon dealt or took damage at the given tick.</summary>

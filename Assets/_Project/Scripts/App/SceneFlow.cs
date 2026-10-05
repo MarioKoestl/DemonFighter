@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using DemonFighter.Common;
+using DemonFighter.Presentation.Audio;
 using DemonFighter.UI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -11,25 +12,30 @@ namespace DemonFighter.App
     /// <summary>
     /// Moves the application between scenes: Bootstrap, then MainMenu, then Run, and back to the menu when a run is
     /// over or saved (ARCHITECTURE, "App"). Scene objects that need wiring get it here, right after their scene has
-    /// loaded, instead of fetching services from a static.
+    /// loaded, instead of fetching services from a static. The main menu's settings go through the applier (D-085).
     /// </summary>
     internal sealed class SceneFlow
     {
         private readonly RunController _runController;
-        private readonly GameSettings _settings;
+        private readonly SettingsApplier _applier;
+        private readonly MusicPlayer _music;
+        private readonly AudioClip? _menuTrack;
         private MainMenuScreen? _mainMenu;
 
-        public SceneFlow(RunController runController, GameSettings settings)
+        public SceneFlow(RunController runController, SettingsApplier applier, MusicPlayer music, AudioClip? menuTrack)
         {
             _runController = runController ?? throw new ArgumentNullException(nameof(runController));
-            _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _applier = applier ?? throw new ArgumentNullException(nameof(applier));
+            _music = music != null ? music : throw new ArgumentNullException(nameof(music));
+            _menuTrack = menuTrack;
             _runController.ReturnToMenuRequested += OnReturnToMenuRequested;
         }
 
-        /// <summary>Loads the main menu, shows Continue when a save exists and listens for New Run and Continue.</summary>
+        /// <summary>Loads the main menu, shows Continue when a save exists, fills the settings and listens for the buttons.</summary>
         public async Awaitable ShowMainMenuAsync()
         {
             await LoadSceneAsync(SceneNames.MainMenu);
+            _music.Play(_menuTrack);
             _mainMenu = Object.FindAnyObjectByType<MainMenuScreen>();
             if (_mainMenu == null)
             {
@@ -38,20 +44,32 @@ namespace DemonFighter.App
             }
 
             _mainMenu.ShowContinue(_runController.HasSavedRun);
-            _mainMenu.ShowSettings(_settings.RandomOffers);
+            _mainMenu.ConfigureSettings(_applier.ToValues());
             _mainMenu.NewRunRequested += OnNewRunRequested;
             _mainMenu.ContinueRequested += OnContinueRequested;
-            _mainMenu.RandomOffersToggled += OnRandomOffersToggled;
+            _mainMenu.QuitRequested += OnQuitRequested;
+            _mainMenu.SettingsChanged += OnSettingsChanged;
             _mainMenu.ResetHintsRequested += OnResetHintsRequested;
         }
 
-        private async void OnNewRunRequested()
+        /// <summary>Leaves the application; in the editor it stops Play Mode instead.</summary>
+        public static void Quit()
+        {
+            Log.Info(LogCategory.App, "Quit requested.");
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+        }
+
+        private async void OnNewRunRequested(int? seed)
         {
             DetachMenu();
             try
             {
                 await LoadSceneAsync(SceneNames.Run);
-                _runController.StartRun(NewSeed());
+                _runController.StartRun(seed ?? NewSeed());
             }
             catch (Exception exception)
             {
@@ -98,16 +116,21 @@ namespace DemonFighter.App
             {
                 _mainMenu.NewRunRequested -= OnNewRunRequested;
                 _mainMenu.ContinueRequested -= OnContinueRequested;
-                _mainMenu.RandomOffersToggled -= OnRandomOffersToggled;
+                _mainMenu.QuitRequested -= OnQuitRequested;
+                _mainMenu.SettingsChanged -= OnSettingsChanged;
                 _mainMenu.ResetHintsRequested -= OnResetHintsRequested;
                 _mainMenu = null;
             }
         }
 
-        // The settings box of the menu (D-076): the offers policy of the next run, and the first-run hints.
-        private void OnRandomOffersToggled(bool randomOffers)
+        private void OnSettingsChanged(SettingsValues values)
         {
-            _settings.RandomOffers = randomOffers;
+            _applier.Apply(values);
+        }
+
+        private static void OnQuitRequested()
+        {
+            Quit();
         }
 
         private static void OnResetHintsRequested()

@@ -6,6 +6,7 @@ using System.Text;
 using DemonFighter.Simulation;
 using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Content;
+using DemonFighter.Simulation.Hazards;
 using DemonFighter.Simulation.Progression;
 using DemonFighter.Simulation.Skills;
 using UnityEngine;
@@ -117,7 +118,7 @@ namespace DemonFighter.UI
             }
 
             _time.text = "Survived " + FormatTime(summary.SecondsSurvived) + "   seed " + summary.Seed;
-            _cause.text = summary.KillerName.Length > 0 ? "Killed by a " + summary.KillerName : "Bled out";
+            _cause.text = Cause(summary);
             _kills.text = summary.Kills == 1 ? "1 kill" : summary.Kills + " kills";
             _biomass.text = "Biomass eaten " + summary.BiomassEaten.ToString("0.0", CultureInfo.InvariantCulture);
             _tier.text = "Highest tier " + summary.HighestTier + (summary.FinalTier != summary.HighestTier ? " (final " + summary.FinalTier + ")" : string.Empty) + ", level " + summary.Level;
@@ -193,6 +194,25 @@ namespace DemonFighter.UI
             label.style.marginBottom = 6;
             Root.Add(label);
             return label;
+        }
+
+        // A living killer is named first; otherwise the fire or the wounds did it (D-086).
+        private static string Cause(RunSummary summary)
+        {
+            if (summary.KillerName.Length > 0)
+            {
+                return "Killed by a " + summary.KillerName;
+            }
+
+            switch (summary.DeathHazard)
+            {
+                case HazardKind.Lava:
+                    return "Burned in lava";
+                case HazardKind.Fissure:
+                    return "Burned in a fissure";
+                default:
+                    return "Bled out";
+            }
         }
 
         private static string FormatTime(float seconds)
