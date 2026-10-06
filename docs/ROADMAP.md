@@ -4,7 +4,9 @@ Milestones are ordered. Each has acceptance criteria that Mario can check in Pla
 
 ## Current milestone
 
-**M5: Look and feel.** M4 is merged. The code side of M5 is done on branch `feat/m5-look-and-feel` (2026-10-05): the art pipeline with import rules, a binder that maps `BP_<Part>_<State>` models to part assets by name, socket anchors as data, a validator and five briefs in `docs/briefs/` (D-079); four visual damage stages and mesh sets with stumps (D-080); gore stage 2 with URP decal projectors, corpse pools, code-born viscera, parts that fall as they looked and the `DemonFighter/DemonSkin` shader that soaks bodies in blood (D-081); procedural motion for bodies and parts with a clip slot per part (D-082); the render look with a generated volume profile, three graphics presets as pipeline assets, a shadow budget, flickering lights, painted surface textures and two-level LODs (D-083); data-driven audio over a pooled player with synthesized placeholder clips, ambient and lava loops and crossfading music (D-084); the main menu with a seed field and Quit, the pause menu, the shared settings panel and `settings.json` (D-085); 565 EditMode and 5 PlayMode tests. Open and Mario's: generate the first meshes from the briefs and drop them in, source real clips and the three music tracks with license entries, tune the look in Play Mode. Next: M6 Steam prep.
+**M6: Animation**, started 2026-10-06 on Mario's call (D-100): the procedural motion still looks like puppets, so bodies get one master skeleton, clips authored in Blender and an Animator built from code. First step: Blender installed, then the master skeleton and chapter 2 of `docs/BLENDER_GUIDE.md`. M7 Steam prep follows. M5 below stays open for Mario's assets, real audio clips and look tuning.
+
+**M5: Look and feel.** M4 is merged. The code side of M5 is done on branch `feat/m5-look-and-feel` (2026-10-05): the art pipeline with import rules, a binder that maps `BP_<Part>_<State>` models to part assets by name, socket anchors as data, a validator and five briefs in `docs/briefs/` (D-079); four visual damage stages and mesh sets with stumps (D-080); gore stage 2 with URP decal projectors, corpse pools, code-born viscera, parts that fall as they looked and the `DemonFighter/DemonSkin` shader that soaks bodies in blood (D-081); procedural motion for bodies and parts with a clip slot per part (D-082); the render look with a generated volume profile, three graphics presets as pipeline assets, a shadow budget, flickering lights, painted surface textures and two-level LODs (D-083); data-driven audio over a pooled player with synthesized placeholder clips, ambient and lava loops and crossfading music (D-084); the main menu with a seed field and Quit, the pause menu, the shared settings panel and `settings.json` (D-085); 565 EditMode and 5 PlayMode tests. Open and Mario's: generate the first meshes from the briefs and drop them in, source real clips and the three music tracks with license entries, tune the look in Play Mode. Next: M6 Animation (Mario, 2026-10-06: the procedural motion still looks like puppets), then M7 Steam prep.
 
 (Claude Code: update this section when a milestone completes. Do not rewrite other sections without asking.)
 
@@ -130,7 +132,20 @@ Acceptance:
 - [x] Audio: bites, wet impacts, footsteps, cavern ambient, lava, mutation and evolution; AI-generated music with a license entry (synthesized placeholders in place, D-084; the real clips, the music and their license entries are Mario's)
 - [x] Main menu, settings menu, pause menu (D-085)
 
-## M6: Steam prep
+## M6: Animation
+
+Demons move like animated creatures, not like puppets: one skeleton for every body plan, clips authored in Blender and blended by an Animator, procedural touches on top. Blender is the tool for rigging and animation; Mario learns it with a guide written for this project.
+
+- [ ] Master skeleton: one bone layout that holds the core (root, belly, chest, head, jaw) and every socket (two arms, two legs, the tail), built by a Blender script into a template file; bone names and the socket mapping documented in `ASSET_PIPELINE.md`
+- [ ] Blender guide for Mario (`docs/BLENDER_GUIDE.md`): navigation, armatures, automatic weights and weight painting, actions, the dope sheet and the graph editor, FBX export for Unity; every chapter ends with a task in this project
+- [ ] Rigging pipeline: a script places the Meshy core and parts on the skeleton and binds them with automatic weights; Mario fixes the weights; the exported skinned models bind to the part assets as the static ones do today
+- [ ] Clip set v1 on the master skeleton: idle, crawl (no legs), walk, run, bite, claw swipe, lunge, tail swing, eat, hit reaction (additive) and death; first blocking passes keyed by script, timing and polish by Mario
+- [ ] Animator Controller built from code: locomotion blended by speed and body plan (crawl without legs, walk with them), an attack layer masked to jaws, arms and tail whose clips stretch to the skill's windup, active and recovery times, an additive hit layer; the simulation stays the authority
+- [ ] Procedural layer on Unity's Animation Rigging package (decision entry): feet planted on the ground by IK, tail and loose flesh on damped bones, the head turned toward the target
+- [ ] The generated chains of D-098 and D-099 retire for rigged parts and stay as the fallback for parts without a rig; collars and junction flesh (D-097) stay where they still help
+- [ ] Captures before and after; D-082 superseded
+
+## M7: Steam prep
 
 - [ ] Steamworks integration (library choice recorded in `DECISIONS.md`), app id, overlay
 - [ ] Build pipeline: Build Profile for Windows x64, IL2CPP, a `Demon Fighter > Build` menu, versioning

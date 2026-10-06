@@ -27,6 +27,7 @@ This file is the entry point for Claude Code. Read it completely before touching
 | 3D models, animations, placeholders, licensing | `docs/ASSET_PIPELINE.md` |
 | Decisions already made, and open questions | `docs/DECISIONS.md` |
 | Unity concepts explained for a .NET developer | `docs/UNITY_PRIMER.md` |
+| Blender for rigging and animation, step by step | `docs/BLENDER_GUIDE.md` |
 
 ## Non-negotiable rules
 
