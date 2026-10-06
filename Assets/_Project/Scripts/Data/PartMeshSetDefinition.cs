@@ -24,6 +24,8 @@ namespace DemonFighter.Data
         [SerializeField] private float _scale = 1f;
         [SerializeField] private Vector3 _offset;
         [SerializeField] private Vector3 _euler;
+        [SerializeField, Range(0f, 2f)] private float _collar = 1f;
+        [SerializeField] private PartPairing _pairing = PartPairing.None;
 
         // The import fix (D-088), read from the file on every bind; not tuning, so not in the Inspector. The turn and
         // unit scale of the model file's own object (a Meshy or Blender export stores its upright turn and centimeter
@@ -69,6 +71,18 @@ namespace DemonFighter.Data
         /// <summary>Extra rotation in degrees on top of the file's own turn; 0 shows the model upright as the tool that made it showed it.</summary>
         public Vector3 Euler => _euler;
 
+        /// <summary>
+        /// Size of the flesh collar that grows the part out of the body (D-097): 1 is the default sleeve where the part
+        /// leaves the blob, 2 a thick one, 0 leaves the joint bare, as for a hide lying on the body.
+        /// </summary>
+        public float Collar => _collar;
+
+        /// <summary>
+        /// Whether the part is drawn as a left and a right copy that move on their own (D-099): Split for a model holding
+        /// both legs, Mirror for a model holding one, None for everything else.
+        /// </summary>
+        public PartPairing Pairing => _pairing;
+
         /// <summary>The file's unit scale times the size that makes the model's longest side one unit; the Scale knob multiplies it.</summary>
         public float ImportScale => _importScale > 0f ? _importScale : 1f;
 
@@ -106,6 +120,16 @@ namespace DemonFighter.Data
         }
 
         /// <summary>Sets the fit knobs; the generator seeds them once and the binder only on a first bind.</summary>
+        internal void SetPairing(PartPairing pairing)
+        {
+            _pairing = pairing;
+        }
+
+        internal void SetCollar(float collar)
+        {
+            _collar = Mathf.Clamp(collar, 0f, 2f);
+        }
+
         internal void SetFit(float scale, Vector3 offset, Vector3 euler)
         {
             if (scale <= 0f)

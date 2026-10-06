@@ -44,7 +44,7 @@ namespace DemonFighter.Editor.Generate
         /// Raise this whenever the generator writes something new or migrates an asset; the editor then reruns the
         /// generator by itself once (GeneratedAssetsGuard), so nobody has to remember the menu after pulling.
         /// </summary>
-        internal const int Version = 10;
+        internal const int Version = 14;
 
         // Generator versions that changed generated assets in place; assets written by an older version get the change
         // once: the post exposure and texture tint, then the painted surfaces, brighter and seamless (both D-087).
@@ -269,6 +269,20 @@ namespace DemonFighter.Editor.Generate
                     EditorUtility.SetDirty(part);
                 }
 
+                if (part.NeedsCollarDefaults)
+                {
+                    // Limbs, legs and tails grow out of the body through a flesh collar; faces and hides lie on it (D-097).
+                    part.ApplyCollarDefaults(visual.Collar);
+                    EditorUtility.SetDirty(part);
+                }
+
+                if (part.NeedsPairingDefaults)
+                {
+                    // Legs move one by one: the pair model is cut in half and each half steps on its own (D-099).
+                    part.ApplyPairingDefaults(visual.Pairing);
+                    EditorUtility.SetDirty(part);
+                }
+
                 parts[spec.Id] = part;
             }
 
@@ -394,7 +408,15 @@ namespace DemonFighter.Editor.Generate
                 throw new IOException("Demon " + spec.Id + " starts with unknown evolution " + spec.StartingEvolutionId + ".");
             }
 
-            return EditorAssets.LoadOrCreate<DemonDefinition>(DemonsFolder + "/DM_" + FileName(spec.Name) + ".asset", demon => demon.Configure(spec, core, startingParts, startingEvolution));
+            DemonDefinition demon = EditorAssets.LoadOrCreate<DemonDefinition>(DemonsFolder + "/DM_" + FileName(spec.Name) + ".asset", created => created.Configure(spec, core, startingParts, startingEvolution));
+            if (demon.NeedsBirthDefaults)
+            {
+                // What a kind is born with, the random body and evolutions (D-095); an older asset gets it once, later edits stay.
+                demon.ApplyBirthDefaults(spec);
+                EditorUtility.SetDirty(demon);
+            }
+
+            return demon;
         }
 
         private static T[] Resolve<T>(Dictionary<string, T> byId, IReadOnlyList<string> ids)

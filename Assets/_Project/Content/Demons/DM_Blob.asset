@@ -20,3 +20,11 @@ MonoBehaviour:
   _moveSpeed: 4
   _sprintMultiplier: 1.6
   _startingStats: []
+  _startingParts: []
+  _startingBiomass: 0
+  _startingLevel: 1
+  _startingEvolution: {fileID: 0}
+  _randomPartChance: 0
+  _startingPartsAtMaxUpgrade: 0
+  _randomEvolutionStages: 0
+  _contentVersion: 2

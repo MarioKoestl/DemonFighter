@@ -171,6 +171,7 @@ namespace DemonFighter.Presentation.Demons
             for (int i = 0; i < _parts.Count; i++)
             {
                 BodyPartView view = _parts[i];
+                view.SetFleshTint(corpseMaterial.color);
                 if (_demon.Body.HasPart(view.PartIndex))
                 {
                     BodyPart part = _demon.Body.GetPart(view.PartIndex);
@@ -257,12 +258,15 @@ namespace DemonFighter.Presentation.Demons
                 _appliedTier = _demon.Tier;
                 _ownerMaterial = _visuals.Palette.ForDemon(_demon);
                 Color tint = _figure.OwnerTint(_ownerMaterial);
+                Color flesh = _figure.FleshTint(_ownerMaterial);
                 for (int i = 0; i < _parts.Count; i++)
                 {
                     if (_ownerColored[i])
                     {
                         _parts[i].ApplyOwner(_ownerMaterial, tint);
                     }
+
+                    _parts[i].SetFleshTint(flesh);
                 }
             }
         }
@@ -292,13 +296,20 @@ namespace DemonFighter.Presentation.Demons
                 {
                     BodyPart part = body.GetPart(view.PartIndex);
                     view.ShowDamage(DamageStages.For(part.Hp / part.MaxHp, part.IsLost, _settings!.WoundedBelowHpFraction, _settings.MangledBelowHpFraction));
+                    view.ShowUpgrade(part.UpgradeLevel, _settings.UpgradeGrowthPerLevel);
                     view.Dry(deltaTime, _settings.BloodDrySeconds);
                     view.Cool(deltaTime, _settings.BurnCoolSeconds);
                 }
 
-                if (!IsCorpse && _animator != null && !view.HasClip && view.Motion != PartMotion.None)
+                if (!IsCorpse && _animator != null && !view.HasClip && view.Motion != PartMotion.None && !view.ChainOwnsPose)
                 {
                     view.SetAnimation(_animator.PartRotation(view.Motion, view.CopyIndex));
+                }
+
+                // Generated bones follow after the part itself has turned (D-098).
+                if (!IsCorpse && view.HasChain)
+                {
+                    view.UpdateChain(new ChainContext(deltaTime, _animator != null ? _animator.LimbFlex() : 0.9f, transform.up, transform.right, transform.forward, _demon.Velocity.ToUnity(), transform.position.y));
                 }
             }
         }
@@ -329,17 +340,16 @@ namespace DemonFighter.Presentation.Demons
                     }
                 }
 
-                BodyPartView? view = _figure.CreatePart(_visuals, part, this, _ownerMaterial, copyIndex, out bool ownerColored);
-                if (view == null)
+                List<BodyPartView> views = _figure.CreatePartViews(_visuals, part, this, _ownerMaterial, copyIndex, out bool ownerColored);
+                for (int v = 0; v < views.Count; v++)
                 {
-                    continue;
+                    BodyPartView view = views[v];
+                    view.RememberBasePose();
+                    view.SetVisible(_bodyVisible);
+                    _parts.Add(view);
+                    _ownerColored.Add(ownerColored);
+                    _lodDirty = true;
                 }
-
-                view.RememberBasePose();
-                view.SetVisible(_bodyVisible);
-                _parts.Add(view);
-                _ownerColored.Add(ownerColored);
-                _lodDirty = true;
             }
 
             if (_lodDirty)
@@ -384,6 +394,9 @@ namespace DemonFighter.Presentation.Demons
             _appliedSize = sizeMeters;
             float radius = sizeMeters * _settings.RadiusPerMeter;
             _controller.radius = radius;
+
+            // The height first: the controller refuses a step offset taller than itself.
+            FitController(force: true);
             _controller.stepOffset = Mathf.Min(sizeMeters * _settings.StepOffsetPerMeter, sizeMeters * 0.5f);
             _controller.skinWidth = sizeMeters * _settings.SkinWidthPerMeter;
             _controller.slopeLimit = _settings.SlopeLimitDegrees;
@@ -393,8 +406,6 @@ namespace DemonFighter.Presentation.Demons
             {
                 _parts[0].RememberBasePose();
             }
-
-            FitController(force: true);
         }
 
         // The capsule reaches from the feet to the top of the core, which stands on its legs (D-094); refit only on a

@@ -28,6 +28,7 @@ namespace DemonFighter.Presentation.Demons
         private const float MinimumHeight = 0.0001f;
         private const int CapsuleAlongY = 1;
         private const float StanceSettleSeconds = 0.3f;
+        private const float RootFadePerRadius = 1.5f;
         private static readonly Vector3 FallbackAnchor = new Vector3(0f, 0.5f, 0f);
         private static readonly Quaternion LyingRotation = Quaternion.Euler(-90f, 0f, 0f);
 
@@ -35,6 +36,11 @@ namespace DemonFighter.Presentation.Demons
         private readonly CapsuleCollider? _coreCapsule;
         private readonly Renderer[] _decorations;
         private readonly List<BodyPartView> _standing = new List<BodyPartView>();
+        private readonly List<Vector4> _junctions = new List<Vector4>();
+        private BodyPartView? _coreView;
+        private Material? _coreMaterial;
+        private Texture? _fleshSource;
+        private float _size = 1f;
         private PartMeshSet? _coreMeshes;
         private Bounds _coreBounds;
         private IReadOnlyList<SocketAnchorDefinition> _anchors = Array.Empty<SocketAnchorDefinition>();
@@ -119,6 +125,12 @@ namespace DemonFighter.Presentation.Demons
         /// </summary>
         public void ApplySize(float sizeMeters, float radiusPerMeter)
         {
+            _size = Mathf.Max(sizeMeters, MinimumHeight);
+            if (_coreView != null)
+            {
+                _coreView.SetFleshParent(CoreParent());
+            }
+
             float radius = sizeMeters * radiusPerMeter;
             var capsuleScale = new Vector3(radius / CapsuleMeshRadius, sizeMeters / CapsuleMeshHeight, radius / CapsuleMeshRadius);
             Placeholders.localPosition = Vector3.up * (sizeMeters * 0.5f);
@@ -188,14 +200,23 @@ namespace DemonFighter.Presentation.Demons
             }
 
             core.SetMotion(PartMotion.None, 0, false);
+
+            // The core wears junction flesh where parts leave it (D-097); its collars wear its material.
+            _coreView = core;
+            _coreMaterial = _coreMeshes.HasValue && _coreMeshes.Value.Material != null ? _coreMeshes.Value.Material : ownerMaterial;
+            _fleshSource = _coreMaterial.mainTexture;
+            _junctions.Clear();
+            core.SetFlesh(_fleshSource != null ? _fleshSource : Texture2D.whiteTexture, FleshTint(ownerMaterial), CoreParent(), Vector4.zero, 0f);
+            core.SetFleshJunctions(_junctions);
         }
 
         /// <summary>
         /// Creates and initializes the view of a part: on the rig at its socket anchor when the part has meshes, as
         /// a primitive in the placeholder space otherwise; null when the part is drawn by the body itself.
         /// </summary>
-        public BodyPartView? CreatePart(PartVisuals visuals, BodyPart part, DemonView? owner, Material ownerMaterial, int copyIndex, out bool ownerColored)
+        public List<BodyPartView> CreatePartViews(PartVisuals visuals, BodyPart part, DemonView? owner, Material ownerMaterial, int copyIndex, out bool ownerColored)
         {
+            var views = new List<BodyPartView>(2);
             if (visuals == null)
             {
                 throw new ArgumentNullException(nameof(visuals));
@@ -216,11 +237,27 @@ namespace DemonFighter.Presentation.Demons
                     rotation = Quaternion.identity;
                 }
 
+                // A pair, as legs: two copies of one part that move on their own, the right half and its mirror image (D-099).
+                if (meshes.Value.Pairing != PartPairing.None)
+                {
+                    PartMeshSet side = meshes.Value.Pairing == PartPairing.Split ? meshes.Value.Half() : meshes.Value;
+                    var gait = new LegGait();
+                    ownerColored = false;
+                    for (int i = 0; i < 2; i++)
+                    {
+                        PartMeshSet placed = i == 0 ? side : side.Mirrored();
+                        BodyPartView copy = visuals.CreateMeshPart(part, meshes.Value, Rig, position, rotation, ownerMaterial, out Material copyMaterial, out ownerColored, placed, gait, i);
+                        Finish(copy, owner, part, copyMaterial, ownerColored, meshes.Value, motion, i, ownerMaterial);
+                        views.Add(copy);
+                    }
+
+                    return views;
+                }
+
                 BodyPartView view = visuals.CreateMeshPart(part, meshes.Value, Rig, position, rotation, ownerMaterial, out Material material, out ownerColored);
-                view.Initialize(owner, part.Index, material, ownerColored && meshes.Value.HasOwnMaterial ? OwnerTint(ownerMaterial) : (Color?)null);
-                view.SetMotion(motion, copyIndex, meshes.Value.Clip != null);
-                StandOnIfLocomotion(part, view);
-                return view;
+                Finish(view, owner, part, material, ownerColored, meshes.Value, motion, copyIndex, ownerMaterial);
+                views.Add(view);
+                return views;
             }
 
             BodyPartView? primitive = visuals.Create(part, Placeholders, ownerMaterial, copyIndex, out Material primitiveMaterial, out ownerColored);
@@ -229,9 +266,33 @@ namespace DemonFighter.Presentation.Demons
                 primitive.Initialize(owner, part.Index, primitiveMaterial, null);
                 primitive.SetMotion(motion, copyIndex, false);
                 StandOnIfLocomotion(part, primitive);
+                views.Add(primitive);
             }
 
-            return primitive;
+            return views;
+        }
+
+        // Look, motion, stance and collar of a new mesh part view.
+        private void Finish(BodyPartView view, DemonView? owner, BodyPart part, Material material, bool ownerColored, in PartMeshSet meshes, PartMotion motion, int copyIndex, Material ownerMaterial)
+        {
+            view.Initialize(owner, part.Index, material, ownerColored && meshes.HasOwnMaterial ? OwnerTint(ownerMaterial) : (Color?)null);
+            view.SetMotion(motion, copyIndex, meshes.Clip != null);
+            StandOnIfLocomotion(part, view);
+            GrowCollar(view, ownerMaterial);
+        }
+
+        /// <summary>
+        /// The tint of the junction flesh and the collars: the owner tint on a textured core, the owner color on the
+        /// capsule, so the joints match the body they grow from (D-097).
+        /// </summary>
+        public Color FleshTint(Material ownerMaterial)
+        {
+            if (ownerMaterial == null)
+            {
+                throw new ArgumentNullException(nameof(ownerMaterial));
+            }
+
+            return _coreMeshes.HasValue && _coreMeshes.Value.HasOwnMaterial ? OwnerTint(ownerMaterial) : ownerMaterial.color;
         }
 
         /// <summary>Moves the stance toward what the standing parts give now, over the settle time, so the body rises on new legs and drops when it loses them.</summary>
@@ -301,6 +362,65 @@ namespace DemonFighter.Presentation.Demons
             {
                 Root.position += Vector3.up * (_root.position.y - lowest);
             }
+        }
+
+        // The collar that grows a mesh part out of the core, the flesh at the part's root and on the core around the
+        // joint (D-097). Skipped when the core or the part cannot be read, or the part does not leave the body.
+        private void GrowCollar(BodyPartView view, Material ownerMaterial)
+        {
+            PartMeshSet? meshes = view.Meshes;
+            Mesh? partMesh = view.CurrentMesh;
+            if (meshes == null || meshes.Value.Collar <= 0f || partMesh == null || _coreMaterial == null)
+            {
+                return;
+            }
+
+            CoreSurface? surface = SurfaceOfCore(out string surfaceKey);
+            if (surface == null)
+            {
+                return;
+            }
+
+            Transform piece = view.transform;
+            var partToRig = Matrix4x4.TRS(piece.localPosition, piece.localRotation, piece.localScale);
+            Vector3 pivot = piece.localPosition + (piece.localRotation * (meshes.Value.Pivot * meshes.Value.Scale));
+            CollarShape? shape = PartCollars.ShapeFor(surface, surfaceKey, partMesh, partToRig, pivot, meshes.Value.Collar);
+            if (shape == null)
+            {
+                return;
+            }
+
+            SkinnedMeshRenderer collar = PartCollars.Create(shape, Rig, piece, _coreMaterial, view.gameObject.layer);
+            view.AttachCollar(collar, shape);
+            Vector3 top = shape.TopCenter;
+            view.SetFlesh(_fleshSource != null ? _fleshSource : Texture2D.whiteTexture, FleshTint(ownerMaterial), Matrix4x4.identity, new Vector4(top.x, top.y, top.z, shape.TopRadius), shape.TopRadius * RootFadePerRadius);
+            Vector3 joint = shape.BaseCenter;
+            _junctions.Add(new Vector4(joint.x, joint.y, joint.z, shape.BaseRadius));
+            if (_coreView != null)
+            {
+                _coreView.SetFleshJunctions(_junctions);
+            }
+        }
+
+        // The core mesh in rig space: the bound core or the prefab capsule, placed by the body transform.
+        private CoreSurface? SurfaceOfCore(out string key)
+        {
+            key = string.Empty;
+            MeshFilter coreFilter = Body.GetComponent<MeshFilter>();
+            Mesh? mesh = _coreMeshes.HasValue ? _coreMeshes.Value.Intact : (coreFilter != null ? coreFilter.sharedMesh : null);
+            if (mesh == null)
+            {
+                return null;
+            }
+
+            Matrix4x4 coreToRig = CoreParent() * Matrix4x4.TRS(Body.localPosition, Body.localRotation, Body.localScale);
+            return PartCollars.SurfaceOf(mesh, coreToRig, out key);
+        }
+
+        // From the space of the figure root, where the body hangs, to rig space in body units.
+        private Matrix4x4 CoreParent()
+        {
+            return Matrix4x4.Scale(Vector3.one / _size);
         }
 
         private void StandOnIfLocomotion(BodyPart part, BodyPartView view)

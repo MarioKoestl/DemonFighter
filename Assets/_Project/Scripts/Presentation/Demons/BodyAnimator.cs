@@ -155,6 +155,33 @@ namespace DemonFighter.Presentation.Demons
             return Quaternion.Euler(pitch, 0f, roll);
         }
 
+        /// <summary>
+        /// How far the arms reach, 0 to 1 of their length (D-098): a little bent at rest, pulled in while a swipe winds
+        /// up, straight on the strike, bent again as it settles.
+        /// </summary>
+        public float LimbFlex()
+        {
+            const float rest = 0.9f;
+            const float woundUp = 0.6f;
+            const float struck = 1f;
+            if (_attack != SkillMotion.Swipe)
+            {
+                return rest;
+            }
+
+            if (_attackTime < _windup)
+            {
+                return Mathf.Lerp(rest, woundUp, Ease(_attackTime / Mathf.Max(_windup, MinimumSeconds)));
+            }
+
+            if (_attackTime < _windup + _active)
+            {
+                return Mathf.Lerp(woundUp, struck, Ease((_attackTime - _windup) / Mathf.Max(_active, MinimumSeconds)));
+            }
+
+            return Mathf.Lerp(struck, rest, Ease((_attackTime - _windup - _active) / Mathf.Max(_recovery, MinimumSeconds)));
+        }
+
         /// <summary>Vertical bob of the whole figure in body units: a bounce per step, scaled by how fast it moves.</summary>
         public float FigureBob()
         {

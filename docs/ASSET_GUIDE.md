@@ -220,6 +220,9 @@ After Generate, select the part asset in `Assets/_Project/Content/BodyParts` (`B
 - **Euler:** turns the part around the point where it meets the body. X tips the upright part over (90 points it out of the body), then Y swings it around the vertical (-90 points an arm forward). The arm brief has a table of values.
 - **Offset:** moves the part along its socket (D-088). Positive Z pushes it out of the body, negative Z into it, Y moves it up. Use small steps, 0.02 to 0.05.
 - The second arm takes every value mirrored, so you set them once.
+- **Collar:** the flesh sleeve that grows the part out of the blob (D-097). 1 is right for arms, legs and tails, 0 for eyes, jaws and hides that lie on the body. Raise it for a thicker joint.
+- **Pairing:** only for legs (D-099). Split when the model holds both legs, as the legs brief asks: the game cuts it in half and moves each leg on its own. Mirror for a model of one leg.
+- Arms, tails and legs bend with bones the game makes from the model (D-098), so a straight model bends best.
 
 ### 3.3 Look at it in the game
 

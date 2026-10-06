@@ -16,7 +16,7 @@ namespace DemonFighter.Presentation.Demons
         private readonly Mesh? _mangled;
         private readonly Mesh? _stump;
 
-        public PartMeshSet(Mesh intact, Mesh? wounded, Mesh? mangled, Mesh? stump, Material? material, AnimationClip? clip, float scale, Vector3 offset, Quaternion rotation, Vector3 pivot = default)
+        public PartMeshSet(Mesh intact, Mesh? wounded, Mesh? mangled, Mesh? stump, Material? material, AnimationClip? clip, float scale, Vector3 offset, Quaternion rotation, Vector3 pivot = default, float collar = 0f, PartPairing pairing = PartPairing.None, Quaternion importRotation = default)
         {
             if (intact == null)
             {
@@ -33,6 +33,31 @@ namespace DemonFighter.Presentation.Demons
             Offset = offset;
             Rotation = rotation;
             Pivot = pivot;
+            Collar = Mathf.Max(collar, 0f);
+            Pairing = pairing;
+
+            // The model's own up and right in mesh units: the import turn makes up and right of the model as the tool showed it.
+            Quaternion import = Quaternion.Dot(importRotation, importRotation) > 0.5f ? importRotation : Quaternion.identity;
+            UpAxis = Quaternion.Inverse(import) * Vector3.up;
+            SideAxis = Quaternion.Inverse(import) * Vector3.right;
+        }
+
+        private PartMeshSet(PartMeshSet source, Mesh intact, Mesh? wounded, Mesh? mangled, Mesh? stump, Vector3 offset, Quaternion rotation, Vector3 pivot, Vector3 upAxis, Vector3 sideAxis)
+        {
+            _intact = intact;
+            _wounded = wounded;
+            _mangled = mangled;
+            _stump = stump;
+            Material = source.Material;
+            Clip = source.Clip;
+            Scale = source.Scale;
+            Offset = offset;
+            Rotation = rotation;
+            Pivot = pivot;
+            Collar = source.Collar;
+            Pairing = source.Pairing;
+            UpAxis = upAxis;
+            SideAxis = sideAxis;
         }
 
         /// <summary>The mesh of an unhurt part; the one every set has.</summary>
@@ -62,6 +87,18 @@ namespace DemonFighter.Presentation.Demons
         /// <summary>The point of the mesh, in its own units, that sits on the socket anchor (D-088).</summary>
         public Vector3 Pivot { get; }
 
+        /// <summary>Size of the flesh collar around the joint (D-097); 0 for none.</summary>
+        public float Collar { get; }
+
+        /// <summary>Whether the part is drawn as a left and a right copy that move on their own (D-099).</summary>
+        public PartPairing Pairing { get; }
+
+        /// <summary>Up of the model as the tool showed it, in mesh units; legs stand along it.</summary>
+        public Vector3 UpAxis { get; }
+
+        /// <summary>Right of the model as the tool showed it, in mesh units; a pair model is cut across it.</summary>
+        public Vector3 SideAxis { get; }
+
         /// <summary>
         /// The set for a copy on the left flank (D-088): every mesh mirrored across its own X axis and the fit mirrored
         /// with it, so the left arm is the mirror image of the right one in shape and in pose.
@@ -69,16 +106,35 @@ namespace DemonFighter.Presentation.Demons
         public PartMeshSet Mirrored()
         {
             return new PartMeshSet(
+                this,
                 MirroredMeshes.For(_intact),
                 _wounded != null ? MirroredMeshes.For(_wounded) : null,
                 _mangled != null ? MirroredMeshes.For(_mangled) : null,
                 _stump != null ? MirroredMeshes.For(_stump) : null,
-                Material,
-                Clip,
-                Scale,
                 SocketAnchors.MirrorOffset(Offset),
                 SocketAnchors.MirrorRotation(Rotation),
-                new Vector3(-Pivot.x, Pivot.y, Pivot.z));
+                new Vector3(-Pivot.x, Pivot.y, Pivot.z),
+                new Vector3(-UpAxis.x, UpAxis.y, UpAxis.z),
+                new Vector3(-SideAxis.x, SideAxis.y, SideAxis.z));
+        }
+
+        /// <summary>
+        /// The right half of a model that holds a pair (D-099): every mesh cut through the pivot across the model's
+        /// right, the fit unchanged, so the half sits exactly where it sat in the pair; its mirror image is the other.
+        /// </summary>
+        public PartMeshSet Half()
+        {
+            return new PartMeshSet(
+                this,
+                HalfMeshes.For(_intact, Pivot, SideAxis),
+                _wounded != null ? HalfMeshes.For(_wounded, Pivot, SideAxis) : null,
+                _mangled != null ? HalfMeshes.For(_mangled, Pivot, SideAxis) : null,
+                _stump != null ? HalfMeshes.For(_stump, Pivot, SideAxis) : null,
+                Offset,
+                Rotation,
+                Pivot,
+                UpAxis,
+                SideAxis);
         }
 
         /// <summary>
@@ -111,7 +167,7 @@ namespace DemonFighter.Presentation.Demons
 
             // The knobs apply on top of the turn and unit scale the model file carries (D-088).
             Quaternion rotation = Quaternion.Euler(definition.Euler) * definition.ImportRotation;
-            set = new PartMeshSet(definition.Intact!, definition.Wounded, definition.Mangled, definition.Stump, definition.Material, definition.Clip, definition.Scale * definition.ImportScale, definition.Offset, rotation, definition.ImportPivot);
+            set = new PartMeshSet(definition.Intact!, definition.Wounded, definition.Mangled, definition.Stump, definition.Material, definition.Clip, definition.Scale * definition.ImportScale, definition.Offset, rotation, definition.ImportPivot, definition.Collar, definition.Pairing, definition.ImportRotation);
             return true;
         }
 

@@ -118,7 +118,7 @@ namespace DemonFighter.Simulation
         public Demon SpawnDemon(ControllerKind controller, DemonSpec spec, Vector3 position, float yaw)
         {
             var demon = new Demon(new DemonId(DemonIds.Next()), controller, spec, Catalog, position, yaw);
-            demon.ApplyStartingPackage();
+            demon.ApplyStartingPackage(Rng);
             _demonsById.Add(demon.Id, demon);
             _demons.Add(demon);
             return demon;

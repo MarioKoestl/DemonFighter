@@ -117,7 +117,7 @@ namespace DemonFighter.Presentation.Demons
         /// anchor rotation, a box trigger around the current mesh. The imported material wins over the palette role.
         /// A set with a legacy clip plays it in a loop instead of the procedural motion (D-082).
         /// </summary>
-        public BodyPartView CreateMeshPart(BodyPart part, PartMeshSet meshes, Transform rig, Vector3 anchorPosition, Quaternion anchorRotation, Material ownerMaterial, out Material material, out bool usesOwnerMaterial)
+        public BodyPartView CreateMeshPart(BodyPart part, PartMeshSet meshes, Transform rig, Vector3 anchorPosition, Quaternion anchorRotation, Material ownerMaterial, out Material material, out bool usesOwnerMaterial, PartMeshSet? placedSet = null, LegGait? gait = null, int side = 0)
         {
             if (part == null)
             {
@@ -136,13 +136,25 @@ namespace DemonFighter.Presentation.Demons
 
             // Fit values are set for the right side; a copy on the left flank is the mirror image, mesh and fit (D-088).
             bool mirrored = definition != null && definition.Visual.MirrorSecondCopy && anchorPosition.x < 0f;
-            PartMeshSet placed = mirrored ? meshes.Mirrored() : meshes;
+            PartMeshSet placed = placedSet ?? (mirrored ? meshes.Mirrored() : meshes);
             SocketAnchors.PlaceMesh(anchorPosition, anchorRotation, placed, out Vector3 position, out Quaternion rotation);
             piece.transform.localPosition = position;
             piece.transform.localRotation = rotation;
             piece.transform.localScale = Vector3.one * meshes.Scale;
-            piece.AddComponent<MeshFilter>();
-            piece.AddComponent<MeshRenderer>();
+
+            // Tails and arms get a bone chain made from the model (D-098); everything else stays rigid.
+            PartMotion motion = definition != null ? definition.Visual.Motion : PartMotion.None;
+            PartSkeleton? skeleton = ChainBones.SkeletonFor(motion, placed);
+            if (skeleton != null)
+            {
+                piece.AddComponent<SkinnedMeshRenderer>();
+            }
+            else
+            {
+                piece.AddComponent<MeshFilter>();
+                piece.AddComponent<MeshRenderer>();
+            }
+
             BoxCollider box = piece.AddComponent<BoxCollider>();
             box.isTrigger = true;
             if (meshes.Clip != null)
@@ -162,6 +174,10 @@ namespace DemonFighter.Presentation.Demons
 
             BodyPartView view = piece.AddComponent<BodyPartView>();
             view.SetMeshes(placed);
+            if (skeleton != null)
+            {
+                view.SetSkeleton(skeleton, motion, gait, side);
+            }
 
             PartMaterialRole role = definition != null ? definition.Visual.Material : PartMaterialRole.Owner;
             usesOwnerMaterial = role == PartMaterialRole.Owner;

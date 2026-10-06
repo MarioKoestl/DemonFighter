@@ -16,7 +16,9 @@ namespace DemonFighter.Data
     {
         private const int M3ContentVersion = 3;
         private const int M5ContentVersion = 6;
-        private const int CurrentContentVersion = 7;
+        private const int SizeContentVersion = 7;
+        private const int CollarContentVersion = 8;
+        private const int CurrentContentVersion = 9;
 
         [Header("Identity")]
         [SerializeField] private string _id = "part.new";
@@ -77,7 +79,13 @@ namespace DemonFighter.Data
         internal bool NeedsM5Defaults => _contentVersion < M5ContentVersion;
 
         /// <summary>True for an asset created before parts could make a body bigger (D-091).</summary>
-        internal bool NeedsSizeDefaults => _contentVersion < CurrentContentVersion;
+        internal bool NeedsSizeDefaults => _contentVersion < SizeContentVersion;
+
+        /// <summary>True for an asset created before parts grew collars (D-097).</summary>
+        internal bool NeedsCollarDefaults => _contentVersion < CollarContentVersion;
+
+        /// <summary>True for an asset created before legs were drawn as two that move on their own (D-099).</summary>
+        internal bool NeedsPairingDefaults => _contentVersion < CurrentContentVersion;
 
         /// <summary>Builds the immutable spec; throws for invalid content or a missing reference.</summary>
         public BodyPartSpec ToSpec()
@@ -211,6 +219,20 @@ namespace DemonFighter.Data
         internal void ApplySizeDefaults(float sizeBonus)
         {
             _sizeBonus = sizeBonus;
+            _contentVersion = SizeContentVersion;
+        }
+
+        /// <summary>Gives an older asset its collar size once (D-097): limbs, legs and tails grow out of the body, faces and hides do not.</summary>
+        internal void ApplyCollarDefaults(float collar)
+        {
+            _visual.Meshes.SetCollar(collar);
+            _contentVersion = CollarContentVersion;
+        }
+
+        /// <summary>Gives an older asset its pairing once (D-099): the legs model holds both legs, cut in half by the game.</summary>
+        internal void ApplyPairingDefaults(PartPairing pairing)
+        {
+            _visual.Meshes.SetPairing(pairing);
             _contentVersion = CurrentContentVersion;
         }
 

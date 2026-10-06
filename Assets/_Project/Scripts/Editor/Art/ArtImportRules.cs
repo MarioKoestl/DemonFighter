@@ -15,7 +15,8 @@ namespace DemonFighter.Editor.Art
     /// </summary>
     internal sealed class ArtImportRules : AssetPostprocessor
     {
-        private const uint RulesVersion = 3;
+        private const uint RulesVersion = 5;
+        private const float FleshSmoothingAngle = 80f;
         private const string StandalonePlatform = "Standalone";
         private static readonly string[] NormalHints = { "normal", "_nrm", "_nor", "_n" };
         private static readonly string[] DataHints = { "rough", "metal", "_ao", "occlusion", "orm", "mask", "height", "displace", "smooth", "gloss" };
@@ -59,7 +60,19 @@ namespace DemonFighter.Editor.Art
             importer.importCameras = false;
             importer.importLights = false;
             importer.importVisibility = false;
-            importer.importNormals = ModelImporterNormals.Import;
+            // Generated flesh often comes with a normal per triangle, which shades a body like crumpled paper; bodies and
+            // parts get smooth normals up to a crease angle that keeps claws and teeth sharp (D-097).
+            if (ArtFolders.SmoothNormals(assetPath))
+            {
+                importer.importNormals = ModelImporterNormals.Calculate;
+                importer.normalSmoothingSource = ModelImporterNormalSmoothingSource.PreferSmoothingGroups;
+                importer.normalCalculationMode = ModelImporterNormalCalculationMode.AreaAndAngleWeighted;
+                importer.normalSmoothingAngle = FleshSmoothingAngle;
+            }
+            else
+            {
+                importer.importNormals = ModelImporterNormals.Import;
+            }
             importer.importTangents = ModelImporterTangents.CalculateMikk;
             importer.animationType = ModelImporterAnimationType.None;
             importer.importAnimation = false;

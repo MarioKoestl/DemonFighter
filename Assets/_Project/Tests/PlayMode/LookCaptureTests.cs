@@ -1,10 +1,13 @@
 #nullable enable
 using System.Collections;
 using System.IO;
+using System.Reflection;
 using DemonFighter.App;
 using DemonFighter.Presentation;
+using DemonFighter.Presentation.Demons;
 using DemonFighter.Simulation;
 using DemonFighter.Simulation.Anatomy;
+using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Worldgen;
 using DemonFighter.UI;
 using NUnit.Framework;
@@ -32,6 +35,7 @@ namespace DemonFighter.PlayMode.Tests
         private const string OutputFolder = "TestResults/look";
         private const string SeedText = "lookcapture";
         private const string ArmId = "part.arm";
+        private static readonly string[] EveryPart = { "part.eyes", "part.jaws", "part.arm", "part.arm", "part.legs", "part.tail", "part.spines" };
 
         [TearDown]
         public void LeaveNoRunBehind()
@@ -120,8 +124,122 @@ namespace DemonFighter.PlayMode.Tests
                 Capture(capture, "5-arms");
             }
 
+            // The player grown with every part, close up from all sides: how the parts meet the core.
+            if (player != null)
+            {
+                yield return EquipEveryPart(state, player);
+                DemonView? body = ViewOf(player);
+                if (body != null)
+                {
+                    Vector3 center = body.BodyCenter;
+                    Vector3 forward = body.transform.forward;
+                    Vector3 right = body.transform.right;
+                    float size = player.SizeMeters + body.Stance;
+                    CaptureFrom(capture, center, (forward * 2.4f) + (Vector3.up * 0.4f), size, "7-body-front");
+                    CaptureFrom(capture, center, (right * 2.4f) + (Vector3.up * 0.4f), size, "8-body-side");
+                    CaptureFrom(capture, center, (-forward * 2.4f) + (Vector3.up * 0.6f), size, "9-body-back");
+                    CaptureFrom(capture, center, (((forward + right) * 1.5f) + (Vector3.up * 0.9f)), size, "10-body-quarter");
+                    // Close to the joints, aimed by rig points: the right shoulder and the root of the tail.
+                    Transform rig = body.Figure.Rig;
+                    CaptureFrom(capture, rig.TransformPoint(new Vector3(0.15f, 0.63f, 0.12f)), (right * 0.55f) + (forward * 0.55f) + (Vector3.up * 0.2f), player.SizeMeters, "11-joint-shoulder");
+                    CaptureFrom(capture, rig.TransformPoint(new Vector3(0f, 0.14f, -0.27f)), (right * 0.7f) - (forward * 0.35f) + (Vector3.up * 0.3f), player.SizeMeters, "12-joint-tail");
+
+                    // The arms through a swipe and the tail through a swing, a frame at a time: the generated bones in motion.
+                    body.PlayAttack("skill.claw", 0.3f, 0.15f, 0.35f);
+                    for (int frame = 0; frame < 5; frame++)
+                    {
+                        yield return new WaitForSeconds(0.13f);
+                        CaptureFrom(capture, body.BodyCenter, (forward * 1.7f) + (right * 1.5f) + (Vector3.up * 0.4f), size, "13-swipe-" + frame);
+                    }
+
+                    yield return new WaitForSeconds(0.5f);
+                    body.PlayAttack("skill.tailswing", 0.25f, 0.2f, 0.4f);
+                    for (int frame = 0; frame < 5; frame++)
+                    {
+                        yield return new WaitForSeconds(0.12f);
+                        CaptureFrom(capture, body.BodyCenter, (-forward * 1.2f) + (right * 0.9f) + (Vector3.up * 1.6f), size, "14-tail-" + frame);
+                    }
+                }
+            }
+
+            // A walking AI demon grown with every part, followed from the side: legs stepping, arms and tail swinging.
+            Demon? walker = null;
+            for (float waited = 0f; walker == null && waited < 3f; waited += 0.1f)
+            {
+                walker = NearestWalker(state, playerPosition);
+                yield return new WaitForSeconds(0.1f);
+            }
+
+            if (walker != null)
+            {
+                yield return EquipEveryPart(state, walker);
+                DemonView? walking = ViewOf(walker);
+                for (int frame = 0; walking != null && frame < 10; frame++)
+                {
+                    yield return new WaitForSeconds(0.1f);
+                    float size = walker.SizeMeters + walking.Stance;
+                    CaptureFrom(capture, walking.BodyCenter, (walking.transform.right * 2.2f) + (Vector3.up * 0.3f), size, "15-walk-" + frame);
+                }
+            }
+
             Object.Destroy(cameraObject);
             Debug.Log("Look captured into " + Path.GetFullPath(OutputFolder));
+        }
+
+        // Grows every part on a demon without cost or transformation, as a starting package would, and waits for the view.
+        private static IEnumerator EquipEveryPart(RunState state, Demon demon)
+        {
+            MethodInfo attach = typeof(Demon).GetMethod("AttachPart", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            foreach (string id in EveryPart)
+            {
+                BodyPartSpec spec = state.Catalog.GetBodyPart(id);
+                if (demon.Body.CanAttach(spec, out _))
+                {
+                    attach.Invoke(demon, new object[] { spec });
+                }
+            }
+
+            // Real time, not frames: batch mode runs frames so fast that easing would still be under way.
+            yield return new WaitForSeconds(1f);
+        }
+
+        // The AI blob nearest to a point that is walking right now, so it walks on while it is filmed.
+        private static Demon? NearestWalker(RunState state, Vector3 near)
+        {
+            Demon? best = null;
+            float bestDistance = float.MaxValue;
+            foreach (Demon demon in state.Demons)
+            {
+                float distance = (demon.Position.ToUnity() - near).sqrMagnitude;
+                if (demon.IsAlive && demon.Controller == ControllerKind.Ai && demon.Tier == 0 && demon.Velocity.Length() > 0.5f && distance < bestDistance)
+                {
+                    best = demon;
+                    bestDistance = distance;
+                }
+            }
+
+            return best;
+        }
+
+        private static DemonView? ViewOf(Demon demon)
+        {
+            foreach (DemonView view in Object.FindObjectsByType<DemonView>(FindObjectsSortMode.None))
+            {
+                if (view.Demon == demon)
+                {
+                    return view;
+                }
+            }
+
+            return null;
+        }
+
+        // A shot from the target along a direction, at a distance in units of the given size.
+        private static void CaptureFrom(Camera camera, Vector3 target, Vector3 direction, float size, string name)
+        {
+            camera.transform.position = target + (direction * size);
+            camera.transform.LookAt(target);
+            Capture(camera, name);
         }
 
         // Perceived brightness of the picture, 0 to 255, for judging the look in numbers next to the screenshots.

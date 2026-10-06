@@ -1,4 +1,6 @@
 #nullable enable
+using System;
+using System.Collections.Generic;
 using DemonFighter.Data;
 using UnityEngine;
 
@@ -25,6 +27,10 @@ namespace DemonFighter.Presentation.Demons
         private const float HighlightBlend = 0.55f;
         private const float WoundRadiusPerExtent = 0.7f;
         private const float CharBlend = 0.8f;
+        private const int MaxFleshJunctions = 8;
+        private const float SkinBoundsGrowth = 0.5f;
+        private const float StumpBloodPerRadius = 2.5f;
+        private const float JunctionFade = 0.05f;
         private static readonly Color MangledBlood = new Color(0.45f, 0.04f, 0.04f);
         private static readonly Color CharColor = new Color(0.07f, 0.03f, 0.02f);
         private static readonly Color HighlightColor = new Color(1f, 0.85f, 0.35f);
@@ -32,6 +38,15 @@ namespace DemonFighter.Presentation.Demons
         private static readonly int BloodAmountId = Shader.PropertyToID("_BloodAmount");
         private static readonly int WoundCenterId = Shader.PropertyToID("_WoundCenter");
         private static readonly int WoundRadiusId = Shader.PropertyToID("_WoundRadius");
+        private static readonly int FleshSourceId = Shader.PropertyToID("_FleshSource");
+        private static readonly int FleshTintId = Shader.PropertyToID("_FleshTint");
+        private static readonly int FleshFromObjectId = Shader.PropertyToID("_FleshFromObject");
+        private static readonly int FleshAllId = Shader.PropertyToID("_FleshAll");
+        private static readonly int FleshRootId = Shader.PropertyToID("_FleshRoot");
+        private static readonly int FleshRootFadeId = Shader.PropertyToID("_FleshRootFade");
+        private static readonly int FleshJunctionsId = Shader.PropertyToID("_FleshJunctions");
+        private static readonly int FleshJunctionCountId = Shader.PropertyToID("_FleshJunctionCount");
+        private static readonly int FleshJunctionFadeId = Shader.PropertyToID("_FleshJunctionFade");
 
         private Renderer _renderer = null!;
         private Collider _collider = null!;
@@ -49,6 +64,7 @@ namespace DemonFighter.Presentation.Demons
         private float _blood;
         private float _burn;
         private float _conditionScale = 1f;
+        private float _upgradeScale = 1f;
         private bool _visible = true;
         private bool _drawn = true;
         private bool _lost;
@@ -58,6 +74,22 @@ namespace DemonFighter.Presentation.Demons
         private DamageStage _shown;
         private Mesh? _measuredMesh;
         private float _measuredLowest;
+        private bool _hasFlesh;
+        private Texture? _fleshSource;
+        private Color _fleshTint = Color.white;
+        private Matrix4x4 _fleshParent = Matrix4x4.identity;
+        private Vector4 _fleshRoot;
+        private float _fleshRootFade;
+        private Vector4[]? _fleshJunctions;
+        private int _fleshJunctionCount;
+        private SkinnedMeshRenderer? _collar;
+        private SkinnedMeshRenderer? _skin;
+        private PartSkeleton? _skeleton;
+        private Transform[]? _bones;
+        private IChainMotion? _chain;
+        private Mesh? _sourceMesh;
+        private MaterialPropertyBlock? _collarBlock;
+        private CollarShape? _collarShape;
 
         /// <summary>The body this part belongs to; null before the owner binds, and on a menu preview figure.</summary>
         public DemonView? Owner { get; private set; }
@@ -67,6 +99,18 @@ namespace DemonFighter.Presentation.Demons
 
         /// <summary>The stage the part shows right now.</summary>
         public DamageStage Stage => _shown;
+
+        /// <summary>The mesh the part shows now, before any skinning; null while it shows nothing of its own.</summary>
+        internal Mesh? CurrentMesh => _sourceMesh != null ? _sourceMesh : (_filter != null ? _filter.sharedMesh : null);
+
+        /// <summary>True when generated bones move the part (D-098).</summary>
+        internal bool HasChain => _chain != null;
+
+        /// <summary>True when the bones pose the whole part, as a leg does, so the body animator leaves the part unturned.</summary>
+        internal bool ChainOwnsPose => _chain != null && _chain.OwnsPose;
+
+        /// <summary>The bound mesh set as placed, mirrored for a left copy; null for a primitive.</summary>
+        internal PartMeshSet? Meshes => _meshes;
 
         /// <summary>True when the part is drawn with a bound mesh set rather than a primitive.</summary>
         public bool HasMeshes => _meshes.HasValue;
@@ -238,6 +282,35 @@ namespace DemonFighter.Presentation.Demons
             _box = _collider as BoxCollider;
         }
 
+        /// <summary>
+        /// Moves the part with generated bones (D-098): the bones are created under it, the meshes it shows are skinned
+        /// to them, and the motion of its kind poses them every frame. Call after <see cref="SetMeshes"/>.
+        /// </summary>
+        internal void SetSkeleton(PartSkeleton skeleton, PartMotion motion, LegGait? gait = null, int side = 0)
+        {
+            _skeleton = skeleton ?? throw new ArgumentNullException(nameof(skeleton));
+            _skin = GetComponent<SkinnedMeshRenderer>();
+            if (_skin == null)
+            {
+                throw new InvalidOperationException("A part with bones needs a SkinnedMeshRenderer.");
+            }
+
+            _bones = skeleton.CreateBones(transform);
+            _skin.bones = _bones;
+            _skin.rootBone = transform;
+            _skin.quality = SkinQuality.Bone2;
+            _chain = ChainBones.MotionFor(motion, transform, _bones, skeleton, gait, side);
+        }
+
+        /// <summary>Poses the bones for this frame; a corpse, a lost part and a rigid one stay as they are.</summary>
+        internal void UpdateChain(in ChainContext context)
+        {
+            if (_chain != null && !_corpse && _drawn)
+            {
+                _chain.Update(context);
+            }
+        }
+
         /// <summary>Tells the view what it is for the animator: its motion, its copy, whether a clip drives it instead.</summary>
         internal void SetMotion(PartMotion motion, int copyIndex, bool hasClip)
         {
@@ -278,6 +351,10 @@ namespace DemonFighter.Presentation.Demons
             _animationRotation = Quaternion.identity;
             _measuredMesh = null;
             ApplyPose();
+            if (_hasFlesh)
+            {
+                ApplyTint();
+            }
         }
 
         /// <summary>
@@ -291,7 +368,7 @@ namespace DemonFighter.Presentation.Demons
                 _filter = GetComponent<MeshFilter>();
             }
 
-            Mesh? mesh = _filter != null ? _filter.sharedMesh : null;
+            Mesh? mesh = CurrentMesh;
             if (_lost || !_drawn || mesh == null)
             {
                 return null;
@@ -299,11 +376,99 @@ namespace DemonFighter.Presentation.Demons
 
             if (mesh != _measuredMesh)
             {
-                _measuredLowest = MeshBounds.LowestY(mesh, Matrix4x4.TRS(Vector3.zero, _restRotation, _baseScale));
+                _measuredLowest = MeshBounds.LowestY(mesh, Matrix4x4.TRS(Vector3.zero, _restRotation, _baseScale * _upgradeScale));
                 _measuredMesh = mesh;
             }
 
             return transform.localPosition.y + _measuredLowest;
+        }
+
+        /// <summary>
+        /// Grows the part by its upgrade level (D-096), around its pivot where it meets the body, so an upgraded part
+        /// is visibly bigger without a model of its own. Cheap to call every frame; it only acts on a change.
+        /// </summary>
+        internal void ShowUpgrade(int level, float growthPerLevel)
+        {
+            float scale = 1f + (Mathf.Max(level, 0) * Mathf.Max(growthPerLevel, 0f));
+            if (Mathf.Approximately(scale, _upgradeScale))
+            {
+                return;
+            }
+
+            _upgradeScale = scale;
+            _measuredMesh = null;
+            ApplyPose();
+            if (_hasFlesh)
+            {
+                ApplyTint();
+            }
+        }
+
+        /// <summary>
+        /// Gives the part junction flesh (D-097): the texture whose average colors it, the tint on top, the matrix from
+        /// its parent's space to body space, and the root of the part in body space (xyz centre, w radius) that wears the
+        /// flesh, fading out over the given distance. A zero root leaves only the junctions, as on the core.
+        /// </summary>
+        internal void SetFlesh(Texture source, Color tint, Matrix4x4 parentToBody, Vector4 root, float rootFade)
+        {
+            _hasFlesh = true;
+            _fleshSource = source != null ? source : Texture2D.whiteTexture;
+            _fleshTint = tint;
+            _fleshParent = parentToBody;
+            _fleshRoot = root;
+            _fleshRootFade = rootFade;
+            ApplyTint();
+        }
+
+        /// <summary>A new matrix from the parent's space to body space, as when the body grows; the core needs it.</summary>
+        internal void SetFleshParent(Matrix4x4 parentToBody)
+        {
+            _fleshParent = parentToBody;
+            if (_hasFlesh)
+            {
+                ApplyTint();
+            }
+        }
+
+        /// <summary>A new tint for the junction flesh and the collar, as when the tier color changes or the body dies.</summary>
+        internal void SetFleshTint(Color tint)
+        {
+            _fleshTint = tint;
+            if (_hasFlesh)
+            {
+                ApplyTint();
+            }
+        }
+
+        /// <summary>The joints on this part where others leave it, in body space (xyz centre, w radius); the core wears flesh around them.</summary>
+        internal void SetFleshJunctions(IReadOnlyList<Vector4> junctions)
+        {
+            if (junctions == null)
+            {
+                throw new ArgumentNullException(nameof(junctions));
+            }
+
+            _fleshJunctions ??= new Vector4[MaxFleshJunctions];
+            _fleshJunctionCount = Mathf.Min(junctions.Count, MaxFleshJunctions);
+            for (int i = 0; i < MaxFleshJunctions; i++)
+            {
+                _fleshJunctions[i] = i < _fleshJunctionCount ? junctions[i] : Vector4.zero;
+            }
+
+            if (_hasFlesh)
+            {
+                ApplyTint();
+            }
+        }
+
+        /// <summary>Takes over the collar that grows this part out of the body; it shows with the part and stays as a stump when the part is lost.</summary>
+        internal void AttachCollar(SkinnedMeshRenderer collar, CollarShape shape)
+        {
+            _collar = collar != null ? collar : throw new ArgumentNullException(nameof(collar));
+            _collarShape = shape ?? throw new ArgumentNullException(nameof(shape));
+            _collarBlock = new MaterialPropertyBlock();
+            ApplyTint();
+            ApplyVisibility();
         }
 
         /// <summary>Hides the part for the first-person camera; a lost part stays hidden either way.</summary>
@@ -402,7 +567,16 @@ namespace DemonFighter.Presentation.Demons
 
         private void ShowMesh(Mesh mesh)
         {
-            if (_filter != null)
+            _sourceMesh = mesh;
+            if (_skin != null && _skeleton != null)
+            {
+                Mesh? skinned = _skeleton.SkinnedCopyOf(mesh);
+                _skin.sharedMesh = skinned != null ? skinned : mesh;
+                Bounds bounds = mesh.bounds;
+                bounds.Expand(bounds.size.magnitude * SkinBoundsGrowth);
+                _skin.localBounds = bounds;
+            }
+            else if (_filter != null)
             {
                 _filter.sharedMesh = mesh;
             }
@@ -436,7 +610,52 @@ namespace DemonFighter.Presentation.Demons
                 _block.SetFloat(WoundRadiusId, _woundRadius);
             }
 
+            if (_hasFlesh)
+            {
+                WriteFlesh(_block);
+            }
+
             _renderer.SetPropertyBlock(_block);
+            ApplyCollarTint();
+        }
+
+        private void WriteFlesh(MaterialPropertyBlock block)
+        {
+            Matrix4x4 rest = Matrix4x4.TRS(transform.localPosition, _restRotation, _baseScale * _upgradeScale);
+            block.SetTexture(FleshSourceId, _fleshSource != null ? _fleshSource : Texture2D.whiteTexture);
+            block.SetColor(FleshTintId, _fleshTint);
+            block.SetMatrix(FleshFromObjectId, _fleshParent * rest);
+            block.SetVector(FleshRootId, _fleshRoot);
+            block.SetFloat(FleshRootFadeId, _fleshRootFade);
+            if (_fleshJunctions != null)
+            {
+                block.SetVectorArray(FleshJunctionsId, _fleshJunctions);
+                block.SetFloat(FleshJunctionCountId, _fleshJunctionCount);
+                block.SetFloat(FleshJunctionFadeId, JunctionFade);
+            }
+        }
+
+        // The collar is junction flesh all over, in body space; once the part is gone its cap is a bleeding stump.
+        private void ApplyCollarTint()
+        {
+            if (_collar == null || _collarBlock == null || _collarShape == null)
+            {
+                return;
+            }
+
+            _collarBlock.Clear();
+            _collarBlock.SetTexture(FleshSourceId, _fleshSource != null ? _fleshSource : Texture2D.whiteTexture);
+            _collarBlock.SetColor(FleshTintId, _fleshTint);
+            _collarBlock.SetMatrix(FleshFromObjectId, Matrix4x4.identity);
+            _collarBlock.SetFloat(FleshAllId, 1f);
+            if (_lost)
+            {
+                _collarBlock.SetFloat(BloodAmountId, 1f);
+                _collarBlock.SetVector(WoundCenterId, _collarShape.TopCenter);
+                _collarBlock.SetFloat(WoundRadiusId, _collarShape.TopRadius * StumpBloodPerRadius);
+            }
+
+            _collar.SetPropertyBlock(_collarBlock);
         }
 
         private Color? LiveTint()
@@ -474,12 +693,18 @@ namespace DemonFighter.Presentation.Demons
         private void ApplyVisibility()
         {
             _renderer.enabled = _visible && _drawn;
+            if (_collar != null)
+            {
+                _collar.enabled = _visible;
+            }
         }
 
+        // The motion turns the part about the axes of the body at the point where the part meets it, whichever way
+        // its model had to be turned to fit; turned about the model's own axes, a swing went wherever the import left them.
         private void ApplyPose()
         {
-            transform.localScale = _baseScale * _conditionScale;
-            transform.localRotation = _restRotation * _animationRotation;
+            transform.localScale = _baseScale * (_conditionScale * _upgradeScale);
+            transform.localRotation = _animationRotation * _restRotation;
         }
     }
 }

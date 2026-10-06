@@ -13,7 +13,7 @@ A heavy, muscular tail that grows from the lower back of the core and grants Tai
 
 - About 0.8 long for a core 1 tall, 0.18 thick at the root, tapering to a heavy, knotted club of bone at the tip.
 - Segmented muscle with a ridge of bone knobs along one side; the root is a ragged ring of flesh that sits against the core.
-- **Generate it standing straight up, the root at the bottom and the club at the top**, like the arm.
+- **Generate it standing straight up, the root at the bottom and the club at the top**, like the arm. The game puts six bones along it and lets it whip (D-098), so a straight tail bends best.
 
 ## How the game attaches it
 

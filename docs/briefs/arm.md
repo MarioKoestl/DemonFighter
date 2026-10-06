@@ -13,7 +13,7 @@ A clawed forelimb that grows from the flank of the core and grants Claw and Grab
 
 - One arm, about 0.55 of the core's height from shoulder to claw tips, about 0.15 thick at the shoulder.
 - Thick at the shoulder, two joints, ending in three or four hooked claws. Sinew and exposed tendon rather than skin. The shoulder end is a ragged ring of flesh that sits against the core.
-- **Generate it standing straight up, the shoulder at the bottom and the claws at the top.** This is the one thing that matters for the fit: the game takes the bottom of the arm as its shoulder.
+- **Generate it standing straight up, the shoulder at the bottom and the claws at the top.** This is the one thing that matters for the fit: the game takes the bottom of the arm as its shoulder. Straight also matters for the motion: the game puts bones along the arm and bends it at the elbow (D-098).
 - A slight bend toward the claws is fine; the arm as a whole stands upright.
 
 ## How the game attaches it

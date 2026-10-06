@@ -168,16 +168,22 @@ namespace DemonFighter.Simulation.Worldgen
             StartingEvolutionId = "evolution.brute.1",
         };
 
-        /// <summary>The high-tier kind that walks the elder loop.</summary>
+        /// <summary>
+        /// The high-tier kind that walks the elder loop: born Tier 4 at 7.5 m and evolved twice along a random line, so it
+        /// walks as Tier 6 at 15 m, with a random body at its highest upgrades (D-095).
+        /// </summary>
         public DemonSpec ElderDemon { get; init; } = new DemonSpec
         {
             Id = "demon.elder",
             Name = "Elder",
-            Tier = 6,
-            SizeMeters = 15f,
+            Tier = 4,
+            SizeMeters = 7.5f,
             MoveSpeed = 3f,
             SprintMultiplier = 1f,
             StartingStats = new[] { new StatValue(StatIds.Strength, 10), new StatValue(StatIds.Constitution, 20) },
+            RandomPartChance = 0.75f,
+            StartingPartsAtMaxUpgrade = true,
+            RandomEvolutionStages = 2,
         };
 
         /// <summary>Fleeing is implemented but switched off in the M2 content (threshold 0): fights are hard to test when prey runs.</summary>

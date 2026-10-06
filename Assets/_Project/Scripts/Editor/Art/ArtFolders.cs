@@ -71,8 +71,11 @@ namespace DemonFighter.Editor.Art
         /// <summary>World features are rigid and may be compressed; bodies and parts keep their exact vertices.</summary>
         public static bool CompressMeshes(string path) => IsUnder(path, World);
 
-        /// <summary>Body part meshes stay readable, so the view can mirror a part for the left flank (D-088).</summary>
-        public static bool ReadableMeshes(string path) => IsUnder(path, BodyParts);
+        /// <summary>Bodies and parts get smooth normals calculated on import; world models keep their own (D-097).</summary>
+        public static bool SmoothNormals(string path) => IsUnder(path, BodyParts) || IsUnder(path, Core) || IsUnder(path, Elders);
+
+        /// <summary>Body part meshes stay readable, so the view can mirror a part for the left flank (D-088); core meshes too, so collars can hug them (D-097).</summary>
+        public static bool ReadableMeshes(string path) => IsUnder(path, BodyParts) || IsUnder(path, Core);
 
         private static bool IsUnder(string path, string folder)
         {

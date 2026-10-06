@@ -358,15 +358,15 @@ namespace DemonFighter.Editor.Generate
         /// <summary>Where and how each part is drawn on the body capsule (capsule mesh units: two tall, radius a half).</summary>
         public static readonly IReadOnlyDictionary<string, PartVisual> Visuals = new Dictionary<string, PartVisual>
         {
-            [CoreId] = new PartVisual(PartVisualKind.None, PartMaterialRole.Owner, Vector3.zero, Vector3.one, Vector3.zero, false),
-            [JawsId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Maw, new Vector3(0f, 0.2f, 0.5f), new Vector3(0.65f, 0.28f, 0.45f), Vector3.zero, false),
+            [CoreId] = new PartVisual(PartVisualKind.None, PartMaterialRole.Owner, Vector3.zero, Vector3.one, Vector3.zero, false, collar: 0f),
+            [JawsId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Maw, new Vector3(0f, 0.2f, 0.5f), new Vector3(0.65f, 0.28f, 0.45f), Vector3.zero, false, collar: 0f),
             [ArmId] = new PartVisual(PartVisualKind.Capsule, PartMaterialRole.Owner, new Vector3(0.62f, 0.1f, 0.15f), new Vector3(0.28f, 0.55f, 0.28f), new Vector3(0f, 0f, -30f), true),
-            [LegsId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Dark, new Vector3(0f, -0.95f, 0f), new Vector3(0.9f, 0.3f, 0.5f), Vector3.zero, false),
-            [ThickHideId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Dark, new Vector3(0f, 0.1f, -0.52f), new Vector3(0.8f, 1.2f, 0.22f), Vector3.zero, false),
-            [PlatesId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Plate, new Vector3(0f, 0.2f, -0.55f), new Vector3(0.9f, 1.0f, 0.25f), Vector3.zero, false),
-            [ElasticTissueId] = new PartVisual(PartVisualKind.Capsule, PartMaterialRole.Owner, new Vector3(0f, 0f, -0.5f), new Vector3(0.7f, 0.9f, 0.35f), Vector3.zero, false),
-            [EyesId] = new PartVisual(PartVisualKind.Sphere, PartMaterialRole.Eye, new Vector3(0f, 0.55f, 0.42f), new Vector3(0.5f, 0.18f, 0.18f), Vector3.zero, false),
-            [SpinesId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Plate, new Vector3(0f, 0.45f, -0.5f), new Vector3(0.6f, 0.7f, 0.3f), new Vector3(30f, 0f, 0f), false),
+            [LegsId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Dark, new Vector3(0f, -0.95f, 0f), new Vector3(0.9f, 0.3f, 0.5f), Vector3.zero, false, pairing: PartPairing.Split),
+            [ThickHideId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Dark, new Vector3(0f, 0.1f, -0.52f), new Vector3(0.8f, 1.2f, 0.22f), Vector3.zero, false, collar: 0f),
+            [PlatesId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Plate, new Vector3(0f, 0.2f, -0.55f), new Vector3(0.9f, 1.0f, 0.25f), Vector3.zero, false, collar: 0f),
+            [ElasticTissueId] = new PartVisual(PartVisualKind.Capsule, PartMaterialRole.Owner, new Vector3(0f, 0f, -0.5f), new Vector3(0.7f, 0.9f, 0.35f), Vector3.zero, false, collar: 0f),
+            [EyesId] = new PartVisual(PartVisualKind.Sphere, PartMaterialRole.Eye, new Vector3(0f, 0.55f, 0.42f), new Vector3(0.5f, 0.18f, 0.18f), Vector3.zero, false, collar: 0f),
+            [SpinesId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Plate, new Vector3(0f, 0.45f, -0.5f), new Vector3(0.6f, 0.7f, 0.3f), new Vector3(30f, 0f, 0f), false, collar: 0f),
             [TailId] = new PartVisual(PartVisualKind.Capsule, PartMaterialRole.Owner, new Vector3(0f, -0.3f, -0.9f), new Vector3(0.2f, 0.7f, 0.2f), new Vector3(-60f, 0f, 0f), false),
         };
 
@@ -446,8 +446,10 @@ namespace DemonFighter.Editor.Generate
 
         internal readonly struct PartVisual
         {
-            public PartVisual(PartVisualKind kind, PartMaterialRole material, Vector3 position, Vector3 scale, Vector3 euler, bool mirrorSecondCopy)
+            public PartVisual(PartVisualKind kind, PartMaterialRole material, Vector3 position, Vector3 scale, Vector3 euler, bool mirrorSecondCopy, float collar = 1f, PartPairing pairing = PartPairing.None)
             {
+                Collar = collar;
+                Pairing = pairing;
                 Kind = kind;
                 Material = material;
                 Position = position;
@@ -467,6 +469,12 @@ namespace DemonFighter.Editor.Generate
             public Vector3 Euler { get; }
 
             public bool MirrorSecondCopy { get; }
+
+            /// <summary>Collar size for a bound mesh (D-097): limbs, legs and tails grow out of the body, faces and hides lie on it.</summary>
+            public float Collar { get; }
+
+            /// <summary>Whether a bound mesh is drawn as a left and a right copy (D-099); the legs model holds both legs.</summary>
+            public PartPairing Pairing { get; }
         }
     }
 }

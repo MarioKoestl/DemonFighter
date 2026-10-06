@@ -145,7 +145,10 @@ namespace DemonFighter.Presentation.Demons
                     }
                 }
 
-                figure.CreatePart(_visuals, part, null, _ownerMaterial, copyIndex, out _);
+                foreach (BodyPartView partView in figure.CreatePartViews(_visuals, part, null, _ownerMaterial, copyIndex, out _))
+                {
+                    partView.ShowUpgrade(part.UpgradeLevel, _settings.UpgradeGrowthPerLevel);
+                }
             }
 
             // Measured before the part views are stripped: the core stands on its legs here too (D-094).

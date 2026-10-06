@@ -37,6 +37,9 @@ namespace DemonFighter.Presentation.Demons
         [SerializeField, Range(0f, 1f)] private float _lodPartsScreenHeight = 0.04f;
         [SerializeField, Range(0f, 1f)] private float _lodBodyScreenHeight = 0.006f;
 
+        [Header("Upgrades (D-096)")]
+        [SerializeField, Range(0f, 0.2f)] private float _upgradeGrowthPerLevel = 0.04f;
+
         /// <summary>Downward acceleration in meters per second squared; negative.</summary>
         public float Gravity => _gravity;
 
@@ -79,5 +82,8 @@ namespace DemonFighter.Presentation.Demons
 
         /// <summary>Below this share of the screen height a body is not drawn at all.</summary>
         public float LodBodyScreenHeight => _lodBodyScreenHeight;
+
+        /// <summary>How much bigger a part grows per upgrade level: 0.04 makes a +5 part a fifth bigger (D-096).</summary>
+        public float UpgradeGrowthPerLevel => _upgradeGrowthPerLevel;
     }
 }

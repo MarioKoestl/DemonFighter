@@ -8,6 +8,7 @@ using DemonFighter.Simulation.Evolution;
 using DemonFighter.Simulation.Hazards;
 using DemonFighter.Simulation.Persistence;
 using DemonFighter.Simulation.Skills;
+using DemonFighter.Simulation.Spawning;
 using DemonFighter.Simulation.Stats;
 
 namespace DemonFighter.Simulation
@@ -730,7 +731,7 @@ namespace DemonFighter.Simulation
         /// Gives a freshly spawned demon what its kind is born with (D-070): parts, Biomass, levels with their stat
         /// points and an evolution package, all free and without a transformation. A part without a free socket is skipped.
         /// </summary>
-        internal void ApplyStartingPackage()
+        internal void ApplyStartingPackage(Rng rng)
         {
             IReadOnlyList<string> parts = Spec.StartingPartIds;
             for (int i = 0; i < parts.Count; i++)
@@ -756,6 +757,21 @@ namespace DemonFighter.Simulation
             if (!string.IsNullOrEmpty(Spec.StartingEvolutionId))
             {
                 EvolutionPackage.Apply(this, _catalog.GetEvolution(Spec.StartingEvolutionId), _catalog);
+            }
+
+            // A kind born evolved and mutated takes its random evolutions, then fills the sockets they left free (D-095).
+            RandomEvolutions.Apply(this, _catalog, rng);
+            RandomBody.Grow(this, _catalog, rng);
+            if (Spec.StartingPartsAtMaxUpgrade)
+            {
+                IReadOnlyList<BodyPart> born = Body.Parts;
+                for (int i = 0; i < born.Count; i++)
+                {
+                    while (!born[i].IsLost && born[i].UpgradeLevel < born[i].Spec.MaxUpgrade)
+                    {
+                        Body.Upgrade(born[i]);
+                    }
+                }
             }
 
             RecomputeDerived(_tuning);

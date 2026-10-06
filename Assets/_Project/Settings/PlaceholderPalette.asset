@@ -38,4 +38,4 @@ MonoBehaviour:
   _bloodPool: {fileID: 2100000, guid: f52cff4811c76394092132af307a6ba4, type: 2}
   _viscera: {fileID: 2100000, guid: 5ef61bc723e17a0478a262a6e423d7f7, type: 2}
   _embers: {fileID: 2100000, guid: f35a526392e5699479bd7ab21d46dae4, type: 2}
-  _generatorVersion: 10
+  _generatorVersion: 14

@@ -53,10 +53,12 @@ MonoBehaviour:
       _scale: 0.4
       _offset: {x: 0, y: -0.1, z: -0.05}
       _euler: {x: 0, y: 0, z: 0}
+      _collar: 0
+      _pairing: 0
       _importScale: 53.34989
       _importRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071067}
       _importPivot: {x: 0.000001733899, y: -0.00011303908, z: -0.00933205}
       _importVersion: 2
     _anchors: []
   _severSound: {fileID: 11400000, guid: e8756f31f9b786d4fabff46f4182e6e8, type: 2}
-  _contentVersion: 7
+  _contentVersion: 9

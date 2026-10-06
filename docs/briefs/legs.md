@@ -19,6 +19,8 @@ The locomotion part: a pair of squat legs that grows from the underside of the c
 
 - **Pivot.** The game takes the point on the ground between the feet as the pivot and sets it under the middle of the core (D-088).
 - **Standing.** The blob stands on its legs (D-094): the game lifts it until the lowest point of the legs touches the ground, whatever their length. A demon that loses its legs drops back onto its belly.
+- **Two legs from one model.** The game cuts the pair in half through its middle and moves each leg on its own: the foot stays planted, then steps (D-099). So the pair must be symmetric (Symmetry On in Meshy) with the legs apart, not touching below the saddle. Keep **Pairing Split** on the mesh set.
+- **Bones.** Each leg gets a hip at its top, a knee and an ankle (D-098); a leg that stands fairly straight bends best.
 - **Size.** The game scales every model so its longest side is 1. **Scale 0.6** makes the pair 0.6 body heights wide.
 - **Direction.** The Locomotion socket points down. **Euler (-90, 0, 0)** turns the legs upright again, exactly as they stood in Meshy, toes forward.
 - **Offset (0, 0, 0.3)** lets the feet reach 0.3 body heights below the blob; the rest of the legs, the saddle, reaches up into it. Offset follows the socket here, so **Z moves the legs down** (larger: more leg shows and the blob stands higher) or up (smaller: the legs sink into the blob), and Y moves them forward (positive) or back.

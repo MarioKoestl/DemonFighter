@@ -95,6 +95,44 @@ namespace DemonFighter.Editor.Tests.Presentation
             _figure.Root.localPosition.y.Should().BeApproximately(0.35f, Tolerance);
         }
 
+        // Upgrades show as growth around the pivot (D-096): +5 at 0.04 per level is a fifth bigger.
+        [Test]
+        public void ShowUpgrade_GrowsThePartAroundItsPivot()
+        {
+            BodyPartView leg = Leg(0.1f);
+
+            leg.ShowUpgrade(5, 0.04f);
+
+            leg.transform.localScale.x.Should().BeApproximately(0.6f, Tolerance);
+            leg.transform.localPosition.y.Should().BeApproximately(0.1f, Tolerance, "the part grows where it meets the body");
+        }
+
+        [Test]
+        public void SnapStance_UpgradedLegs_StandHigher()
+        {
+            BodyPartView leg = Leg(0.1f);
+            _figure.AddStandingPart(leg);
+            leg.ShowUpgrade(5, 0.04f);
+
+            _figure.SnapStance();
+
+            _figure.Stance.Should().BeApproximately(0.4f, Tolerance, "a cube 0.6 wide at 0.1 reaches 0.2 body units, 0.4 m, below the core");
+        }
+
+        // A swing turns the part about the axes of the body, whichever way the model was turned to fit.
+        [Test]
+        public void SetAnimation_TurnsAboutTheAxesOfTheBody()
+        {
+            BodyPartView leg = Leg(0.1f);
+            leg.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+            leg.RememberBasePose();
+
+            leg.SetAnimation(Quaternion.Euler(30f, 0f, 0f));
+
+            Quaternion expected = Quaternion.Euler(30f, 0f, 0f) * Quaternion.Euler(0f, 90f, 0f);
+            Quaternion.Angle(leg.transform.localRotation, expected).Should().BeLessThan(0.01f);
+        }
+
         // Rest pose taken after placing, as the figure does for a part it creates.
         private BodyPartView Leg(float height)
         {
