@@ -25,3 +25,7 @@ MonoBehaviour:
   _startingBiomass: 30
   _startingLevel: 2
   _startingEvolution: {fileID: 0}
+  _randomPartChance: 0
+  _startingPartsAtMaxUpgrade: 0
+  _randomEvolutionStages: 0
+  _contentVersion: 2

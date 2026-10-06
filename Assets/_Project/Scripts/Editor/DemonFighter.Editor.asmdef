@@ -2,6 +2,9 @@
   "name": "DemonFighter.Editor",
   "rootNamespace": "DemonFighter.Editor",
   "references": [
+    "Unity.RenderPipelines.Universal.Editor",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime",
     "DemonFighter.Simulation",
     "DemonFighter.Data",
     "DemonFighter.Presentation",

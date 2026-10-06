@@ -47,6 +47,21 @@ namespace DemonFighter.Simulation.Content
         /// <summary>Evolution applied at spawn as its package; empty for none.</summary>
         public string StartingEvolutionId { get; init; } = string.Empty;
 
+        /// <summary>
+        /// Chance, 0 to 1, that each socket slot the starting package left free gets a random part that fits it, unlocks,
+        /// levels and Biomass aside (D-095); 0 for none. Drawn from the run's seed.
+        /// </summary>
+        public float RandomPartChance { get; init; }
+
+        /// <summary>When true, every part the demon is born with starts at its highest upgrade (D-095).</summary>
+        public bool StartingPartsAtMaxUpgrade { get; init; }
+
+        /// <summary>
+        /// Evolution stages the demon is born having taken, after its starting evolution: the first of a random line,
+        /// the rest of the same line (D-095). Each raises the tier by one, so the kind's tier is the one before them.
+        /// </summary>
+        public int RandomEvolutionStages { get; init; }
+
         /// <summary>Throws with the first content error found.</summary>
         public void Validate()
         {
@@ -61,6 +76,8 @@ namespace DemonFighter.Simulation.Content
             Require(StartingPartIds != null && StartingEvolutionId != null, "Starting lists must not be null.");
             Require(StartingBiomass >= 0f, "StartingBiomass is never negative.");
             Require(StartingLevel >= 1, "StartingLevel starts at 1.");
+            Require(RandomPartChance >= 0f && RandomPartChance <= 1f, "RandomPartChance lies between 0 and 1.");
+            Require(RandomEvolutionStages >= 0, "RandomEvolutionStages is never negative.");
         }
 
         private void Require([DoesNotReturnIf(false)] bool condition, string message)

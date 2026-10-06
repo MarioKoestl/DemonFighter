@@ -32,7 +32,7 @@ namespace DemonFighter.Simulation.Tests.Spawning
 
             brute.Body.Parts.Select(p => p.Spec.Id).Should().Contain(TestContent.ArmId).And.Contain(TestContent.HideId);
             brute.Biomass.Should().BeApproximately(30f, Tolerance);
-            brute.Level.Should().Be(2);
+            brute.Level.Should().Be(1, "its starting evolution started Tier 1 at level 1 (D-091)");
             brute.Stats.UnspentPoints.Should().Be(TestContent.Tuning.StatPointsPerLevel + TestContent.Brute1.StatPoints);
             brute.Evolutions.Should().Be(1);
             brute.Stats.Get(StatIds.Strength).Should().Be(10);

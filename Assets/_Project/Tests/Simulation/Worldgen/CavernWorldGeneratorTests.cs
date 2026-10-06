@@ -77,6 +77,7 @@ namespace DemonFighter.Simulation.Tests.Worldgen
         public void Generate_AshCavern_HeightsStayWithinTheAmplitude()
         {
             WorldLayout layout = new CavernWorldGenerator().Generate(Seed, Biome);
+            // Pool beds and shores lie at ground heights the terrain already had (D-086).
             float limit = Biome.HeightAmplitude * 1.5f + 0.001f;
 
             foreach (float height in layout.Heightfield.Heights)

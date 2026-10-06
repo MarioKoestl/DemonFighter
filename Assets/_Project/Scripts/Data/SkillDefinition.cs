@@ -13,7 +13,8 @@ namespace DemonFighter.Data
     [CreateAssetMenu(menuName = "Demon Fighter/Content/Skill", fileName = "SK_NewSkill")]
     public sealed class SkillDefinition : ScriptableObject
     {
-        private const int CurrentContentVersion = 3;
+        private const int M3ContentVersion = 3;
+        private const int CurrentContentVersion = 5;
 
         [Header("Identity")]
         [SerializeField] private string _id = "skill.new";
@@ -59,13 +60,26 @@ namespace DemonFighter.Data
         [SerializeField] private float _reachBonusPerLevel = 0.01f;
         [SerializeField] private SkillPerkDefinition _perk = new SkillPerkDefinition();
 
+        [Header("Look")]
+        [SerializeField] private SkillMotion _motion = SkillMotion.None;
+        [SerializeField] private AudioEventDefinition? _useSound;
+
         [SerializeField, HideInInspector] private int _contentVersion;
 
         /// <summary>Stable content id.</summary>
         public string Id => _id;
 
+        /// <summary>How the view animates a use of this skill (D-082); look only, the simulation never reads it.</summary>
+        public SkillMotion Motion => _motion;
+
+        /// <summary>The sound a use of this skill makes (D-084); null for a silent skill.</summary>
+        public AudioEventDefinition? UseSound => _useSound;
+
         /// <summary>True for an asset created before M3 that still lacks the M3 fields.</summary>
-        internal bool NeedsM3Defaults => _contentVersion < CurrentContentVersion;
+        internal bool NeedsM3Defaults => _contentVersion < M3ContentVersion;
+
+        /// <summary>True for an asset created before M5 that still lacks the motion.</summary>
+        internal bool NeedsM5Defaults => _contentVersion < CurrentContentVersion;
 
         /// <summary>Builds the immutable spec; throws for invalid content.</summary>
         public SkillSpec ToSpec()
@@ -156,6 +170,14 @@ namespace DemonFighter.Data
             _speedBonusPerLevel = spec.SpeedBonusPerLevel;
             _reachBonusPerLevel = spec.ReachBonusPerLevel;
             _perk.Configure(spec.Perk);
+            _contentVersion = M3ContentVersion;
+        }
+
+        /// <summary>Gives an older asset its motion and its sound once; the generator picks them by skill id.</summary>
+        internal void ApplyM5Defaults(SkillMotion motion, AudioEventDefinition? useSound)
+        {
+            _motion = motion;
+            _useSound = useSound;
             _contentVersion = CurrentContentVersion;
         }
 

@@ -6,8 +6,10 @@ using DemonFighter.Simulation.Commands;
 using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Evolution;
 using DemonFighter.Simulation.Food;
+using DemonFighter.Simulation.Hazards;
 using DemonFighter.Simulation.Movement;
 using DemonFighter.Simulation.Mutation;
+using DemonFighter.Simulation.Playtest;
 using DemonFighter.Simulation.Skills;
 using DemonFighter.Simulation.Spawning;
 
@@ -15,7 +17,7 @@ namespace DemonFighter.Simulation
 {
     /// <summary>
     /// Advances a run by one fixed step at a time, in the order from ARCHITECTURE "Tick": commands, movement, status
-    /// effects, AI, threat and spawning, food decay, then the event flush. Stages that no milestone needs yet are
+    /// effects and hazards, AI, threat and spawning, food decay, then the event flush. Stages that no milestone needs yet are
     /// simply absent.
     /// </summary>
     public sealed class SimulationTicker
@@ -38,6 +40,7 @@ namespace DemonFighter.Simulation
             Commands.RegisterHandler(new SpendStatPointCommandHandler(events));
             Commands.RegisterHandler(new MutateCommandHandler(events));
             Commands.RegisterHandler(new EvolveCommandHandler(events));
+            Commands.RegisterHandler(new SetTestModeCommandHandler());
             Ai = new AiSystem();
             Threat = new ThreatSystem(events);
             Spawning = new SpawnSystem(events, Ai);
@@ -81,10 +84,12 @@ namespace DemonFighter.Simulation
         {
             float seconds = State.Config.TickSeconds;
             Commands.ApplyAll(State, Events);
+            TestModeSystem.Refill(State);
             HoldSystem.Advance(State, seconds);
             MovementSystem.Advance(State, seconds);
             SprintSystem.Advance(State, Events, seconds);
             StatusSystem.Advance(State, Damage, seconds);
+            HazardSystem.Advance(State, Damage, seconds);
             SkillSystem.Advance(State);
             TransformationSystem.Advance(State, Events);
             EatingSystem.Advance(State, Events, seconds);
@@ -104,6 +109,7 @@ namespace DemonFighter.Simulation
         public void ApplyPendingCommands()
         {
             Commands.ApplyAll(State, Events);
+            TestModeSystem.Refill(State);
             Events.Flush();
         }
     }

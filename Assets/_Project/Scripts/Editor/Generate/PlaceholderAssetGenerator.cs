@@ -1,11 +1,14 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.IO;
 using DemonFighter.Common;
 using DemonFighter.Data;
+using DemonFighter.Editor.Art;
 using DemonFighter.Editor.Setup;
 using DemonFighter.Presentation;
 using DemonFighter.Presentation.Cameras;
+using DemonFighter.Presentation.Combat;
 using DemonFighter.Presentation.Demons;
 using DemonFighter.Simulation.Ai;
 using DemonFighter.Simulation.Content;
@@ -19,10 +22,12 @@ namespace DemonFighter.Editor.Generate
     /// <summary>
     /// Creates the primitive-stage assets from code so they can be regenerated after a change (ASSET_PIPELINE): the
     /// URP materials, the palette that maps roles to them, the settings assets, the content assets (parts, skills,
-    /// evolutions, two demon kinds, combat tuning, the ash cavern biome) and the demon prefab, then rebuilds the
-    /// content catalog. Materials are rewritten every run; every other asset is created once and keeps its Inspector
-    /// values, except that assets from an earlier milestone receive the fields a later one added, once.
-    /// Public because the -executeMethod command line switch of Unity has to find it.
+    /// evolutions, the demon kinds, combat tuning, the ash cavern biome), the gore settings, the painted blood textures
+    /// with their decal materials, the decal renderer feature, the art folders, and the demon prefab, then
+    /// binds whatever art models exist and rebuilds the content catalog. Materials are rewritten every run; every
+    /// other asset is created once and keeps its Inspector values, except that assets from an earlier milestone
+    /// receive the fields a later one added, once. Public because the -executeMethod command line switch of Unity
+    /// has to find it.
     /// </summary>
     public static class PlaceholderAssetGenerator
     {
@@ -30,12 +35,31 @@ namespace DemonFighter.Editor.Generate
         internal const string WorldBuildSettingsPath = SettingsFolder + "/WorldBuildSettings.asset";
         internal const string DemonViewSettingsPath = SettingsFolder + "/DemonViewSettings.asset";
         internal const string CameraRigSettingsPath = SettingsFolder + "/CameraRigSettings.asset";
+        internal const string GoreSettingsPath = SettingsFolder + "/GoreSettings.asset";
         internal const string AshCavernPath = BiomesFolder + "/BI_AshCavern.asset";
         internal const string DemonPrefabPath = PrefabsFolder + "/P_Demon.prefab";
         internal const string MenuPath = "Demon Fighter/Generate/Placeholder Assets";
 
+        /// <summary>
+        /// Raise this whenever the generator writes something new or migrates an asset; the editor then reruns the
+        /// generator by itself once (GeneratedAssetsGuard), so nobody has to remember the menu after pulling.
+        /// </summary>
+        internal const int Version = 14;
+
+        // Generator versions that changed generated assets in place; assets written by an older version get the change
+        // once: the post exposure and texture tint, then the painted surfaces, brighter and seamless (both D-087).
+        private const int BrightLookVersion = 4;
+        private const int SurfacePaintVersion = 6;
+
         private const string LitShader = "Universal Render Pipeline/Lit";
+        private const string DemonSkinShader = "DemonFighter/DemonSkin";
+        private const string DecalShader = "Shader Graphs/Decal";
+        private const string DecalBaseMapProperty = "Base_Map";
         private const string MaterialsFolder = "Assets/_Project/Art/Materials/Placeholder";
+        private const string DecalMaterialsFolder = "Assets/_Project/Art/Materials/Decals";
+        private const string ParticleShader = "Universal Render Pipeline/Particles/Unlit";
+        private const string SurfaceProperty = "_Surface";
+        private const string BlendProperty = "_Blend";
         private const string SettingsFolder = "Assets/_Project/Settings";
         private const string ContentFolder = "Assets/_Project/Content";
         private const string BiomesFolder = ContentFolder + "/Biomes";
@@ -47,7 +71,19 @@ namespace DemonFighter.Editor.Generate
         private const string CombatTuningPath = ContentCatalogRebuilder.CatalogFolder + "/CombatTuning.asset";
         private const string PrefabsFolder = "Assets/_Project/Prefabs";
         private const string DemonBodyProperty = "_body";
+        private const string DemonFigureProperty = "_figureRoot";
+        private const string DemonPlaceholdersProperty = "_placeholders";
+        private const string DemonRigProperty = "_rig";
+        private const string GitKeepFile = ".gitkeep";
         private const string EmissionKeyword = "_EMISSION";
+        private const string NormalMapKeyword = "_NORMALMAP";
+        private const string BaseMapProperty = "_BaseMap";
+        private const string BumpMapProperty = "_BumpMap";
+        private const string EmissionMapProperty = "_EmissionMap";
+        private const float GroundTiling = 2.5f;
+        private const float RockTiling = 2f;
+        private const float WallTiling = 6f;
+        private const float LavaTiling = 1f;
         private const string EmissionColorProperty = "_EmissionColor";
         private const string SmoothnessProperty = "_Smoothness";
 
@@ -67,54 +103,115 @@ namespace DemonFighter.Editor.Generate
             EditorAssets.EnsureFolder(DemonsFolder);
             EditorAssets.EnsureFolder(EvolutionsFolder);
             EditorAssets.EnsureFolder(ContentCatalogRebuilder.CatalogFolder);
+            EnsureArtFolders();
 
-            PlaceholderPalette palette = GenerateMaterials();
-            EditorAssets.LoadOrCreate<WorldBuildSettings>(WorldBuildSettingsPath);
-            EditorAssets.LoadOrCreate<DemonViewSettings>(DemonViewSettingsPath);
+            int stamped = StampedVersion();
+            bool brighten = stamped < BrightLookVersion;
+            PlaceholderPalette palette = GenerateMaterials(stamped < SurfacePaintVersion);
+            WorldBuildSettings worldSettings = EditorAssets.LoadOrCreate<WorldBuildSettings>(WorldBuildSettingsPath);
+            if (worldSettings.NeedsLightingDefaults)
+            {
+                // The world was too dark (D-087); an older asset gets the brighter lighting once.
+                worldSettings.ApplyLightingDefaults();
+                EditorUtility.SetDirty(worldSettings);
+            }
+
+            var viewSettings = EditorAssets.LoadOrCreate<DemonViewSettings>(DemonViewSettingsPath);
+            if (brighten)
+            {
+                // Written again so the asset drops the tint field the lighter texture tint replaced (D-087).
+                EditorUtility.SetDirty(viewSettings);
+            }
+
             EditorAssets.LoadOrCreate<CameraRigSettings>(CameraRigSettingsPath);
+            EditorAssets.LoadOrCreate<GoreSettings>(GoreSettingsPath);
+            RenderPipelineSetup.EnsureDecalFeature();
+            RenderLookGenerator.EnsureVolumeProfile(brighten);
+            RenderLookGenerator.EnsurePresets();
             GenerateContent();
+            int bound = ArtAssetBinder.Bind();
             GenerateDemonPrefab(palette);
 
+            palette.StampGenerator(Version);
+            EditorUtility.SetDirty(palette);
             AssetDatabase.SaveAssets();
             ContentCatalogRebuilder.Rebuild();
-            Log.Info(LogCategory.Editor, "Generated placeholder materials, palette, settings, content assets and " + DemonPrefabPath + ".");
+            Log.Info(LogCategory.Editor, "Generated placeholder materials, palette, settings, content assets and " + DemonPrefabPath + "; bound art for " + bound + " part(s).");
         }
 
-        private static PlaceholderPalette GenerateMaterials()
+        /// <summary>Why the generated assets are behind the code, or null when they are current.</summary>
+        internal static string? OutdatedReason()
+        {
+            var palette = AssetDatabase.LoadAssetAtPath<PlaceholderPalette>(PalettePath);
+            if (palette == null)
+            {
+                return "the palette is missing";
+            }
+
+            return palette.GeneratorVersion < Version ? "written by generator version " + palette.GeneratorVersion + ", the code is at " + Version : null;
+        }
+
+        private static int StampedVersion()
+        {
+            var palette = AssetDatabase.LoadAssetAtPath<PlaceholderPalette>(PalettePath);
+            return palette != null ? palette.GeneratorVersion : 0;
+        }
+
+        // The art folders exist from the start so there is a place to drop models into; a .gitkeep keeps each empty
+        // folder in Git, and Unity ignores files that start with a dot.
+        private static void EnsureArtFolders()
+        {
+            foreach (string folder in ArtFolders.All)
+            {
+                EditorAssets.EnsureFolder(folder);
+                string keep = folder + "/" + GitKeepFile;
+                if (!File.Exists(keep))
+                {
+                    File.WriteAllText(keep, string.Empty);
+                }
+            }
+        }
+
+        private static PlaceholderPalette GenerateMaterials(bool repaintSurfaces)
         {
             // Colors from ASSET_PIPELINE "Placeholder standard": player teal, AI by tier, elders near black.
-            Material ground = Lit("M_Ground", new Color(0.16f, 0.12f, 0.11f), 0.15f);
-            Material wall = Lit("M_Wall", new Color(0.09f, 0.07f, 0.07f), 0.1f);
-            Material rock = Lit("M_Rock", new Color(0.24f, 0.21f, 0.2f), 0.2f);
+            // The painted surfaces shade the flat colors; the tiling follows the UV density of each shape (D-083).
+            Material ground = Surface(Lit("M_Ground", Color.white, 0.15f), TextureGenerator.EnsureSurface("Ground", TextureGenerator.SurfaceStyle.Ash, 21, repaintSurfaces), GroundTiling);
+            Material wall = Surface(Lit("M_Wall", Color.white, 0.1f), TextureGenerator.EnsureSurface("Wall", TextureGenerator.SurfaceStyle.DarkRock, 45, repaintSurfaces), WallTiling);
+            Material rock = Surface(Lit("M_Rock", Color.white, 0.2f), TextureGenerator.EnsureSurface("Rock", TextureGenerator.SurfaceStyle.Rock, 33, repaintSurfaces), RockTiling);
             Material fissure = Emissive("M_Fissure", new Color(0.3f, 0.1f, 0.02f), new Color(1f, 0.45f, 0.08f) * 3f);
-            Material lava = Emissive("M_Lava", new Color(0.4f, 0.08f, 0.02f), new Color(1f, 0.3f, 0.05f) * 4f);
+            Material lava = Surface(Emissive("M_Lava", Color.white, new Color(1f, 0.32f, 0.06f) * 6f), TextureGenerator.EnsureSurface("Lava", TextureGenerator.SurfaceStyle.Lava, 57, repaintSurfaces), LavaTiling);
             Material water = Lit("M_Water", new Color(0.05f, 0.09f, 0.14f), 0.9f);
             Material bone = Lit("M_Bone", new Color(0.75f, 0.72f, 0.62f), 0.3f);
-            Material player = Lit("M_DemonPlayer", new Color(0.1f, 0.65f, 0.6f), 0.4f);
+            // Everything a demon wears uses the skin shader, so blood can soak it (D-081).
+            Material player = Skin("M_DemonPlayer", new Color(0.1f, 0.65f, 0.6f), 0.4f);
             Material[] tiers =
             {
-                Lit("M_DemonTier0", new Color(0.45f, 0.45f, 0.45f), 0.4f),
-                Lit("M_DemonTier1", new Color(0.42f, 0.45f, 0.2f), 0.4f),
-                Lit("M_DemonTier2", new Color(0.55f, 0.28f, 0.12f), 0.4f),
-                Lit("M_DemonTier3", new Color(0.4f, 0.06f, 0.06f), 0.4f),
+                Skin("M_DemonTier0", new Color(0.45f, 0.45f, 0.45f), 0.4f),
+                Skin("M_DemonTier1", new Color(0.42f, 0.45f, 0.2f), 0.4f),
+                Skin("M_DemonTier2", new Color(0.55f, 0.28f, 0.12f), 0.4f),
+                Skin("M_DemonTier3", new Color(0.4f, 0.06f, 0.06f), 0.4f),
             };
-            Material elder = Lit("M_DemonElder", new Color(0.06f, 0.05f, 0.05f), 0.5f);
-            Material corpse = Lit("M_Corpse", new Color(0.13f, 0.09f, 0.08f), 0.2f);
+            Material elder = Skin("M_DemonElder", new Color(0.06f, 0.05f, 0.05f), 0.5f);
+            Material corpse = Skin("M_Corpse", new Color(0.13f, 0.09f, 0.08f), 0.2f);
             Material blood = Lit("M_Blood", new Color(0.28f, 0.01f, 0.01f), 0.65f);
-            Material maw = Lit("M_DemonMaw", new Color(0.35f, 0.03f, 0.03f), 0.3f);
-            Material eye = Lit("M_Eye", new Color(0.9f, 0.88f, 0.8f), 0.7f);
-            Material plate = Lit("M_Plate", new Color(0.2f, 0.2f, 0.22f), 0.55f);
+            Material maw = Skin("M_DemonMaw", new Color(0.35f, 0.03f, 0.03f), 0.3f);
+            Material eye = Skin("M_Eye", new Color(0.9f, 0.88f, 0.8f), 0.7f);
+            Material plate = Skin("M_Plate", new Color(0.2f, 0.2f, 0.22f), 0.55f);
 
             PlaceholderPalette palette = EditorAssets.LoadOrCreate<PlaceholderPalette>(PalettePath);
             palette.SetMaterials(ground, wall, rock, fissure, lava, water, bone, player, tiers, elder, corpse, blood, maw, eye, plate);
+            GenerateGoreMaterials(palette);
             EditorUtility.SetDirty(palette);
             return palette;
         }
 
         // Each asset is initialized from its spec once; afterwards the asset is the truth. Parts are created in the
-        // order of PlaceholderContent so a part that requires another finds it, and M2 assets get the M3 fields once.
+        // order of PlaceholderContent so a part that requires another finds it, and older assets get the fields of
+        // later milestones once.
         private static void GenerateContent()
         {
+            AudioGenerator.AudioLibrary audio = AudioGenerator.Ensure();
             var skills = new Dictionary<string, SkillDefinition>();
             foreach (SkillSpec spec in PlaceholderContent.Skills)
             {
@@ -122,6 +219,12 @@ namespace DemonFighter.Editor.Generate
                 if (skill.NeedsM3Defaults)
                 {
                     skill.ApplyM3Defaults(spec);
+                    EditorUtility.SetDirty(skill);
+                }
+
+                if (skill.NeedsM5Defaults)
+                {
+                    skill.ApplyM5Defaults(PlaceholderContent.SkillMotionFor(spec.Id), audio.EventForSkill(spec.Id));
                     EditorUtility.SetDirty(skill);
                 }
 
@@ -152,6 +255,34 @@ namespace DemonFighter.Editor.Generate
                     EditorUtility.SetDirty(part);
                 }
 
+                if (part.NeedsM5Defaults)
+                {
+                    // Assets written before M5 get the socket anchors of the capsule and the default mesh fit once.
+                    part.ApplyM5Defaults(DefaultAnchorsFor(spec), PlaceholderContent.MeshOffsetFor(spec.Id), PlaceholderContent.MotionFor(spec.Id), audio.SeverSoundFor(spec.Fate));
+                    EditorUtility.SetDirty(part);
+                }
+
+                if (part.NeedsSizeDefaults)
+                {
+                    // Tiers come from evolutions now; bulky parts still make the body bigger (D-091).
+                    part.ApplySizeDefaults(spec.SizeBonus);
+                    EditorUtility.SetDirty(part);
+                }
+
+                if (part.NeedsCollarDefaults)
+                {
+                    // Limbs, legs and tails grow out of the body through a flesh collar; faces and hides lie on it (D-097).
+                    part.ApplyCollarDefaults(visual.Collar);
+                    EditorUtility.SetDirty(part);
+                }
+
+                if (part.NeedsPairingDefaults)
+                {
+                    // Legs move one by one: the pair model is cut in half and each half steps on its own (D-099).
+                    part.ApplyPairingDefaults(visual.Pairing);
+                    EditorUtility.SetDirty(part);
+                }
+
                 parts[spec.Id] = part;
             }
 
@@ -170,7 +301,14 @@ namespace DemonFighter.Editor.Generate
                 evolutions[spec.Id] = evolution;
             }
 
-            EditorAssets.LoadOrCreate<CombatTuningDefinition>(CombatTuningPath, tuning => tuning.Configure(new CombatTuning()));
+            var combatTuning = EditorAssets.LoadOrCreate<CombatTuningDefinition>(CombatTuningPath, tuning => tuning.Configure(new CombatTuning()));
+            if (combatTuning.NeedsProgressionDefaults)
+            {
+                // Kill XP (D-090) and tiers through evolution (D-091) changed the progression; an older asset gets it once.
+                combatTuning.ApplyProgressionDefaults();
+                EditorUtility.SetDirty(combatTuning);
+            }
+
             BodyPartDefinition core = parts[PlaceholderContent.CoreId];
             BiomeSpec ashCavern = BiomeSpec.AshCavern;
             DemonDefinition blob = Demon(ashCavern.BlobDemon, core, parts, evolutions);
@@ -200,6 +338,7 @@ namespace DemonFighter.Editor.Generate
                 biome.SetDemons(blob, elder);
                 biome.SetSpawnTable(spawnTable);
                 biome.SetBlobArchetypes(blobArchetypes);
+                biome.SetAudio(audio.Clip(AudioGenerator.DroneClip), audio.Clip(AudioGenerator.LavaClip), audio.Clip(AudioGenerator.CalmTrackClip), audio.Clip(AudioGenerator.CombatTrackClip));
             });
 
             // An older biome asset predates the demon references and the spawn table (D-070); it gets both once. The
@@ -208,6 +347,12 @@ namespace DemonFighter.Editor.Generate
             if (existingBiome != null)
             {
                 existingBiome.SetDemons(blob, elder);
+                if (!existingBiome.HasAudio)
+                {
+                    // The placeholder loops and tracks (D-084); a biome that already has sound keeps it.
+                    existingBiome.SetAudio(audio.Clip(AudioGenerator.DroneClip), audio.Clip(AudioGenerator.LavaClip), audio.Clip(AudioGenerator.CalmTrackClip), audio.Clip(AudioGenerator.CombatTrackClip));
+                }
+
                 if (!existingBiome.HasSpawnTable)
                 {
                     existingBiome.SetSpawnTable(spawnTable);
@@ -219,6 +364,12 @@ namespace DemonFighter.Editor.Generate
                     existingBiome.ApplyDefaults(ashCavern);
                 }
 
+                // Lava and fissures burn since D-086; older assets get the burn numbers once.
+                if (existingBiome.NeedsHazardDefaults)
+                {
+                    existingBiome.ApplyHazardDefaults(ashCavern);
+                }
+
                 if (!existingBiome.HasBlobArchetypes)
                 {
                     existingBiome.SetBlobArchetypes(blobArchetypes);
@@ -226,6 +377,25 @@ namespace DemonFighter.Editor.Generate
 
                 EditorUtility.SetDirty(existingBiome);
             }
+        }
+
+        // Only the core exposes sockets, so only the core gets anchors; they describe the placeholder capsule.
+        private static SocketAnchorDefinition[] DefaultAnchorsFor(BodyPartSpec spec)
+        {
+            if (!spec.IsCore)
+            {
+                return Array.Empty<SocketAnchorDefinition>();
+            }
+
+            var anchors = new SocketAnchorDefinition[PlaceholderContent.DefaultAnchors.Count];
+            for (int i = 0; i < anchors.Length; i++)
+            {
+                PlaceholderContent.SocketAnchor anchor = PlaceholderContent.DefaultAnchors[i];
+                anchors[i] = new SocketAnchorDefinition();
+                anchors[i].Configure(anchor.Kind, anchor.Position, anchor.Euler);
+            }
+
+            return anchors;
         }
 
         // One asset per demon kind, named after the kind; the starting package resolves to part and evolution assets.
@@ -238,7 +408,15 @@ namespace DemonFighter.Editor.Generate
                 throw new IOException("Demon " + spec.Id + " starts with unknown evolution " + spec.StartingEvolutionId + ".");
             }
 
-            return EditorAssets.LoadOrCreate<DemonDefinition>(DemonsFolder + "/DM_" + FileName(spec.Name) + ".asset", demon => demon.Configure(spec, core, startingParts, startingEvolution));
+            DemonDefinition demon = EditorAssets.LoadOrCreate<DemonDefinition>(DemonsFolder + "/DM_" + FileName(spec.Name) + ".asset", created => created.Configure(spec, core, startingParts, startingEvolution));
+            if (demon.NeedsBirthDefaults)
+            {
+                // What a kind is born with, the random body and evolutions (D-095); an older asset gets it once, later edits stay.
+                demon.ApplyBirthDefaults(spec);
+                EditorUtility.SetDirty(demon);
+            }
+
+            return demon;
         }
 
         private static T[] Resolve<T>(Dictionary<string, T> byId, IReadOnlyList<string> ids)
@@ -263,9 +441,73 @@ namespace DemonFighter.Editor.Generate
             return displayName.Replace(" ", string.Empty);
         }
 
+        // Blood decals wear the URP decal shader over the painted placeholder textures; viscera wear wet flesh.
+        private static void GenerateGoreMaterials(PlaceholderPalette palette)
+        {
+            EditorAssets.EnsureFolder(DecalMaterialsFolder);
+            Texture2D[] splatTextures = TextureGenerator.EnsureBloodSplats();
+            var splats = new Material[splatTextures.Length];
+            for (int i = 0; i < splats.Length; i++)
+            {
+                splats[i] = Decal("M_Blood_Splat_" + (i + 1).ToString("00"), splatTextures[i]);
+            }
+
+            Material pool = Decal("M_Blood_Pool", TextureGenerator.EnsureBloodPool());
+            Material viscera = Skin("M_Viscera", new Color(0.32f, 0.03f, 0.03f), 0.8f);
+            palette.SetGore(splats, pool, viscera, Embers());
+        }
+
+        // Additive glowing particles for sparks and lava embers (D-086); URP's own material setup sets blending and keywords.
+        private static Material Embers()
+        {
+            Material material = LoadOrCreateMaterial("M_Embers", ParticleShader, MaterialsFolder);
+            material.SetTexture(BaseMapProperty, TextureGenerator.EnsureEmber());
+            material.color = Color.white;
+            material.SetFloat(SurfaceProperty, (float)BaseShaderGUI.SurfaceType.Transparent);
+            material.SetFloat(BlendProperty, (float)BaseShaderGUI.BlendMode.Additive);
+            BaseShaderGUI.SetMaterialKeywords(material);
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
+        private static Material Decal(string name, Texture2D texture)
+        {
+            Material material = LoadOrCreateMaterial(name, DecalShader, DecalMaterialsFolder);
+            material.SetTexture(DecalBaseMapProperty, texture);
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
+        private static Material Skin(string name, Color color, float smoothness)
+        {
+            Material material = LoadOrCreateMaterial(name, DemonSkinShader, MaterialsFolder);
+            material.color = color;
+            material.SetFloat(SmoothnessProperty, smoothness);
+            material.DisableKeyword(EmissionKeyword);
+            material.SetColor(EmissionColorProperty, Color.black);
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
+        // Base color and normal map on a material; the base color stays white so the texture carries the palette.
+        private static Material Surface(Material material, TextureGenerator.SurfaceTextures textures, float tiling)
+        {
+            material.SetTexture(BaseMapProperty, textures.BaseColor);
+            material.SetTexture(BumpMapProperty, textures.Normal);
+            material.EnableKeyword(NormalMapKeyword);
+            material.mainTextureScale = new Vector2(tiling, tiling);
+            if (textures.Emission != null)
+            {
+                material.SetTexture(EmissionMapProperty, textures.Emission);
+            }
+
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
         private static Material Lit(string name, Color color, float smoothness)
         {
-            Material material = LoadOrCreateMaterial(name);
+            Material material = LoadOrCreateMaterial(name, LitShader, MaterialsFolder);
             material.color = color;
             material.SetFloat(SmoothnessProperty, smoothness);
             material.DisableKeyword(EmissionKeyword);
@@ -284,19 +526,27 @@ namespace DemonFighter.Editor.Generate
             return material;
         }
 
-        private static Material LoadOrCreateMaterial(string name)
+        // An existing material keeps its values but follows a shader change, as when the demon materials moved to the
+        // skin shader; the property names match, so nothing is lost.
+        private static Material LoadOrCreateMaterial(string name, string shaderName, string folder)
         {
-            string path = MaterialsFolder + "/" + name + ".mat";
+            Shader shader = Shader.Find(shaderName);
+            if (shader == null)
+            {
+                throw new IOException("Shader not found: " + shaderName + ". Is URP installed and is the shader in the project?");
+            }
+
+            string path = folder + "/" + name + ".mat";
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (existing != null)
             {
-                return existing;
-            }
+                if (existing.shader != shader)
+                {
+                    existing.shader = shader;
+                    EditorUtility.SetDirty(existing);
+                }
 
-            Shader shader = Shader.Find(LitShader);
-            if (shader == null)
-            {
-                throw new IOException("Shader not found: " + LitShader + ". Is URP installed?");
+                return existing;
             }
 
             var material = new Material(shader) { name = name };
@@ -304,8 +554,9 @@ namespace DemonFighter.Editor.Generate
             return material;
         }
 
-        // Root with the controller and the view, one capsule child as the body and core part with a trigger collider
-        // on the Demon layer for hit detection; materials come at bind time.
+        // Root with the controller and the view; under the figure root the capsule body (the core part view with a
+        // trigger collider on the Demon layer for hit detection), the placeholder space and the rig the figure
+        // composes parts into (DemonFigure); materials come at bind time.
         private static void GenerateDemonPrefab(PlaceholderPalette palette)
         {
             EditorAssets.EnsureFolder(PrefabsFolder);
@@ -313,9 +564,11 @@ namespace DemonFighter.Editor.Generate
             try
             {
                 root.AddComponent<CharacterController>();
+                var figure = new GameObject(DemonFigure.FigureName);
+                figure.transform.SetParent(root.transform, false);
                 GameObject body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 body.name = "Body";
-                body.transform.SetParent(root.transform, false);
+                body.transform.SetParent(figure.transform, false);
                 body.GetComponent<Collider>().isTrigger = true;
                 body.layer = Layers.Demon;
                 body.AddComponent<BodyPartView>();
@@ -329,8 +582,16 @@ namespace DemonFighter.Editor.Generate
                 Object.DestroyImmediate(snout.GetComponent<Collider>());
                 snout.GetComponent<Renderer>().sharedMaterial = palette.Maw;
 
+                var placeholders = new GameObject(DemonFigure.PlaceholdersName);
+                placeholders.transform.SetParent(figure.transform, false);
+                var rig = new GameObject(DemonFigure.RigName);
+                rig.transform.SetParent(figure.transform, false);
+
                 DemonView view = root.AddComponent<DemonView>();
                 EditorAssets.SetReference(view, DemonBodyProperty, body.transform);
+                EditorAssets.SetReference(view, DemonFigureProperty, figure.transform);
+                EditorAssets.SetReference(view, DemonPlaceholdersProperty, placeholders.transform);
+                EditorAssets.SetReference(view, DemonRigProperty, rig.transform);
                 PrefabUtility.SaveAsPrefabAsset(root, DemonPrefabPath);
             }
             finally

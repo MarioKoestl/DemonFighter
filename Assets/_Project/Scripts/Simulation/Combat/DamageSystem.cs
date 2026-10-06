@@ -49,6 +49,15 @@ namespace DemonFighter.Simulation.Combat
             float armor = Tuning.Multiplier(skill.DamageType, target.Body.EffectiveDefense(part));
             float partBonus = 1f + attacker.Body.SkillDamageBonus(skill.Id);
             float amount = skill.BaseDamage * levelBonus * partBonus * attacker.Derived.DamageMultiplier * armor;
+
+            // A demon in test mode shrugs the whole hit off: no damage, no bleeding, no stagger (D-089). The damage numbers
+            // still learn what it would have taken (D-092).
+            if (target.InTestMode)
+            {
+                _events.Publish(new DamageBlocked(target.Id, part.Index, amount, skill.DamageType, attacker.Id));
+                return;
+            }
+
             bool alive = ApplyDamage(target, part, amount, skill.DamageType, attacker.Id);
 
             // Spines give a share of the hit back as Pierce (D-058); plain damage, so thorns never chain.
@@ -100,6 +109,14 @@ namespace DemonFighter.Simulation.Combat
                 return target.IsAlive;
             }
 
+            // A demon in test mode is too (D-089), against hits, thorns, bleeding and hazards alike; only the damage
+            // numbers hear of it (D-092).
+            if (target.InTestMode)
+            {
+                _events.Publish(new DamageBlocked(target.Id, part.Index, amount, type, attacker));
+                return true;
+            }
+
             bool wasWounded = part.Condition == PartCondition.Wounded;
             bool lost = part.ApplyDamage(amount);
             _events.Publish(new DamageApplied(target.Id, part.Index, amount, type, attacker));
@@ -143,11 +160,12 @@ namespace DemonFighter.Simulation.Combat
                 _events.Publish(new PartDestroyed(target.Id, part.Index));
             }
 
+            target.RefreshSize();
             return true;
         }
 
         // The corpse carries the tier value plus whatever Biomass the dead demon had not spent (D-012). The killer
-        // gets the kill XP scaled by the tier gap (GAME_DESIGN, "Reward scaling").
+        // gets the kill XP, the only source of character XP, scaled by the victim's tier and level and the tier gap (D-090).
         private void Kill(Demon target, DemonId killer)
         {
             target.Die();
@@ -158,7 +176,7 @@ namespace DemonFighter.Simulation.Combat
             if (killer.IsValid && killer != target.Id && _state.TryGetDemon(killer, out Demon? killerDemon))
             {
                 killerDemon.RecordKill();
-                float xp = Tuning.KillXpBase * (target.Tier + 1) * Tuning.RewardFactor(killerDemon.Tier, target.Tier);
+                float xp = Tuning.KillXp(killerDemon.Tier, target.Tier, target.Level);
                 XpSystem.Grant(killerDemon, xp, XpSource.Kill, Tuning, _events);
             }
         }

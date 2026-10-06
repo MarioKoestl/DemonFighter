@@ -27,3 +27,7 @@ MonoBehaviour:
   _startingBiomass: 60
   _startingLevel: 5
   _startingEvolution: {fileID: 11400000, guid: f1a638a39ff80c24bb56e9a6f9616c5c, type: 2}
+  _randomPartChance: 0
+  _startingPartsAtMaxUpgrade: 0
+  _randomEvolutionStages: 0
+  _contentVersion: 2

@@ -13,6 +13,8 @@ namespace DemonFighter.Data
     [CreateAssetMenu(menuName = "Demon Fighter/Content/Combat Tuning", fileName = "CombatTuning")]
     public sealed class CombatTuningDefinition : ScriptableObject
     {
+        private const int CurrentProgressionVersion = 2;
+
         [Header("Damage matrix")]
         [SerializeField] private float _strongMultiplier = 1.5f;
         [SerializeField] private float _weakMultiplier = 0.6f;
@@ -36,14 +38,15 @@ namespace DemonFighter.Data
         [SerializeField] private float _inCombatSeconds = 5f;
 
         [Header("Experience")]
-        [SerializeField] private float _killXpBase = 50f;
+        [SerializeField] private float _killXpBase = 100f;
+        [SerializeField] private float _killXpPerVictimLevel = 0.25f;
         [SerializeField] private float _rewardBonusPerTierAbove = 0.5f;
         [SerializeField] private float _rewardFactorFarBelow = 0.1f;
         // Playtest pace (D-062): a level comes quicker than with the design baseline the CombatTuning record keeps.
         [SerializeField] private float _levelXpBase = 30f;
         [SerializeField] private float _levelXpExponent = 1.2f;
+        [SerializeField] private float _levelXpPerTier = 1f;
         [SerializeField] private int _statPointsPerLevel = 3;
-        [SerializeField] private float _characterXpPerSkillXp = 0.5f;
 
         [Header("Food")]
         [SerializeField] private float _eatBiomassPerSecond = 15f;
@@ -52,7 +55,6 @@ namespace DemonFighter.Data
         [SerializeField] private float _foodDecaySeconds = 90f;
 
         [Header("Body")]
-        [SerializeField] private int _tierInvestmentStep = 4;
         [SerializeField] private float _sizeStepPerTier = 0.5f;
         [SerializeField] private float _partHpPerUpgradeLevel = 0.15f;
 
@@ -66,12 +68,15 @@ namespace DemonFighter.Data
 
         [Header("Evolution")]
         [SerializeField] private int _firstEvolutionLevel = 5;
-        [SerializeField] private int _secondEvolutionLevel = 10;
+        [SerializeField] private int _secondEvolutionLevel = 5;
         [SerializeField] private int _baseStatCap = 10;
         [SerializeField] private float _perceptionPerSenseLevel = 0.3f;
 
         [Header("Stats")]
         [SerializeField] private StatDefinition[] _stats = Array.Empty<StatDefinition>();
+
+        // Lags on an asset written before the kill XP of D-090 or the tiers of D-091; the generator updates it.
+        [SerializeField, HideInInspector] private int _progressionVersion;
 
         /// <summary>Builds the immutable tuning; throws for invalid content.</summary>
         public CombatTuning ToSpec()
@@ -101,17 +106,17 @@ namespace DemonFighter.Data
                 MinBleedFraction = _minBleedFraction,
                 InCombatSeconds = _inCombatSeconds,
                 KillXpBase = _killXpBase,
+                KillXpPerVictimLevel = _killXpPerVictimLevel,
                 RewardBonusPerTierAbove = _rewardBonusPerTierAbove,
                 RewardFactorFarBelow = _rewardFactorFarBelow,
                 LevelXpBase = _levelXpBase,
                 LevelXpExponent = _levelXpExponent,
+                LevelXpPerTier = _levelXpPerTier,
                 StatPointsPerLevel = _statPointsPerLevel,
-                CharacterXpPerSkillXp = _characterXpPerSkillXp,
                 EatBiomassPerSecond = _eatBiomassPerSecond,
                 EatReachPerMeter = _eatReachPerMeter,
                 CorpseBiomassPerTier = _corpseBiomassPerTier,
                 FoodDecaySeconds = _foodDecaySeconds,
-                TierInvestmentStep = _tierInvestmentStep,
                 SizeStepPerTier = _sizeStepPerTier,
                 PartHpPerUpgradeLevel = _partHpPerUpgradeLevel,
                 TransformationSeconds = _transformationSeconds,
@@ -127,6 +132,24 @@ namespace DemonFighter.Data
             };
             tuning.Validate();
             return tuning;
+        }
+
+        /// <summary>True for an asset written before the kill XP of D-090 or the tiers of D-091.</summary>
+        internal bool NeedsProgressionDefaults => _progressionVersion < CurrentProgressionVersion;
+
+        /// <summary>
+        /// The progression of D-090 and D-091, once: kill XP with a bonus per victim level, every tier evolving at the same
+        /// level, and levels costing more per tier. The level curve itself stays as tuned (D-062).
+        /// </summary>
+        internal void ApplyProgressionDefaults()
+        {
+            var defaults = new CombatTuning();
+            _killXpBase = defaults.KillXpBase;
+            _killXpPerVictimLevel = defaults.KillXpPerVictimLevel;
+            _firstEvolutionLevel = defaults.EvolutionLevels[0];
+            _secondEvolutionLevel = defaults.EvolutionLevels[1];
+            _levelXpPerTier = defaults.LevelXpPerTier;
+            _progressionVersion = CurrentProgressionVersion;
         }
 
         internal void Configure(CombatTuning spec)
@@ -148,17 +171,18 @@ namespace DemonFighter.Data
             _minBleedFraction = spec.MinBleedFraction;
             _inCombatSeconds = spec.InCombatSeconds;
             _killXpBase = spec.KillXpBase;
+            _killXpPerVictimLevel = spec.KillXpPerVictimLevel;
+            _progressionVersion = CurrentProgressionVersion;
             _rewardBonusPerTierAbove = spec.RewardBonusPerTierAbove;
             _rewardFactorFarBelow = spec.RewardFactorFarBelow;
             _levelXpBase = spec.LevelXpBase;
             _levelXpExponent = spec.LevelXpExponent;
+            _levelXpPerTier = spec.LevelXpPerTier;
             _statPointsPerLevel = spec.StatPointsPerLevel;
-            _characterXpPerSkillXp = spec.CharacterXpPerSkillXp;
             _eatBiomassPerSecond = spec.EatBiomassPerSecond;
             _eatReachPerMeter = spec.EatReachPerMeter;
             _corpseBiomassPerTier = spec.CorpseBiomassPerTier;
             _foodDecaySeconds = spec.FoodDecaySeconds;
-            _tierInvestmentStep = spec.TierInvestmentStep;
             _sizeStepPerTier = spec.SizeStepPerTier;
             _partHpPerUpgradeLevel = spec.PartHpPerUpgradeLevel;
             _transformationSeconds = spec.TransformationSeconds;
@@ -168,7 +192,7 @@ namespace DemonFighter.Data
             _characterLevelPerUpgradeLevel = spec.CharacterLevelPerUpgradeLevel;
             _knockbackSeconds = spec.KnockbackSeconds;
             _firstEvolutionLevel = spec.EvolutionLevels.Count > 0 ? spec.EvolutionLevels[0] : 5;
-            _secondEvolutionLevel = spec.EvolutionLevels.Count > 1 ? spec.EvolutionLevels[1] : 10;
+            _secondEvolutionLevel = spec.EvolutionLevels.Count > 1 ? spec.EvolutionLevels[1] : 5;
             _baseStatCap = spec.BaseStatCap;
             _perceptionPerSenseLevel = spec.PerceptionPerSenseLevel;
             _stats = new StatDefinition[spec.Stats.Count];

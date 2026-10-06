@@ -2,6 +2,7 @@
 using System;
 using DemonFighter.Presentation;
 using DemonFighter.Presentation.Cameras;
+using DemonFighter.Presentation.Combat;
 using DemonFighter.Presentation.Demons;
 using DemonFighter.UI;
 using UnityEngine;
@@ -19,6 +20,7 @@ namespace DemonFighter.App
         [SerializeField] private WorldBuildSettings _worldSettings = null!;
         [SerializeField] private DemonViewSettings _demonSettings = null!;
         [SerializeField] private CameraRigSettings _cameraSettings = null!;
+        [SerializeField] private GoreSettings _goreSettings = null!;
         [SerializeField] private DemonView _demonPrefab = null!;
         [SerializeField] private CameraRig _cameraRig = null!;
         [SerializeField] private HudScreen _hud = null!;
@@ -30,6 +32,8 @@ namespace DemonFighter.App
         public DemonViewSettings DemonSettings => _demonSettings;
 
         public CameraRigSettings CameraSettings => _cameraSettings;
+
+        public GoreSettings GoreSettings => _goreSettings;
 
         public DemonView DemonPrefab => _demonPrefab;
 
@@ -44,6 +48,7 @@ namespace DemonFighter.App
             Require(_worldSettings, nameof(_worldSettings));
             Require(_demonSettings, nameof(_demonSettings));
             Require(_cameraSettings, nameof(_cameraSettings));
+            Require(_goreSettings, nameof(_goreSettings));
             Require(_demonPrefab, nameof(_demonPrefab));
             Require(_cameraRig, nameof(_cameraRig));
             Require(_hud, nameof(_hud));

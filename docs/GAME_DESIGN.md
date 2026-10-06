@@ -58,26 +58,26 @@ Every demon, player or AI, grows on three independent layers. They feed each oth
 
 | Layer | Fed by | What it changes | Where you spend it |
 |---|---|---|---|
-| **Level** | XP from kills and from skill use | Base stats (points you allocate), evolutions at level thresholds | Stats tab, Evolve tab |
+| **Level** | XP from kills only (D-090); starts again at 1 in every new tier (D-091) | Base stats (points you allocate), evolutions at level thresholds | Stats tab, Evolve tab |
 | **Mutation** | Biomass from eating | Body parts, part upgrades, regrowing lost parts | Mutate tab |
 | **Skill** | Using the skill (Skyrim style) | Skill level: effectiveness, cost, speed; perks at skill level thresholds | Nothing to spend; use it and it grows. Skills tab shows progress |
 
 Resources:
 
-- **Experience (XP)** from kills and from using skills. XP raises **Level**. Each level grants stat points. Level gates mutations (requirements) and triggers evolutions at thresholds.
+- **Experience (XP)** from kills only. A higher victim is worth more: its tier and its level both raise the XP (D-090). XP raises **Level**. Each level grants stat points. Level gates mutations (counting the levels of earlier tiers) and, at the evolution level, lets the demon evolve into the next tier, where it starts again at level 1 (D-091).
 - **Biomass** from eating corpses and severed parts. Biomass buys mutations and regrows lost parts. Biomass is lost on death. Your corpse is worth Biomass to whoever eats it.
-- **Skill XP** per skill, from using that skill. Not a currency; it only raises that skill's level.
+- **Skill XP** per skill, from using that skill. Not a currency; it only raises that skill's level and never feeds character XP.
 
 XP, Biomass and the active skills' levels are shown in the HUD at all times.
 
-**Reward scaling:** XP and Biomass from a kill or a meal scale with the victim's tier relative to yours. Prey more than one tier below you gives very little. This is the rule that makes elders ignore the small, and it applies to the player too.
+**Reward scaling:** XP and Biomass from a kill or a meal scale with the victim's tier relative to yours, and kill XP also grows with the victim's own tier and level. Prey more than one tier below you gives very little. This is the rule that makes elders ignore the small, and it applies to the player too.
 
 ## The run
 
 - **Start:** the player spawns as a Tier 0 blob with Bite, Crawl and Eat. A handful of other Tier 0 demons spawn in the same area at the same time (same rules, same starting body).
 - **World:** procedurally generated from a seed, bounded by cavern walls. v1 is a single biome with terrain features (rock formations, lava, glowing fissures, pools, bone piles) that matter for line of sight and escape routes. More biomes later.
 - **Pressure:** a run-wide **threat level** rises with time. Higher threat means more and stronger spawns, and elders wander closer. There is no hunger mechanic. This is what keeps a run at 15 to 20 minutes.
-- **Elders:** one or two very high tier demons roam the world from the start. They ignore anything far below their tier (it is not worth the XP) unless attacked. The player should see one walking in the distance within the first minutes. They can be attacked and will fight back. Not a boss fight in v1, just a very bad idea.
+- **Elders:** one or two very high tier demons roam the world from the start. They ignore anything far below their tier (it is not worth the XP) unless attacked. The player should see one walking in the distance within the first minutes. Each run's elder is born evolved along a random line and with a different random body, every part at its highest upgrade (D-095). They can be attacked and will fight back. Not a boss fight in v1, just a very bad idea.
 - **End of run:** death. Run summary shows time survived, highest tier, evolutions taken, kills, Biomass eaten, final body. Other end conditions (reaching an exit, killing an elder) are later ideas.
 - **Save and resume:** quitting mid-run saves the run. Resuming deletes the save. One slot. This is a convenience, not a safety net; death still ends the run.
 - **Meta-progression:** none in v1. The code keeps a hook (`IMetaProgression`).
@@ -101,11 +101,11 @@ Later: a mind stat for magic (Will or similar) when magic enters the game. The s
 
 ### Derived values
 
-Health (core plus parts), Stamina, Speed, Perception (from sensory parts) and per-skill values (Bite force, Claw sharpness) are computed from base stats plus body parts. Tier (0 to N) is a derived label from total body investment and evolutions. Tier drives threat assessment, reward scaling and spawn tables.
+Health (core plus parts), Stamina, Speed, Perception (from sensory parts) and per-skill values (Bite force, Claw sharpness) are computed from base stats plus body parts. Tier (0 to N) counts evolutions: a blob starts at Tier 0, and every evolution raises the tier by one (D-091). Mutations bought with Biomass change the body, not the tier. Tier drives threat assessment, reward scaling and spawn tables. **(Mario, later)** Higher tiers also improve skills and mutations; how is open (O-012).
 
 ### Size
 
-Demons grow physically with tier. A Tier 0 blob is about 1 meter; elders are about 15 meters. Growth changes collision, camera distance, reach and how big a bite is. Every system must handle a body that can be 1 meter or 15 meters. **(default, open)** v1 player content reaches about Tier 3, roughly 3 meters; elder sizes exist as AI content only.
+Demons grow physically with tier, and bulky mutations add some size on top: legs and plates a tenth, thick hide and elastic tissue a twentieth (D-091). A body with legs stands on them, so legs also lift it off the ground (D-094). A Tier 0 blob is about 1 meter; elders are about 15 meters. Growth changes collision, camera distance, reach and how big a bite is. Every system must handle a body that can be 1 meter or 15 meters. **(default, open)** v1 player content reaches about Tier 3, roughly 3 meters; elder sizes exist as AI content only.
 
 ### The body: parts and sockets
 
@@ -146,13 +146,14 @@ At level thresholds the demon evolves: a big change of form, inspired by Chrysal
   - unlocked **part categories** (a Brute line unlocks heavy limbs and Plates, a Stalker line unlocks speed and sensory parts)
 - Evolving is confirmed like a mutation (short transformation; the out-of-combat rule is suspended, D-060) and grows the body a size step.
 - AI demons evolve too, picking by archetype preference.
-- **(default, open)** v1 has two evolution thresholds, Level 5 and Level 10, three options each. Whether an option's stat pool is fully free or partly bound to a stat is decided when the first evolutions are written in M3; default: fully free pool, option-specific size and caps.
+- Evolving raises the tier by one and starts the new tier at level 1; stats and unspent points stay. A demon waits at the evolution level until it evolves (D-091).
+- **(default, open)** v1 has two evolutions, three options each; every tier evolves at level 5 (D-091). Whether an option's stat pool is fully free or partly bound to a stat is decided when the first evolutions are written in M3; default: fully free pool, option-specific size and caps.
 
 ### Skill levels
 
 Skills get better by being used, like in Skyrim. There is nothing to buy.
 
-- Each use of a skill grants skill XP to that skill (hits grant more than misses; harder targets grant more). Skill XP also feeds a share into character XP.
+- Each use of a skill grants skill XP to that skill (hits grant more than misses; harder targets grant more). Skill XP stays with its skill; character XP comes only from kills (D-090).
 - Skill level raises the skill's numbers: damage or effect, stamina cost, cooldown, speed, reach. The curve is data on the `SkillSpec`.
 - At skill level thresholds the skill gains a **perk** (data): Bite might gain a longer bleed, Claw a faster follow-up, Sprint a lower cost. Perks are defined per skill in the content catalog.
 - Skill levels are per demon and per run. Losing the part that grants a skill freezes its level; regrowing the part restores the skill at the same level.
@@ -218,7 +219,7 @@ Whatever the stage: every wound must be visible on the body.
 ## World generation
 
 - Seeded. Same seed, same world.
-- v1: one biome, a bounded cavern of roughly 300 x 300 meters. Height variation, rock formations, lava pools and glowing fissures (light, damage on contact), shallow water pools, bone piles that hold a little free Biomass, cavern walls at the edge.
+- v1: one biome, a bounded cavern of roughly 300 x 300 meters. Height variation, rock formations, lava pools and glowing fissures (light, damage on contact: lava burns hard, fissures a little, the legs burn first; AI demons walk around them, D-086), shallow water pools, bone piles that hold a little free Biomass, cavern walls at the edge.
 - Spawn points for Tier 0 demons are clustered so early encounters are guaranteed. Elder routes are generated as loops through the area.
 - No jumping or climbing in v1; the generator must not create terrain that requires it. Flying is a later idea.
 - Later: multiple biomes, more hazards, vertical structures.

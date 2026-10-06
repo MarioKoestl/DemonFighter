@@ -9,17 +9,15 @@ using UnityEngine.Rendering;
 namespace DemonFighter.Presentation.Demons
 {
     /// <summary>
-    /// Renders a body for the mutation menu (GAME_DESIGN, "UI"): the same prefab and part primitives the world uses,
-    /// built from a body the menu composes, on a stage far below the world on the Preview layer, filmed by its own
-    /// camera into a texture the menu shows. The figure turns slowly by itself and by drag. Fog is switched off while
-    /// this camera renders, so the preview stays readable in a foggy cavern. No game rules live here.
+    /// Renders a body for the mutation menu (GAME_DESIGN, "UI"): the same prefab, figure composition and part views
+    /// the world uses, built from a body the menu composes, on a stage far below the world on the Preview layer,
+    /// filmed by its own camera into a texture the menu shows. The figure turns slowly by itself and by drag. Fog is
+    /// switched off while this camera renders, so the preview stays readable in a foggy cavern. No game rules live here.
     /// </summary>
     public sealed class BodyPreviewRig : MonoBehaviour
     {
         private const int TextureWidth = 512;
         private const int TextureHeight = 640;
-        private const float CapsuleMeshHeight = 2f;
-        private const float CapsuleMeshRadius = 0.5f;
         private const float CameraDistancePerMeter = 2.6f;
         private const float CameraHeightPerMeter = 0.6f;
         private const float LookAtHeightPerMeter = 0.45f;
@@ -96,7 +94,7 @@ namespace DemonFighter.Presentation.Demons
             ApplyYaw();
         }
 
-        /// <summary>Replaces the figure with this body at this size: the core capsule of the prefab plus a primitive per attached part.</summary>
+        /// <summary>Replaces the figure with this body at this size: the core of the prefab plus a view per attached part, composed like a world body.</summary>
         public void Show(Body body, float sizeMeters)
         {
             if (body == null)
@@ -110,24 +108,24 @@ namespace DemonFighter.Presentation.Demons
             }
 
             DemonView view = Instantiate(_prefab, _stage);
-            GameObject figure = view.gameObject;
-            figure.name = "Figure";
-            _figure = figure;
+            GameObject figureObject = view.gameObject;
+            figureObject.name = "Figure";
+            _figure = figureObject;
 
-            // The prefab brings the view and the controller for a demon it has not got; only its meshes are wanted.
+            // The prefab brings the view and the controller for a demon it has not got; only its figure is wanted.
             BodyPartView core = view.GetComponentInChildren<BodyPartView>(true);
-            Transform bodyTransform = core.transform;
+            DemonFigure figure = view.Figure;
             Destroy(view);
-            CharacterController controller = figure.GetComponent<CharacterController>();
+            CharacterController controller = figureObject.GetComponent<CharacterController>();
             if (controller != null)
             {
                 Destroy(controller);
             }
 
-            float radius = sizeMeters * _settings.RadiusPerMeter;
-            bodyTransform.localScale = new Vector3(radius / CapsuleMeshRadius, sizeMeters / CapsuleMeshHeight, radius / CapsuleMeshRadius);
-            bodyTransform.localPosition = Vector3.up * (sizeMeters * 0.5f);
-            bodyTransform.GetComponent<Renderer>().sharedMaterial = _ownerMaterial;
+            figure.Prepare(_visuals, body.Core.Spec.Id, _settings);
+            figure.ApplySize(sizeMeters, _settings.RadiusPerMeter);
+            figure.InitializeCore(core, null, body.Core.Index, _ownerMaterial);
+            figure.SetDecorationsVisible(true);
 
             IReadOnlyList<BodyPart> parts = body.Parts;
             for (int i = 0; i < parts.Count; i++)
@@ -147,15 +145,16 @@ namespace DemonFighter.Presentation.Demons
                     }
                 }
 
-                BodyPartView? piece = _visuals.Create(part, bodyTransform, _ownerMaterial, copyIndex, out Material material, out _);
-                if (piece != null)
+                foreach (BodyPartView partView in figure.CreatePartViews(_visuals, part, null, _ownerMaterial, copyIndex, out _))
                 {
-                    piece.GetComponent<Renderer>().sharedMaterial = material;
+                    partView.ShowUpgrade(part.UpgradeLevel, _settings.UpgradeGrowthPerLevel);
                 }
             }
 
-            StripForPreview(figure);
-            FrameCamera(sizeMeters);
+            // Measured before the part views are stripped: the core stands on its legs here too (D-094).
+            figure.SnapStance();
+            StripForPreview(figureObject);
+            FrameCamera(sizeMeters + figure.Stance);
             ApplyYaw();
         }
 

@@ -14,5 +14,8 @@ namespace DemonFighter.Common
 
         /// <summary>Swaps between third and first person.</summary>
         void ToggleView();
+
+        /// <summary>True in first person; attacks then always go where the camera looks (D-093).</summary>
+        bool IsFirstPerson { get; }
     }
 }

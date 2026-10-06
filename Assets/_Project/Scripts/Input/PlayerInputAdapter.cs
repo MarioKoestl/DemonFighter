@@ -116,9 +116,10 @@ namespace DemonFighter.Input
         /// <inheritdoc />
         public void SubmitCommands(CommandQueue commands)
         {
-            // While attacking the body faces the camera, so the hit lands where the crosshair points.
+            // While attacking the body faces where the camera looks, so the hit lands where the crosshair points; a
+            // third-person camera looking at the face leaves the body facing its way (D-093).
             bool aiming = _requestedSlots.Count > 0 || _player.CurrentSkillUse != null;
-            System.Numerics.Vector2 facing = aiming ? HeadingDirection() : System.Numerics.Vector2.Zero;
+            System.Numerics.Vector2 facing = aiming ? AttackFacing.Choose(HeadingDirection(), _player.FacingDirection, _camera.IsFirstPerson) : System.Numerics.Vector2.Zero;
             Vector2 input = _move.ReadValue<Vector2>();
             commands.Submit(new MoveCommand(_player.Id, ToWorldDirection(input), _sprint.IsPressed(), facing));
 

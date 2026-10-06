@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Food;
+using DemonFighter.Simulation.Hazards;
 using DemonFighter.Simulation.Worldgen;
 
 namespace DemonFighter.Simulation
@@ -82,6 +83,9 @@ namespace DemonFighter.Simulation
         /// <summary>The generated world, attached once at run start; null only while the run is being set up.</summary>
         public WorldLayout? World { get; private set; }
 
+        /// <summary>Where the world burns (D-086), built with the world; empty until it is attached.</summary>
+        public HazardMap Hazards { get; private set; } = HazardMap.Empty;
+
         /// <summary>Every demon in this run in spawn order; iterate by index, the list never allocates.</summary>
         public IReadOnlyList<Demon> Demons => _demons;
 
@@ -104,6 +108,7 @@ namespace DemonFighter.Simulation
             }
 
             World = world;
+            Hazards = HazardMap.From(world);
         }
 
         /// <summary>
@@ -113,7 +118,7 @@ namespace DemonFighter.Simulation
         public Demon SpawnDemon(ControllerKind controller, DemonSpec spec, Vector3 position, float yaw)
         {
             var demon = new Demon(new DemonId(DemonIds.Next()), controller, spec, Catalog, position, yaw);
-            demon.ApplyStartingPackage();
+            demon.ApplyStartingPackage(Rng);
             _demonsById.Add(demon.Id, demon);
             _demons.Add(demon);
             return demon;

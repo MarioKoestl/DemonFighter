@@ -18,6 +18,7 @@ namespace DemonFighter.Presentation.Cameras
     {
         private const int ActivePriority = 20;
         private const int InactivePriority = 10;
+        private const float StanceRefitMeters = 0.01f;
 
         [SerializeField] private CinemachineBrain _brain = null!;
         [SerializeField] private CinemachineCamera _thirdPerson = null!;
@@ -30,9 +31,13 @@ namespace DemonFighter.Presentation.Cameras
         private float _yawDegrees;
         private float _pitchDegrees;
         private float _appliedSize;
+        private float _appliedStance;
 
         /// <inheritdoc />
         public float YawRadians => _yawDegrees * Mathf.Deg2Rad;
+
+        private float _sensitivityScale = 1f;
+        private bool? _invertYOverride;
 
         /// <summary>True while the first-person camera is the live one.</summary>
         public bool IsFirstPerson { get; private set; }
@@ -56,13 +61,20 @@ namespace DemonFighter.Presentation.Cameras
             _thirdPerson.Target.TrackingTarget = target.transform;
             _thirdPerson.Target.CustomLookAtTarget = false;
             _orbit.VerticalAxis.Range = new Vector2(settings.PitchMinDegrees, settings.PitchMaxDegrees);
-            ApplyFraming(target.Demon.SizeMeters);
+            ApplyFraming(target.Demon.SizeMeters, target.Stance);
             _brain.DefaultBlend = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, settings.BlendSeconds);
 
             _yawDegrees = WrapDegrees(target.transform.eulerAngles.y);
             _pitchDegrees = settings.DefaultPitchDegrees;
             SetFirstPerson(false);
             ApplyAxes();
+        }
+
+        /// <summary>Overrides the tuned mouse look with the player's settings (D-085): a multiplier and the Y direction.</summary>
+        public void SetLook(float sensitivityScale, bool invertY)
+        {
+            _sensitivityScale = Mathf.Max(0.01f, sensitivityScale);
+            _invertYOverride = invertY;
         }
 
         /// <inheritdoc />
@@ -73,9 +85,10 @@ namespace DemonFighter.Presentation.Cameras
                 return;
             }
 
-            float sensitivity = _settings.LookSensitivityDegreesPerPixel;
+            float sensitivity = _settings.LookSensitivityDegreesPerPixel * _sensitivityScale;
+            bool invertY = _invertYOverride ?? _settings.InvertY;
             _yawDegrees = WrapDegrees(_yawDegrees + deltaPixels.x * sensitivity);
-            float pitchDelta = deltaPixels.y * sensitivity * (_settings.InvertY ? 1f : -1f);
+            float pitchDelta = deltaPixels.y * sensitivity * (invertY ? 1f : -1f);
             _pitchDegrees = Mathf.Clamp(_pitchDegrees + pitchDelta, _settings.PitchMinDegrees, _settings.PitchMaxDegrees);
         }
 
@@ -92,16 +105,17 @@ namespace DemonFighter.Presentation.Cameras
                 return;
             }
 
-            if (_target.Demon != null && !Mathf.Approximately(_target.Demon.SizeMeters, _appliedSize))
+            if (_target.Demon != null && (!Mathf.Approximately(_target.Demon.SizeMeters, _appliedSize) || Mathf.Abs(_target.Stance - _appliedStance) > StanceRefitMeters))
             {
-                ApplyFraming(_target.Demon.SizeMeters);
+                ApplyFraming(_target.Demon.SizeMeters, _target.Stance);
             }
 
             ApplyAxes();
         }
 
-        // Orbit radius and look height follow the body size (D-018), also when the demon grows mid-run.
-        private void ApplyFraming(float size)
+        // Orbit radius and look height follow the body size (D-018), also when the demon grows mid-run; the look
+        // height also rises with the core when it stands on legs (D-094).
+        private void ApplyFraming(float size, float stance)
         {
             if (_settings == null)
             {
@@ -109,7 +123,8 @@ namespace DemonFighter.Presentation.Cameras
             }
 
             _appliedSize = size;
-            Vector3 lookOffset = Vector3.up * (size * _settings.LookHeightPerMeter);
+            _appliedStance = stance;
+            Vector3 lookOffset = Vector3.up * (stance + (size * _settings.LookHeightPerMeter));
             _orbit.Radius = _settings.OrbitRadiusBase + size * _settings.OrbitRadiusPerMeter;
             _orbit.TargetOffset = lookOffset;
             _composer.TargetOffset = lookOffset;

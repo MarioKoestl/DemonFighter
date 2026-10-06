@@ -69,6 +69,20 @@ namespace DemonFighter.Data
             return null;
         }
 
+        /// <summary>The skill definition with this id, or null; views read its motion.</summary>
+        public SkillDefinition? FindSkill(string id)
+        {
+            for (int i = 0; i < _skills.Length; i++)
+            {
+                if (_skills[i] != null && string.Equals(_skills[i].Id, id, StringComparison.Ordinal))
+                {
+                    return _skills[i];
+                }
+            }
+
+            return null;
+        }
+
         internal void SetContent(
             CombatTuningDefinition tuning,
             BodyPartDefinition[] bodyParts,

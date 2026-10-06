@@ -175,6 +175,7 @@ namespace DemonFighter.Editor.Generate
         {
             Id = LegsId,
             Name = "Legs",
+            SizeBonus = 0.1f,
             Socket = SocketKind.Locomotion,
             MaxHp = 30f,
             Fate = PartFate.Severed,
@@ -189,6 +190,7 @@ namespace DemonFighter.Editor.Generate
         {
             Id = ThickHideId,
             Name = "Thick Hide",
+            SizeBonus = 0.05f,
             Socket = SocketKind.Hide,
             MaxHp = 40f,
             Defense = DefenseType.ThickHide,
@@ -202,6 +204,7 @@ namespace DemonFighter.Editor.Generate
         {
             Id = PlatesId,
             Name = "Plates",
+            SizeBonus = 0.1f,
             Socket = SocketKind.Hide,
             MaxHp = 50f,
             Defense = DefenseType.Plates,
@@ -215,6 +218,7 @@ namespace DemonFighter.Editor.Generate
         {
             Id = ElasticTissueId,
             Name = "Elastic Tissue",
+            SizeBonus = 0.05f,
             Socket = SocketKind.Hide,
             MaxHp = 35f,
             Defense = DefenseType.ElasticTissue,
@@ -354,23 +358,98 @@ namespace DemonFighter.Editor.Generate
         /// <summary>Where and how each part is drawn on the body capsule (capsule mesh units: two tall, radius a half).</summary>
         public static readonly IReadOnlyDictionary<string, PartVisual> Visuals = new Dictionary<string, PartVisual>
         {
-            [CoreId] = new PartVisual(PartVisualKind.None, PartMaterialRole.Owner, Vector3.zero, Vector3.one, Vector3.zero, false),
-            [JawsId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Maw, new Vector3(0f, 0.2f, 0.5f), new Vector3(0.65f, 0.28f, 0.45f), Vector3.zero, false),
+            [CoreId] = new PartVisual(PartVisualKind.None, PartMaterialRole.Owner, Vector3.zero, Vector3.one, Vector3.zero, false, collar: 0f),
+            [JawsId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Maw, new Vector3(0f, 0.2f, 0.5f), new Vector3(0.65f, 0.28f, 0.45f), Vector3.zero, false, collar: 0f),
             [ArmId] = new PartVisual(PartVisualKind.Capsule, PartMaterialRole.Owner, new Vector3(0.62f, 0.1f, 0.15f), new Vector3(0.28f, 0.55f, 0.28f), new Vector3(0f, 0f, -30f), true),
-            [LegsId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Dark, new Vector3(0f, -0.95f, 0f), new Vector3(0.9f, 0.3f, 0.5f), Vector3.zero, false),
-            [ThickHideId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Dark, new Vector3(0f, 0.1f, -0.52f), new Vector3(0.8f, 1.2f, 0.22f), Vector3.zero, false),
-            [PlatesId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Plate, new Vector3(0f, 0.2f, -0.55f), new Vector3(0.9f, 1.0f, 0.25f), Vector3.zero, false),
-            [ElasticTissueId] = new PartVisual(PartVisualKind.Capsule, PartMaterialRole.Owner, new Vector3(0f, 0f, -0.5f), new Vector3(0.7f, 0.9f, 0.35f), Vector3.zero, false),
-            [EyesId] = new PartVisual(PartVisualKind.Sphere, PartMaterialRole.Eye, new Vector3(0f, 0.55f, 0.42f), new Vector3(0.5f, 0.18f, 0.18f), Vector3.zero, false),
-            [SpinesId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Plate, new Vector3(0f, 0.45f, -0.5f), new Vector3(0.6f, 0.7f, 0.3f), new Vector3(30f, 0f, 0f), false),
+            [LegsId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Dark, new Vector3(0f, -0.95f, 0f), new Vector3(0.9f, 0.3f, 0.5f), Vector3.zero, false, pairing: PartPairing.Split),
+            [ThickHideId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Dark, new Vector3(0f, 0.1f, -0.52f), new Vector3(0.8f, 1.2f, 0.22f), Vector3.zero, false, collar: 0f),
+            [PlatesId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Plate, new Vector3(0f, 0.2f, -0.55f), new Vector3(0.9f, 1.0f, 0.25f), Vector3.zero, false, collar: 0f),
+            [ElasticTissueId] = new PartVisual(PartVisualKind.Capsule, PartMaterialRole.Owner, new Vector3(0f, 0f, -0.5f), new Vector3(0.7f, 0.9f, 0.35f), Vector3.zero, false, collar: 0f),
+            [EyesId] = new PartVisual(PartVisualKind.Sphere, PartMaterialRole.Eye, new Vector3(0f, 0.55f, 0.42f), new Vector3(0.5f, 0.18f, 0.18f), Vector3.zero, false, collar: 0f),
+            [SpinesId] = new PartVisual(PartVisualKind.Cube, PartMaterialRole.Plate, new Vector3(0f, 0.45f, -0.5f), new Vector3(0.6f, 0.7f, 0.3f), new Vector3(30f, 0f, 0f), false, collar: 0f),
             [TailId] = new PartVisual(PartVisualKind.Capsule, PartMaterialRole.Owner, new Vector3(0f, -0.3f, -0.9f), new Vector3(0.2f, 0.7f, 0.2f), new Vector3(-60f, 0f, 0f), false),
         };
 
         /// <summary>One placeholder visual, ready to write into a part definition.</summary>
+        /// <summary>
+        /// Where parts plug into the placeholder capsule, in body units (1 is the body height, origin at the base), the
+        /// first limb anchor on the right like the primitives. A core model with Socket_ transforms replaces them.
+        /// </summary>
+        public static readonly IReadOnlyList<SocketAnchor> DefaultAnchors = new[]
+        {
+            new SocketAnchor(SocketKind.Head, new Vector3(0f, 0.62f, 0.28f), Vector3.zero),
+            new SocketAnchor(SocketKind.Limb, new Vector3(0.29f, 0.52f, 0.06f), new Vector3(0f, 90f, 0f)),
+            new SocketAnchor(SocketKind.Limb, new Vector3(-0.29f, 0.52f, 0.06f), new Vector3(0f, -90f, 0f)),
+            new SocketAnchor(SocketKind.Locomotion, new Vector3(0f, 0.04f, 0f), new Vector3(90f, 0f, 0f)),
+            new SocketAnchor(SocketKind.Hide, new Vector3(0f, 0.55f, -0.28f), new Vector3(0f, 180f, 0f)),
+            new SocketAnchor(SocketKind.Tail, new Vector3(0f, 0.3f, -0.28f), new Vector3(25f, 180f, 0f)),
+        };
+
+        /// <summary>How the view moves each placeholder part (D-082); hides, eyes, plates and spines sit still.</summary>
+        public static PartMotion MotionFor(string partId)
+        {
+            switch (partId)
+            {
+                case JawsId:
+                    return PartMotion.Jaws;
+                case ArmId:
+                    return PartMotion.Limb;
+                case LegsId:
+                    return PartMotion.Legs;
+                case TailId:
+                    return PartMotion.Tail;
+                default:
+                    return PartMotion.None;
+            }
+        }
+
+        /// <summary>How the view animates each placeholder skill (D-082); sprint has no motion of its own.</summary>
+        public static SkillMotion SkillMotionFor(string skillId)
+        {
+            switch (skillId)
+            {
+                case BiteId:
+                    return SkillMotion.Bite;
+                case ClawId:
+                case GrabId:
+                    return SkillMotion.Swipe;
+                case LungeId:
+                    return SkillMotion.Lunge;
+                case TailSwingId:
+                    return SkillMotion.TailSwing;
+                default:
+                    return SkillMotion.None;
+            }
+        }
+
+        /// <summary>Default shift of a bound mesh from its anchor in body units; eyes sit above the jaws that share the head socket.</summary>
+        public static Vector3 MeshOffsetFor(string partId)
+        {
+            return partId == EyesId ? new Vector3(0f, 0.12f, 0.02f) : Vector3.zero;
+        }
+
+        internal readonly struct SocketAnchor
+        {
+            public SocketAnchor(SocketKind kind, Vector3 position, Vector3 euler)
+            {
+                Kind = kind;
+                Position = position;
+                Euler = euler;
+            }
+
+            public SocketKind Kind { get; }
+
+            public Vector3 Position { get; }
+
+            public Vector3 Euler { get; }
+        }
+
         internal readonly struct PartVisual
         {
-            public PartVisual(PartVisualKind kind, PartMaterialRole material, Vector3 position, Vector3 scale, Vector3 euler, bool mirrorSecondCopy)
+            public PartVisual(PartVisualKind kind, PartMaterialRole material, Vector3 position, Vector3 scale, Vector3 euler, bool mirrorSecondCopy, float collar = 1f, PartPairing pairing = PartPairing.None)
             {
+                Collar = collar;
+                Pairing = pairing;
                 Kind = kind;
                 Material = material;
                 Position = position;
@@ -390,6 +469,12 @@ namespace DemonFighter.Editor.Generate
             public Vector3 Euler { get; }
 
             public bool MirrorSecondCopy { get; }
+
+            /// <summary>Collar size for a bound mesh (D-097): limbs, legs and tails grow out of the body, faces and hides lie on it.</summary>
+            public float Collar { get; }
+
+            /// <summary>Whether a bound mesh is drawn as a left and a right copy (D-099); the legs model holds both legs.</summary>
+            public PartPairing Pairing { get; }
         }
     }
 }

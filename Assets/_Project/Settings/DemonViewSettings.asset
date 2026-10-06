@@ -19,3 +19,34 @@ MonoBehaviour:
   _stepOffsetPerMeter: 0.25
   _skinWidthPerMeter: 0.04
   _slopeLimitDegrees: 45
+  _woundedBelowHpFraction: 0.5
+  _mangledBelowHpFraction: 0.2
+  _textureTintBlend: 0.3
+  _bloodDrySeconds: 15
+  _burnCoolSeconds: 12
+  _animation:
+    _breathAmplitude: 0.02
+    _breathSeconds: 2.6
+    _stretchPerSpeed: 0.12
+    _bobAmplitude: 0.03
+    _strideLengthPerMeter: 0.8
+    _speedSmoothing: 4
+    _legSwingDegrees: 35
+    _armSwingDegrees: 20
+    _armIdleDegrees: 4
+    _armRaiseDegrees: 35
+    _armStrikeDegrees: 60
+    _jawOpenDegrees: 25
+    _jawSnapDegrees: 8
+    _tailSwayDegrees: 15
+    _tailSwaySeconds: 1.8
+    _tailSwingDegrees: 60
+    _hitWobbleDegrees: 12
+    _hitWobbleSeconds: 0.4
+    _attackContraction: 0.15
+    _biteNodDegrees: 8
+    _lungeStretch: 0.25
+    _transformationPulse: 0.25
+    _transformationPulses: 3
+  _lodPartsScreenHeight: 0.04
+  _lodBodyScreenHeight: 0.006

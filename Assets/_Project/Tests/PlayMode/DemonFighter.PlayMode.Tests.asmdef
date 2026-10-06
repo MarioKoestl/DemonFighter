@@ -2,6 +2,8 @@
   "name": "DemonFighter.PlayMode.Tests",
   "rootNamespace": "DemonFighter.PlayMode.Tests",
   "references": [
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.RenderPipelines.Core.Runtime",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner",
     "DemonFighter.Simulation",

@@ -15,16 +15,30 @@ MonoBehaviour:
   _wallHeight: 40
   _wallThickness: 4
   _chunkCells: 30
-  _ambientColor: {r: 0.55, g: 0.32, b: 0.22, a: 1}
-  _ambientIntensity: 1.1
-  _ceilingLightColor: {r: 1, g: 0.62, b: 0.4, a: 1}
-  _ceilingLightIntensity: 0.35
+  _ambientColor: {r: 0.62, g: 0.52, b: 0.46, a: 1}
+  _ambientIntensity: 2.5
+  _ambientEquatorFraction: 0.85
+  _ambientGroundFraction: 0.35
+  _ceilingLightColor: {r: 1, g: 0.9, b: 0.8, a: 1}
+  _ceilingLightIntensity: 1.6
+  _ceilingLightPitch: 62
+  _ceilingLightYaw: 35
+  _ceilingShadowStrength: 0.6
   _lavaLightColor: {r: 1, g: 0.35, b: 0.05, a: 1}
-  _lavaLightIntensity: 8
-  _lavaLightRangePerMeter: 2.5
+  _lavaLightIntensity: 12
+  _lavaLightRangePerMeter: 3
   _fissureLightColor: {r: 1, g: 0.55, b: 0.1, a: 1}
-  _fissureLightIntensity: 4
+  _fissureLightIntensity: 5
   _fissureLightRange: 14
-  _fogColor: {r: 0.12, g: 0.06, b: 0.05, a: 1}
-  _fogStartDistance: 60
-  _fogEndDistance: 260
+  _shadowedPointLights: 2
+  _lavaFlickerAmplitude: 0.12
+  _lavaFlickerSpeed: 1.5
+  _fissureFlickerAmplitude: 0.2
+  _fissureFlickerSpeed: 3
+  _lavaTilesPerMeter: 0.12
+  _lavaFlowTilesPerSecond: {x: 0.012, y: 0.006}
+  _lavaEmbersPerSquareMeter: 0.12
+  _fogColor: {r: 0.45, g: 0.32, b: 0.25, a: 1}
+  _fogStartDistance: 40
+  _fogEndDistance: 230
+  _lightingVersion: 3

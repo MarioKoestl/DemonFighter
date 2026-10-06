@@ -59,4 +59,6 @@ MonoBehaviour:
     _staminaMultiplier: 1
     _reachMultiplier: 1
     _effectMultiplier: 1
-  _contentVersion: 3
+  _motion: 1
+  _useSound: {fileID: 11400000, guid: e55bd1779e5c3ca458cdb21799d47917, type: 2}
+  _contentVersion: 5

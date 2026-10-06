@@ -63,6 +63,9 @@ namespace DemonFighter.Simulation.Content
         /// <summary>Character level needed for every further copy, never below MinLevel; a second arm comes later than the first.</summary>
         public int RepeatMinLevel { get; init; } = 1;
 
+        /// <summary>Fraction the part adds to the body's size while it is attached and not lost (D-091); 0.1 is a tenth bigger.</summary>
+        public float SizeBonus { get; init; }
+
         /// <summary>Part kinds that must be attached before this one.</summary>
         public IReadOnlyList<string> RequiredPartIds { get; init; } = Array.Empty<string>();
 
@@ -79,6 +82,7 @@ namespace DemonFighter.Simulation.Content
             Require(!string.IsNullOrWhiteSpace(Name), "Name is required.");
             Require(MaxHp > 0f, "MaxHp must be positive.");
             Require(BiomassValue >= 0f, "BiomassValue is never negative.");
+            Require(SizeBonus >= 0f, "SizeBonus is never negative.");
             Require(GrantedSkillIds != null, "GrantedSkillIds must not be null.");
             Require(Socket == SocketKind.Hide || Defense == DefenseType.None, "Only hide parts carry a defense type.");
             Require(Sockets != null && StatBonusesPerLevel != null && SkillDamageBonusesPerLevel != null, "Bonus lists must not be null.");

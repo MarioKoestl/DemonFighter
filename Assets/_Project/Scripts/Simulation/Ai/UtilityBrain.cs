@@ -7,6 +7,7 @@ using DemonFighter.Simulation.Commands;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Evolution;
 using DemonFighter.Simulation.Food;
+using DemonFighter.Simulation.Hazards;
 using DemonFighter.Simulation.Mutation;
 using DemonFighter.Simulation.Skills;
 
@@ -24,6 +25,9 @@ namespace DemonFighter.Simulation.Ai
     {
         /// <summary>Half the size of the prey counts as its radius when judging reach, like the hit rules do.</summary>
         private const float TargetRadiusPerMeter = 0.3f;
+        private const float HazardLookaheadMeters = 3f;
+        private const float HazardLookaheadPerMeter = 1.5f;
+        private const float BodyRadiusPerMeter = 0.3f;
 
         private readonly GroundBounds _bounds;
         private readonly IReadOnlyList<Vector3>? _route;
@@ -77,7 +81,7 @@ namespace DemonFighter.Simulation.Ai
             Demon? attacker = threat == null ? FindAttackerToPunish(state) : null;
             if (threat != null)
             {
-                StartFlee(threat);
+                StartFlee(state, threat);
             }
             else if (attacker != null)
             {
@@ -424,7 +428,7 @@ namespace DemonFighter.Simulation.Ai
             _sawOpportunity = false;
         }
 
-        private void StartFlee(Demon threat)
+        private void StartFlee(RunState state, Demon threat)
         {
             ClearTargets();
             CurrentGoal = AiGoal.Flee;
@@ -436,7 +440,7 @@ namespace DemonFighter.Simulation.Ai
                 away = new Vector3(Demon.FacingDirection.X, 0f, Demon.FacingDirection.Y);
             }
 
-            CurrentTarget = _bounds.Clamp(Demon.Position + Vector3.Normalize(away) * Archetype.WanderRadius);
+            CurrentTarget = SafeGoal(state, Demon.Position + Vector3.Normalize(away) * Archetype.WanderRadius);
         }
 
         private void StartWander(RunState state)
@@ -446,7 +450,7 @@ namespace DemonFighter.Simulation.Ai
             float angle = state.Rng.NextFloat(0f, MathF.PI * 2f);
             float distance = state.Rng.NextFloat(Archetype.ArriveDistance, Archetype.WanderRadius);
             var offset = new Vector3(MathF.Sin(angle) * distance, 0f, MathF.Cos(angle) * distance);
-            CurrentTarget = _bounds.Clamp(Demon.Position + offset);
+            CurrentTarget = SafeGoal(state, Demon.Position + offset);
         }
 
         private void StartRest(RunState state)
@@ -467,7 +471,7 @@ namespace DemonFighter.Simulation.Ai
             Vector3 waypoint = _route![RouteIndex];
             float pull = MathF.Min(Archetype.RoutePullMax, Archetype.RoutePullPerThreat * state.ThreatLevel);
             Demon? player = pull > 0f ? Perception.FindPlayer(state) : null;
-            CurrentTarget = player != null ? _bounds.Clamp(Vector3.Lerp(waypoint, player.Position, pull)) : waypoint;
+            CurrentTarget = SafeGoal(state, player != null ? Vector3.Lerp(waypoint, player.Position, pull) : waypoint);
         }
 
         private void Act(RunState state, CommandQueue commands)
@@ -486,10 +490,10 @@ namespace DemonFighter.Simulation.Ai
                     ActEat(state, commands);
                     break;
                 case AiGoal.Flee:
-                    MoveToward(CurrentTarget, sprint: true, commands);
+                    MoveToward(state, CurrentTarget, sprint: true, commands);
                     break;
                 default:
-                    MoveToward(CurrentTarget, sprint: false, commands);
+                    MoveToward(state, CurrentTarget, sprint: false, commands);
                     break;
             }
         }
@@ -516,7 +520,10 @@ namespace DemonFighter.Simulation.Ai
                     return;
                 }
 
-                commands.Submit(new MoveCommand(Demon.Id, facing, sprint: false));
+                // A hunter follows its prey into lava or onto a fissure and burns there (D-086, Mario): lava is a trap
+                // to lure it into. Prey outside a hazard is reached around it as before.
+                bool preyInHazard = state.Hazards.KindAt(prey.Position) != HazardKind.None;
+                commands.Submit(new MoveCommand(Demon.Id, preyInHazard ? facing : AvoidHazards(state, facing), sprint: false));
                 return;
             }
 
@@ -549,7 +556,7 @@ namespace DemonFighter.Simulation.Ai
             float distance = toFood.Length();
             if (distance > state.Catalog.Tuning.EatReachPerMeter * Demon.SizeMeters)
             {
-                MoveToward(food.Position, sprint: false, commands);
+                MoveToward(state, food.Position, sprint: false, commands);
                 return;
             }
 
@@ -558,7 +565,7 @@ namespace DemonFighter.Simulation.Ai
             commands.Submit(new EatCommand(Demon.Id, food.Id));
         }
 
-        private void MoveToward(Vector3 target, bool sprint, CommandQueue commands)
+        private void MoveToward(RunState state, Vector3 target, bool sprint, CommandQueue commands)
         {
             Vector2 direction = Planar(target - Demon.Position);
             float length = direction.Length();
@@ -567,7 +574,26 @@ namespace DemonFighter.Simulation.Ai
                 direction /= length;
             }
 
-            commands.Submit(new MoveCommand(Demon.Id, direction, sprint));
+            commands.Submit(new MoveCommand(Demon.Id, AvoidHazards(state, direction), sprint));
+        }
+
+        // AI demons do not walk into lava or fissures (D-086): the heading bends around them, a body already inside walks out.
+        private Vector2 AvoidHazards(RunState state, Vector2 direction)
+        {
+            float lookahead = MathF.Max(HazardLookaheadMeters, Demon.SizeMeters * HazardLookaheadPerMeter);
+            return state.Hazards.Steer(Demon.Position, direction, lookahead, HazardMargin(state));
+        }
+
+        // A goal inside a hazard would be circled forever; it moves to a point beside the hazard and inside the walls.
+        private Vector3 SafeGoal(RunState state, Vector3 goal)
+        {
+            return _bounds.Clamp(state.Hazards.PushOut(_bounds.Clamp(goal), HazardMargin(state)));
+        }
+
+        private float HazardMargin(RunState state)
+        {
+            float margin = state.World != null ? state.World.Biome.HazardAvoidMarginMeters : 0f;
+            return margin + Demon.SizeMeters * BodyRadiusPerMeter;
         }
 
         // The hardest granted strike that is no leap and no mere hold; Grab is a combo tool the AI leaves to the player.

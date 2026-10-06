@@ -6,13 +6,17 @@ using DemonFighter.Data;
 using DemonFighter.Editor.Setup;
 using DemonFighter.Presentation;
 using DemonFighter.Presentation.Cameras;
+using DemonFighter.Presentation.Combat;
 using DemonFighter.Presentation.Demons;
+using DemonFighter.Presentation.Rendering;
 using DemonFighter.UI;
 using Unity.Cinemachine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 using Object = UnityEngine.Object;
@@ -71,6 +75,8 @@ namespace DemonFighter.Editor.Generate
             SetReference(bootstrapper, "_biome", LoadRequired<BiomeDefinition>(PlaceholderAssetGenerator.AshCavernPath));
             SetReference(bootstrapper, "_actions", LoadRequired<InputActionAsset>(ProjectWideInputActions.AssetPath));
             SetReference(bootstrapper, "_catalog", LoadRequired<ContentCatalogDefinition>(ContentCatalogRebuilder.CatalogPath));
+            SetReference(bootstrapper, "_audio", LoadRequired<AudioCatalogDefinition>(AudioGenerator.CatalogPath));
+            SetReference(bootstrapper, "_graphicsPresets", LoadRequired<GraphicsPresetCatalog>(RenderLookGenerator.PresetCatalogPath));
             return Save(scene, SceneNames.Bootstrap);
         }
 
@@ -78,6 +84,7 @@ namespace DemonFighter.Editor.Generate
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             CreateCamera(MenuBackground);
+            CreateVolume();
 
             var menu = new GameObject(nameof(MainMenuScreen));
             UIDocument document = menu.AddComponent<UIDocument>();
@@ -93,6 +100,7 @@ namespace DemonFighter.Editor.Generate
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             GameObject cameraObject = CreateCamera(RunBackground);
             CinemachineBrain brain = cameraObject.AddComponent<CinemachineBrain>();
+            CreateVolume();
 
             var rigObject = new GameObject("Camera Rig");
             CameraRig rig = rigObject.AddComponent<CameraRig>();
@@ -119,6 +127,7 @@ namespace DemonFighter.Editor.Generate
             SetReference(root, "_worldSettings", LoadRequired<WorldBuildSettings>(PlaceholderAssetGenerator.WorldBuildSettingsPath));
             SetReference(root, "_demonSettings", LoadRequired<DemonViewSettings>(PlaceholderAssetGenerator.DemonViewSettingsPath));
             SetReference(root, "_cameraSettings", LoadRequired<CameraRigSettings>(PlaceholderAssetGenerator.CameraRigSettingsPath));
+            SetReference(root, "_goreSettings", LoadRequired<GoreSettings>(PlaceholderAssetGenerator.GoreSettingsPath));
             SetReference(root, "_demonPrefab", LoadRequired<GameObject>(PlaceholderAssetGenerator.DemonPrefabPath).GetComponent<DemonView>());
             SetReference(root, "_cameraRig", rig);
             SetReference(root, "_hud", hud);
@@ -132,7 +141,23 @@ namespace DemonFighter.Editor.Generate
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = background;
             cameraObject.AddComponent<AudioListener>();
+
+            // Post-processing and anti-aliasing are per camera in URP (D-083).
+            UniversalAdditionalCameraData cameraData = camera.GetUniversalAdditionalCameraData();
+            cameraData.renderPostProcessing = true;
+            cameraData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            cameraData.dithering = true;
             return cameraObject;
+        }
+
+        // One global volume with the cavern profile the render look generator built; the camera applies it everywhere.
+        private static void CreateVolume()
+        {
+            var volumeObject = new GameObject("Post Processing");
+            Volume volume = volumeObject.AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.priority = 0f;
+            volume.sharedProfile = LoadRequired<VolumeProfile>(RenderLookGenerator.VolumeProfilePath);
         }
 
         private static GameObject Child(string name, Transform parent)

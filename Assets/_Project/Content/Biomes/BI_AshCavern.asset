@@ -40,6 +40,9 @@ MonoBehaviour:
   _bonePileCountMax: 14
   _bonePileRadiusMin: 1.5
   _bonePileRadiusMax: 3
+  _lavaBurnFractionPerSecond: 0.2
+  _fissureBurnFractionPerSecond: 0.05
+  _hazardAvoidMarginMeters: 1.5
   _initialBlobs: 16
   _spawnClusterRadius: 30
   _spawnClearRadius: 30
@@ -50,7 +53,7 @@ MonoBehaviour:
   _threatMaxLevel: 10
   _blobsPerThreatLevel: 2
   _respawnSpeedupPerThreat: 0.2
-  _contentVersion: 3
+  _contentVersion: 4
   _spawnTable:
   - _demon: {fileID: 11400000, guid: fb635abb7989bc04b96a3bb3acd0c14b, type: 2}
     _minThreat: 0
@@ -91,6 +94,10 @@ MonoBehaviour:
     _weight: 30
   - _archetype: {fileID: 11400000, guid: 7b685d93035e61f4798d9e13bfb3225e, type: 2}
     _weight: 20
+  _ambientLoop: {fileID: 8300000, guid: cbff3b2c32d6817429da870d2628c444, type: 3}
+  _lavaLoop: {fileID: 8300000, guid: 53392821e297c204a95a5b9aa17155ee, type: 3}
+  _calmTrack: {fileID: 8300000, guid: 8870d8c2be240ad4a863dc4b0d742078, type: 3}
+  _combatTrack: {fileID: 8300000, guid: 6b1aa0fa9af7c8c45af31a0dc71c03bf, type: 3}
   _elderRouteRadius: 100
   _elderRouteWaypoints: 12
   _elderRouteJitter: 12

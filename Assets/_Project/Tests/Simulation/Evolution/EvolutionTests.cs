@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
@@ -27,14 +28,14 @@ namespace DemonFighter.Simulation.Tests.Evolution
             int atFive = EvolutionRules.PendingStage(run.Player, TestContent.Tuning);
             run.Player.RecordEvolution();
             int afterFirst = EvolutionRules.PendingStage(run.Player, TestContent.Tuning);
-            run.ReachLevel(10);
-            int atTen = EvolutionRules.PendingStage(run.Player, TestContent.Tuning);
+            run.ReachLevel(5);
+            int atFiveAgain = EvolutionRules.PendingStage(run.Player, TestContent.Tuning);
             run.Player.RecordEvolution();
 
             atStart.Should().Be(0);
             atFive.Should().Be(1);
             afterFirst.Should().Be(0);
-            atTen.Should().Be(2);
+            atFiveAgain.Should().Be(2, "every tier evolves at level 5 (D-091)");
             EvolutionRules.PendingStage(run.Player, TestContent.Tuning).Should().Be(0);
             EvolutionRules.NextThreshold(run.Player, TestContent.Tuning).Should().Be(0);
         }
@@ -145,7 +146,8 @@ namespace DemonFighter.Simulation.Tests.Evolution
             run.Submit(new EvolveCommand(run.Player.Id, TestContent.Brute1.Id));
             run.Tick(1);
             run.Tick(run.State.Config.TicksFor(TestContent.Tuning.TransformationSeconds));
-            run.ReachLevel(10);
+            run.Player.Level.Should().Be(1, "the evolution started Tier 1 at level 1");
+            run.ReachLevel(5);
 
             run.Submit(new EvolveCommand(run.Player.Id, TestContent.Brute2.Id));
             run.Tick(1);
@@ -224,7 +226,10 @@ namespace DemonFighter.Simulation.Tests.Evolution
             {
                 while (Player.Level < level)
                 {
-                    Player.GainXp(TestContent.Tuning.LevelXpForNext(Player.Level), TestContent.Tuning);
+                    if (Player.GainXp(TestContent.Tuning.LevelXpForNext(Player.Level, Player.Tier), TestContent.Tuning) == 0)
+                    {
+                        throw new InvalidOperationException("Level " + level + " lies past the next evolution (D-091).");
+                    }
                 }
             }
 

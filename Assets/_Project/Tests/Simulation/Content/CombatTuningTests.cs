@@ -29,6 +29,22 @@ namespace DemonFighter.Simulation.Tests.Content
             multiplier.Should().BeApproximately(expected, Tolerance);
         }
 
+        [TestCase(0, 0, 1, 100f)]
+        [TestCase(0, 0, 5, 200f)]
+        [TestCase(0, 1, 1, 300f)]
+        [TestCase(0, 1, 3, 450f)]
+        [TestCase(3, 0, 1, 10f)]
+        public void KillXp_GrowsWithTheVictimsTierAndLevel(int killerTier, int victimTier, int victimLevel, float expected)
+        {
+            Tuning.KillXp(killerTier, victimTier, victimLevel).Should().BeApproximately(expected, Tolerance);
+        }
+
+        [Test]
+        public void LevelXpForNext_TierTwo_CostsThreeTimesAsMuch()
+        {
+            Tuning.LevelXpForNext(3, 2).Should().BeApproximately(Tuning.LevelXpForNext(3) * 3f, 0.01f);
+        }
+
         [Test]
         public void LevelXpForNext_Level1_IsTheBase()
         {

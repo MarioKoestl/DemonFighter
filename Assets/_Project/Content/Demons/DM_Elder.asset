@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: DemonFighter.Data::DemonFighter.Data.DemonDefinition
   _id: demon.elder
   _displayName: Elder
-  _tier: 6
+  _tier: 4
   _core: {fileID: 11400000, guid: ad87b9563db02f349ab623f663a8804a, type: 2}
-  _sizeMeters: 15
+  _sizeMeters: 7.5
   _moveSpeed: 3
   _sprintMultiplier: 1
   _startingStats:
@@ -24,3 +24,11 @@ MonoBehaviour:
     _value: 10
   - _statId: stat.constitution
     _value: 20
+  _startingParts: []
+  _startingBiomass: 0
+  _startingLevel: 1
+  _startingEvolution: {fileID: 0}
+  _randomPartChance: 0.75
+  _startingPartsAtMaxUpgrade: 1
+  _randomEvolutionStages: 2
+  _contentVersion: 2

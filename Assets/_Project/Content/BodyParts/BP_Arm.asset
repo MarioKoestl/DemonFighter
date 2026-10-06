@@ -34,6 +34,7 @@ MonoBehaviour:
   _biomassCost: 30
   _minLevel: 1
   _repeatMinLevel: 3
+  _sizeBonus: 0
   _requiredParts: []
   _requiresUnlock: 0
   _visual:
@@ -43,4 +44,23 @@ MonoBehaviour:
     _localScale: {x: 0.28, y: 0.55, z: 0.28}
     _localEuler: {x: 0, y: 0, z: -30}
     _mirrorSecondCopy: 1
-  _contentVersion: 3
+    _motion: 2
+    _meshes:
+      _intact: {fileID: -9037851627997230718, guid: 28f20b2bb3048644da4c905f9d42ab4c, type: 3}
+      _wounded: {fileID: 0}
+      _mangled: {fileID: 0}
+      _stump: {fileID: 0}
+      _material: {fileID: 2100000, guid: 93d463442ebd7d24cbf93bb014e931d2, type: 2}
+      _clip: {fileID: 0}
+      _scale: 0.7
+      _offset: {x: 0, y: 0.1, z: -0.2}
+      _euler: {x: -90, y: 110, z: 0}
+      _collar: 1
+      _pairing: 0
+      _importScale: 52.63482
+      _importRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071067}
+      _importPivot: {x: 0.000021615027, y: -0.000023579356, z: -0.009500939}
+      _importVersion: 2
+    _anchors: []
+  _severSound: {fileID: 11400000, guid: 6695ebbe30c15fe4f802d21f0f21c2b0, type: 2}
+  _contentVersion: 9

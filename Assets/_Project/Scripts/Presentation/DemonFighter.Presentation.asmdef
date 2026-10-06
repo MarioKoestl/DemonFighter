@@ -2,6 +2,7 @@
   "name": "DemonFighter.Presentation",
   "rootNamespace": "DemonFighter.Presentation",
   "references": [
+    "Unity.RenderPipelines.Universal.Runtime",
     "DemonFighter.Simulation",
     "DemonFighter.Data",
     "DemonFighter.Common",

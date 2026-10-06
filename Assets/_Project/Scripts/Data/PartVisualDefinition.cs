@@ -1,13 +1,16 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace DemonFighter.Data
 {
     /// <summary>
-    /// How a body part is drawn in the placeholder stage, nested in a body part asset: a primitive, a palette
-    /// material and where it sits on the body capsule, in capsule mesh units (two tall, radius a half). The second
-    /// copy of a part can be mirrored, so two arms hang on both sides.
+    /// How a body part is drawn, nested in a body part asset. In the placeholder stage a primitive with a palette
+    /// material sits on the body capsule where the local values say, in capsule mesh units (two tall, radius a
+    /// half); the second copy of a part can be mirrored, so two arms hang on both sides. Once the art binder finds
+    /// a model for the part, the mesh set replaces the primitive and the part hangs on a socket anchor of the core
+    /// instead (ASSET_PIPELINE, "Modular body parts"). Only the core carries anchors.
     /// </summary>
     [Serializable]
     public sealed class PartVisualDefinition
@@ -18,9 +21,13 @@ namespace DemonFighter.Data
         [SerializeField] private Vector3 _localScale = new Vector3(0.3f, 0.5f, 0.3f);
         [SerializeField] private Vector3 _localEuler;
         [SerializeField] private bool _mirrorSecondCopy;
+        [SerializeField] private PartMotion _motion = PartMotion.None;
+        [SerializeField] private PartMeshSetDefinition _meshes = new PartMeshSetDefinition();
+        [SerializeField] private SocketAnchorDefinition[] _anchors = Array.Empty<SocketAnchorDefinition>();
 
         public PartVisualKind Kind => _kind;
 
+        /// <summary>The palette material of the primitive; also the fallback of a mesh set without a material of its own.</summary>
         public PartMaterialRole Material => _material;
 
         /// <summary>Center of the primitive in capsule mesh units, X right, Y up, Z forward.</summary>
@@ -33,6 +40,15 @@ namespace DemonFighter.Data
         /// <summary>True when the second copy of the part mirrors across the X axis.</summary>
         public bool MirrorSecondCopy => _mirrorSecondCopy;
 
+        /// <summary>How the view moves the part procedurally (D-082); a clip on the mesh set wins over it.</summary>
+        public PartMotion Motion => _motion;
+
+        /// <summary>The real meshes once a model is bound (M5); empty in the placeholder stage.</summary>
+        public PartMeshSetDefinition Meshes => _meshes;
+
+        /// <summary>Where other parts plug into this one, in body units; empty for everything but the core.</summary>
+        public IReadOnlyList<SocketAnchorDefinition> Anchors => _anchors;
+
         internal void Configure(PartVisualKind kind, PartMaterialRole material, Vector3 position, Vector3 scale, Vector3 euler, bool mirrorSecondCopy)
         {
             _kind = kind;
@@ -41,6 +57,16 @@ namespace DemonFighter.Data
             _localScale = scale;
             _localEuler = euler;
             _mirrorSecondCopy = mirrorSecondCopy;
+        }
+
+        internal void SetMotion(PartMotion motion)
+        {
+            _motion = motion;
+        }
+
+        internal void SetAnchors(SocketAnchorDefinition[] anchors)
+        {
+            _anchors = anchors ?? throw new ArgumentNullException(nameof(anchors));
         }
     }
 }

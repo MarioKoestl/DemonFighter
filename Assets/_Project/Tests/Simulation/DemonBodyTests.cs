@@ -31,20 +31,17 @@ namespace DemonFighter.Simulation.Tests
         }
 
         [Test]
-        public void TierForAndSizeFor_MatchTheDemonAfterAttaching()
+        public void TierForAndSizeFor_MatchTheDemon()
         {
             Demon demon = Spawn();
-            int tier = Demon.TierFor(demon.Spec, demon.Evolutions, demon.Body.InvestmentPoints + 4, TestContent.Tuning);
-            float size = Demon.SizeFor(demon.Spec, tier, TestContent.Tuning);
+            demon.AttachPart(BulkyLegs);
+            demon.RecordEvolution();
 
-            demon.AttachPart(TestContent.Arm);
-            demon.AttachPart(TestContent.Arm);
-            demon.AttachPart(TestContent.Legs);
-            demon.AttachPart(TestContent.Jaws);
+            int tier = Demon.TierFor(demon.Spec, demon.Evolutions);
 
             tier.Should().Be(demon.Spec.Tier + 1);
             demon.Tier.Should().Be(tier);
-            demon.SizeMeters.Should().BeApproximately(size, Tolerance);
+            demon.SizeMeters.Should().BeApproximately(Demon.SizeFor(demon.Spec, tier, demon.Body.SizeBonus, TestContent.Tuning), Tolerance);
         }
 
         [Test]
@@ -53,10 +50,7 @@ namespace DemonFighter.Simulation.Tests
             Demon demon = Spawn();
             demon.HighestTier.Should().Be(demon.Spec.Tier);
 
-            demon.AttachPart(TestContent.Arm);
-            demon.AttachPart(TestContent.Arm);
-            demon.AttachPart(TestContent.Legs);
-            demon.AttachPart(TestContent.Jaws);
+            demon.RecordEvolution();
 
             demon.HighestTier.Should().Be(demon.Spec.Tier + 1);
             demon.HighestTier.Should().Be(demon.Tier);
@@ -87,21 +81,35 @@ namespace DemonFighter.Simulation.Tests
             demon.ReachMultiplier.Should().BeApproximately(1.3f, Tolerance);
         }
 
+        // Biomass buys parts, not tiers; only bulky parts make the body bigger (D-091).
         [Test]
-        public void AttachPart_FourParts_RaisesTheTierAndTheSize()
+        public void AttachPart_FourParts_KeepTheTierAndOnlyBulkyOnesGrowTheBody()
         {
             Demon demon = Spawn();
 
             demon.AttachPart(TestContent.Arm);
             demon.AttachPart(TestContent.Arm);
-            demon.AttachPart(TestContent.Legs);
-            int tierAtThree = demon.Tier;
+            demon.AttachPart(BulkyLegs);
             demon.AttachPart(TestContent.Tail);
 
-            tierAtThree.Should().Be(0);
             demon.Body.InvestmentPoints.Should().Be(4);
-            demon.Tier.Should().Be(1);
-            demon.SizeMeters.Should().BeApproximately(1.8f, Tolerance);
+            demon.Tier.Should().Be(0);
+            demon.SizeMeters.Should().BeApproximately(1.2f * 1.1f, Tolerance);
+        }
+
+        [Test]
+        public void LosingABulkyPart_TakesItsBulkAlong()
+        {
+            var scenario = new CombatScenario();
+            scenario.Target.AttachPart(BulkyLegs);
+            float withLegs = scenario.Target.SizeMeters;
+            BodyPart legs = scenario.Target.Body.Parts[1];
+
+            scenario.DamageSystem.ApplyDamage(scenario.Target, legs, 10000f, DamageType.Blunt, scenario.Attacker.Id);
+
+            legs.IsLost.Should().BeTrue();
+            withLegs.Should().BeGreaterThan(scenario.Target.SizeMeters);
+            scenario.Target.SizeMeters.Should().BeApproximately(scenario.Target.Spec.SizeMeters, Tolerance);
         }
 
         [Test]
@@ -169,6 +177,26 @@ namespace DemonFighter.Simulation.Tests
             demon.SizeMeters.Should().BeApproximately(1.8f, Tolerance);
         }
 
+        // Evolving starts the next tier at level 1; stats and unspent points stay (D-091).
+        [Test]
+        public void RecordEvolution_StartsTheNextTierAtLevelOne()
+        {
+            Demon demon = Spawn();
+            while (demon.Level < 5)
+            {
+                demon.GainXp(TestContent.Tuning.LevelXpForNext(demon.Level), TestContent.Tuning);
+            }
+
+            int points = demon.Stats.UnspentPoints;
+
+            demon.RecordEvolution();
+
+            demon.Level.Should().Be(1);
+            demon.Xp.Should().Be(0f);
+            demon.Stats.UnspentPoints.Should().Be(points);
+            demon.ProgressLevel.Should().Be(5, "the four levels of Tier 0 still count for mutations");
+        }
+
         [Test]
         public void Constructor_Elder_KeepsItsSpecTierAndSize()
         {
@@ -177,6 +205,8 @@ namespace DemonFighter.Simulation.Tests
             elder.Tier.Should().Be(6);
             elder.SizeMeters.Should().BeApproximately(15f, Tolerance);
         }
+
+        private static readonly BodyPartSpec BulkyLegs = TestContent.Legs with { SizeBonus = 0.1f };
 
         private static Demon Spawn()
         {

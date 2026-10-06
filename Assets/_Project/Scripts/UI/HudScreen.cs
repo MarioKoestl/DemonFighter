@@ -7,7 +7,9 @@ using DemonFighter.Common;
 using DemonFighter.Simulation;
 using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Content;
+using DemonFighter.Simulation.Events;
 using DemonFighter.Simulation.Evolution;
+using DemonFighter.Simulation.Hazards;
 using DemonFighter.Simulation.Mutation;
 using DemonFighter.Simulation.Progression;
 using DemonFighter.Simulation.Skills;
@@ -50,6 +52,7 @@ namespace DemonFighter.UI
 
         private UIDocument _document = null!;
         private VisualElement _overlay = null!;
+        private DamageNumbersLayer? _damageNumbers;
         private Label _health = null!;
         private VisualElement _partList = null!;
         private Label _stamina = null!;
@@ -58,6 +61,8 @@ namespace DemonFighter.UI
         private Label _tier = null!;
         private VisualElement _skillList = null!;
         private Label _bleeding = null!;
+        private Label _burning = null!;
+        private Label _testMode = null!;
         private Label _status = null!;
         private Label _points = null!;
         private Label _evolution = null!;
@@ -94,6 +99,8 @@ namespace DemonFighter.UI
         private Label _hint = null!;
         private float _hintSecondsLeft;
         private int _bleedingShown;
+        private int _burningShown = -1;
+        private int _testModeShown = -1;
         private int _statusState;
         private int _pointsValue;
         private int _evolutionShown;
@@ -117,6 +124,15 @@ namespace DemonFighter.UI
         /// <summary>Raised when the player clicks Save and Quit on the pause panel.</summary>
         public event Action? SaveAndQuitRequested;
 
+        /// <summary>Raised with the complete settings after a control of the pause menu changed (D-085).</summary>
+        public event Action<SettingsValues>? SettingsChanged;
+
+        /// <summary>Raised when the player clicks Quit to Desktop in the pause menu.</summary>
+        public event Action? QuitRequested;
+
+        /// <summary>Raised when the player asks to see the first-run hints again.</summary>
+        public event Action? ResetHintsRequested;
+
         /// <summary>True while the pause panel is open.</summary>
         public bool IsPauseOpen => _pause != null && _pause.IsVisible;
 
@@ -124,7 +140,7 @@ namespace DemonFighter.UI
         public bool IsMenuOpen => _menu != null && _menu.IsOpen;
 
         /// <summary>Shows the run and follows the demon of the player from now on; the aim callback feeds the eat prompt, the preview the menu.</summary>
-        public void Bind(RunState state, Demon player, Func<FoodId> aimedFood, IMutationOfferPolicy offers, IBodyPreview? preview = null, Func<TargetFocus>? targetFocus = null)
+        public void Bind(RunState state, Demon player, Func<FoodId> aimedFood, IMutationOfferPolicy offers, IBodyPreview? preview = null, Func<TargetFocus>? targetFocus = null, SimulationEvents? events = null, Func<DemonId, float>? stanceOf = null)
         {
             _state = state ?? throw new ArgumentNullException(nameof(state));
             _player = player ?? throw new ArgumentNullException(nameof(player));
@@ -133,6 +149,18 @@ namespace DemonFighter.UI
             if (offers == null)
             {
                 throw new ArgumentNullException(nameof(offers));
+            }
+
+            // Damage numbers over the targets of the player's hits (D-092), under every HUD panel.
+            if (events != null)
+            {
+                if (_damageNumbers == null)
+                {
+                    _damageNumbers = new DamageNumbersLayer();
+                    _document.rootVisualElement.Insert(0, _damageNumbers.Root);
+                }
+
+                _damageNumbers.Bind(state, events, player.Id, stanceOf);
             }
 
             ResetCaches();
@@ -211,6 +239,12 @@ namespace DemonFighter.UI
             _pause?.SetVisible(false);
         }
 
+        /// <summary>Shows these settings in the pause menu.</summary>
+        public void ConfigureSettings(SettingsValues values)
+        {
+            _pause?.ConfigureSettings(values);
+        }
+
         /// <summary>Shows the death screen for the run; the menu and the pause panel close if they were open.</summary>
         public void ShowRunSummary(RunState state, Demon player, RunSummary summary)
         {
@@ -228,6 +262,14 @@ namespace DemonFighter.UI
             _pause = new PausePanel();
             _pause.ResumeRequested += OnResume;
             _pause.SaveAndQuitRequested += OnSaveAndQuit;
+            _pause.SettingsChanged += OnSettingsChanged;
+            _pause.QuitRequested += OnQuit;
+            _pause.ResetHintsRequested += OnResetHints;
+        }
+
+        private void OnDestroy()
+        {
+            _damageNumbers?.Dispose();
         }
 
         private void OnEnable()
@@ -235,6 +277,11 @@ namespace DemonFighter.UI
             VisualElement root = _document.rootVisualElement;
             root.Clear();
             root.pickingMode = PickingMode.Ignore;
+            if (_damageNumbers != null)
+            {
+                root.Add(_damageNumbers.Root);
+            }
+
             _overlay = BuildLayout();
             root.Add(_overlay);
             if (_menu != null)
@@ -259,6 +306,8 @@ namespace DemonFighter.UI
             {
                 return;
             }
+
+            _damageNumbers?.Update(Time.deltaTime, Camera.main);
 
             if (_menu != null && _menu.IsOpen)
             {
@@ -311,7 +360,7 @@ namespace DemonFighter.UI
                 ShowHint(HintMemory.FirstBiomass, "Biomass. Press Tab to spend it on new body parts.");
             }
 
-            int xpNext = Mathf.RoundToInt(tuning.LevelXpForNext(_player.Level));
+            int xpNext = Mathf.RoundToInt(tuning.LevelXpForNext(_player.Level, _player.Tier));
             if (Changed(ref _levelValue, _player.Level) | Changed(ref _xp, Mathf.RoundToInt(_player.Xp)) | Changed(ref _xpNext, xpNext))
             {
                 _level.text = "Level " + _levelValue + "   XP " + _xp + " / " + _xpNext;
@@ -341,6 +390,19 @@ namespace DemonFighter.UI
             if (Changed(ref _bleedingShown, IsBleeding(body) ? 1 : 0))
             {
                 _bleeding.style.display = _bleedingShown == 1 ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            // Standing in lava or a fissure burns (D-086); the warning says where and that it is time to step out.
+            if (Changed(ref _burningShown, (int)_player.Hazard))
+            {
+                _burning.text = _player.Hazard == HazardKind.Lava ? "BURNING: get out of the lava" : "BURNING: step off the fissure";
+                _burning.style.display = _player.Hazard == HazardKind.None ? DisplayStyle.None : DisplayStyle.Flex;
+            }
+
+            // Test mode (D-089) says so on screen, so a playtest never passes for a real run.
+            if (Changed(ref _testModeShown, _player.InTestMode ? 1 : 0))
+            {
+                _testMode.style.display = _testModeShown == 1 ? DisplayStyle.Flex : DisplayStyle.None;
             }
 
             if (Changed(ref _pointsValue, _player.Stats.UnspentPoints))
@@ -670,6 +732,21 @@ namespace DemonFighter.UI
             SaveAndQuitRequested?.Invoke();
         }
 
+        private void OnSettingsChanged(SettingsValues values)
+        {
+            SettingsChanged?.Invoke(values);
+        }
+
+        private void OnQuit()
+        {
+            QuitRequested?.Invoke();
+        }
+
+        private void OnResetHints()
+        {
+            ResetHintsRequested?.Invoke();
+        }
+
         private void OnSpendRequested(StatId stat)
         {
             StatPointRequested?.Invoke(stat);
@@ -714,6 +791,13 @@ namespace DemonFighter.UI
             _bleeding.text = "BLEEDING";
             _bleeding.style.unityFontStyleAndWeight = FontStyle.Bold;
             _bleeding.style.display = DisplayStyle.None;
+            _burning = StatLabel("burning", stats, WarningText);
+            _burning.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _burning.style.display = DisplayStyle.None;
+            _testMode = StatLabel("test-mode", stats, HighlightText);
+            _testMode.text = "TEST MODE: invincible";
+            _testMode.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _testMode.style.display = DisplayStyle.None;
             _status = StatLabel("status", stats, HighlightText);
             _status.style.unityFontStyleAndWeight = FontStyle.Bold;
             _status.style.display = DisplayStyle.None;

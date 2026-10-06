@@ -641,18 +641,17 @@ namespace DemonFighter.UI
                 }
             }
 
-            int added = 0;
             foreach (MutationOffer offer in _planned.Values)
             {
                 if (offer.Kind == MutationKind.Attach && body.CanAttach(offer.Part, out _))
                 {
                     body.Attach(offer.Part);
-                    added++;
                 }
             }
 
-            int tier = Demon.TierFor(_player.Spec, _player.Evolutions, current.InvestmentPoints + added, tuning);
-            _preview.Show(body, Demon.SizeFor(_player.Spec, tier, tuning));
+            // Parts do not change the tier, but bulky ones make the body bigger (D-091).
+            int tier = Demon.TierFor(_player.Spec, _player.Evolutions);
+            _preview.Show(body, Demon.SizeFor(_player.Spec, tier, body.SizeBonus, tuning));
         }
 
         private void RefreshEvolve()

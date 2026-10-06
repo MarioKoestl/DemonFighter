@@ -5,8 +5,10 @@ using System.Numerics;
 using DemonFighter.Simulation.Anatomy;
 using DemonFighter.Simulation.Content;
 using DemonFighter.Simulation.Evolution;
+using DemonFighter.Simulation.Hazards;
 using DemonFighter.Simulation.Persistence;
 using DemonFighter.Simulation.Skills;
+using DemonFighter.Simulation.Spawning;
 using DemonFighter.Simulation.Stats;
 
 namespace DemonFighter.Simulation
@@ -79,8 +81,8 @@ namespace DemonFighter.Simulation
         /// <summary>Current body height in meters: the spawn size grown by a step per tier gained (D-018).</summary>
         public float SizeMeters { get; private set; }
 
-        /// <summary>Tier label (GAME_DESIGN, "Derived values"): the spawn tier plus evolutions plus one per few points of body investment.</summary>
-        public int Tier => TierFor(Spec, Evolutions, Body.InvestmentPoints, _tuning);
+        /// <summary>Tier label (GAME_DESIGN, "Derived values"): the spawn tier plus the evolutions taken (D-091).</summary>
+        public int Tier => TierFor(Spec, Evolutions);
 
         /// <summary>Factor on the reach of hits and eating: sensory parts such as Eyes let the demon use the far end of its range (D-058).</summary>
         public float ReachMultiplier => 1f + Body.PerceptionBonus;
@@ -88,16 +90,36 @@ namespace DemonFighter.Simulation
         /// <summary>How much the demon learns about what it aims at (D-066): one level per PerceptionPerSenseLevel of perception bonus.</summary>
         public int SenseLevel => _tuning.PerceptionPerSenseLevel > 0f ? (int)MathF.Floor(Body.PerceptionBonus / _tuning.PerceptionPerSenseLevel + 0.0001f) : 0;
 
-        /// <summary>The tier a demon of this kind has with the given evolutions and body investment (D-054); the menu previews with it.</summary>
-        public static int TierFor(DemonSpec spec, int evolutions, int investmentPoints, CombatTuning tuning)
+        /// <summary>The tier a demon of this kind has after the given evolutions (D-091); mutations do not change it.</summary>
+        public static int TierFor(DemonSpec spec, int evolutions)
         {
-            return spec.Tier + evolutions + investmentPoints / tuning.TierInvestmentStep;
+            return spec.Tier + evolutions;
         }
 
-        /// <summary>Body height in meters of a demon of this kind at the given tier (D-018).</summary>
-        public static float SizeFor(DemonSpec spec, int tier, CombatTuning tuning)
+        /// <summary>Body height in meters of a demon of this kind at the given tier, plus the size bonus of its parts (D-018, D-091).</summary>
+        public static float SizeFor(DemonSpec spec, int tier, float sizeBonus, CombatTuning tuning)
         {
-            return spec.SizeMeters * (1f + tuning.SizeStepPerTier * (tier - spec.Tier));
+            return spec.SizeMeters * (1f + (tuning.SizeStepPerTier * (tier - spec.Tier)) + sizeBonus);
+        }
+
+        /// <summary>
+        /// The level counted over every tier (D-091): the levels of earlier tiers up to their evolution plus the current
+        /// one, so Tier 1 level 1 is progress level 5 when Tier 0 evolved at 5. Mutation requirements read it until
+        /// tier-based requirements replace them.
+        /// </summary>
+        public int ProgressLevel
+        {
+            get
+            {
+                IReadOnlyList<int> levels = _tuning.EvolutionLevels;
+                int earlier = 0;
+                for (int i = 0; i < Evolutions && levels.Count > 0; i++)
+                {
+                    earlier += levels[Math.Min(i, levels.Count - 1)] - 1;
+                }
+
+                return Level + earlier;
+            }
         }
 
         /// <summary>Evolutions taken in this run; each raises the tier by one.</summary>
@@ -150,6 +172,15 @@ namespace DemonFighter.Simulation
 
         /// <summary>False once the core is destroyed; a dead demon is a corpse and takes no commands.</summary>
         public bool IsAlive => !Body.IsCoreDestroyed;
+
+        /// <summary>The hazard the demon stood in at the last tick (D-086); the HUD and the death screen read it. Not saved, the next tick finds it again.</summary>
+        public HazardKind Hazard { get; private set; }
+
+        /// <summary>
+        /// Test mode (D-089), a playtest setting: takes no damage, and Biomass and stat points never fall below 1000. Not
+        /// saved; the run applies the setting to the player after starting or loading.
+        /// </summary>
+        public bool InTestMode { get; private set; }
 
         /// <summary>Tick until which a Blunt hit keeps this demon from acting; -1 when never staggered.</summary>
         public long StaggeredUntilTick { get; private set; } = -1;
@@ -320,6 +351,35 @@ namespace DemonFighter.Simulation
         internal void SetIntent(MovementIntent intent)
         {
             Intent = intent;
+        }
+
+        /// <summary>Records the hazard the demon stands in this tick; the hazard system calls it.</summary>
+        internal void SetHazard(HazardKind kind)
+        {
+            Hazard = kind;
+        }
+
+        /// <summary>Switches test mode (D-089); the command handler calls it.</summary>
+        internal void SetTestMode(bool enabled)
+        {
+            InTestMode = enabled;
+        }
+
+        /// <summary>
+        /// Raises Biomass and unspent stat points to at least the given amounts (D-089). Neither counts as eaten or
+        /// earned, so the run summary stays honest.
+        /// </summary>
+        internal void TopUp(float biomass, int statPoints)
+        {
+            if (Biomass < biomass)
+            {
+                Biomass = biomass;
+            }
+
+            if (Stats.UnspentPoints < statPoints)
+            {
+                Stats.GrantPoints(statPoints - Stats.UnspentPoints);
+            }
         }
 
         /// <summary>Records that this demon dealt or took damage at the given tick.</summary>
@@ -604,10 +664,18 @@ namespace DemonFighter.Simulation
             RecomputeDerived(_tuning);
         }
 
-        /// <summary>Counts an evolution; tier and size follow.</summary>
+        /// <summary>Lets the size follow a lost part: a severed leg or a destroyed hide takes its bulk with it (D-091).</summary>
+        internal void RefreshSize()
+        {
+            RecomputeSize();
+        }
+
+        /// <summary>Counts an evolution: the tier rises by one, the body grows, and the level starts again at 1 (D-091).</summary>
         internal void RecordEvolution()
         {
             Evolutions++;
+            Level = 1;
+            Xp = 0f;
             RecomputeDerived(_tuning);
         }
 
@@ -632,7 +700,7 @@ namespace DemonFighter.Simulation
 
         private void RecomputeSize()
         {
-            SizeMeters = SizeFor(Spec, Tier, _tuning);
+            SizeMeters = SizeFor(Spec, Tier, Body.SizeBonus, _tuning);
             HighestTier = Math.Max(HighestTier, Tier);
         }
 
@@ -663,7 +731,7 @@ namespace DemonFighter.Simulation
         /// Gives a freshly spawned demon what its kind is born with (D-070): parts, Biomass, levels with their stat
         /// points and an evolution package, all free and without a transformation. A part without a free socket is skipped.
         /// </summary>
-        internal void ApplyStartingPackage()
+        internal void ApplyStartingPackage(Rng rng)
         {
             IReadOnlyList<string> parts = Spec.StartingPartIds;
             for (int i = 0; i < parts.Count; i++)
@@ -689,6 +757,21 @@ namespace DemonFighter.Simulation
             if (!string.IsNullOrEmpty(Spec.StartingEvolutionId))
             {
                 EvolutionPackage.Apply(this, _catalog.GetEvolution(Spec.StartingEvolutionId), _catalog);
+            }
+
+            // A kind born evolved and mutated takes its random evolutions, then fills the sockets they left free (D-095).
+            RandomEvolutions.Apply(this, _catalog, rng);
+            RandomBody.Grow(this, _catalog, rng);
+            if (Spec.StartingPartsAtMaxUpgrade)
+            {
+                IReadOnlyList<BodyPart> born = Body.Parts;
+                for (int i = 0; i < born.Count; i++)
+                {
+                    while (!born[i].IsLost && born[i].UpgradeLevel < born[i].Spec.MaxUpgrade)
+                    {
+                        Body.Upgrade(born[i]);
+                    }
+                }
             }
 
             RecomputeDerived(_tuning);
@@ -801,12 +884,19 @@ namespace DemonFighter.Simulation
 
             Xp += amount;
             int levelsGained = 0;
-            while (Xp >= tuning.LevelXpForNext(Level))
+            int cap = Evolutions < tuning.EvolutionLevels.Count ? tuning.EvolutionLevels[Evolutions] : int.MaxValue;
+            while (Level < cap && Xp >= tuning.LevelXpForNext(Level, Tier))
             {
-                Xp -= tuning.LevelXpForNext(Level);
+                Xp -= tuning.LevelXpForNext(Level, Tier);
                 Level++;
                 levelsGained++;
                 Stats.GrantPoints(tuning.StatPointsPerLevel);
+            }
+
+            // At the level of its next evolution a demon waits for it; the evolution starts the next tier at level 1 (D-091).
+            if (Level >= cap)
+            {
+                Xp = 0f;
             }
 
             return levelsGained;
