@@ -1,6 +1,6 @@
 # Asset Pipeline
 
-Nobody on this project models in Blender, and Claude Code cannot create 3D models, textures or animations. The plan is built around that.
+Nobody on this project models in Blender, and Claude Code cannot create 3D models or textures. The plan is built around that: shapes come from generators. Rigging and animation are done in Blender from M6 on (D-100): Mario animates, Blender Python scripts by Claude Code do the repetitive work, and `docs/BLENDER_GUIDE.md` teaches the steps.
 
 For the click-by-click version (accounts, tools, prompts, Audacity, Unity steps, license entries), read `ASSET_GUIDE.md`.
 
